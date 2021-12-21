@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.12)
+cmake_minimum_required(VERSION 3.13)
 
 project(CoffeeChain VERSION 0.1 DESCRIPTION "open 2D engine for creating games - shared library" LANGUAGES C)
 
@@ -44,12 +44,24 @@ endif()
 
 
 configure_file(src/config.h.in include/coffeechain/config.h)
-
 target_include_directories(${PROJECT_NAME} PUBLIC ${PROJECT_BINARY_DIR}/include/coffeechain)
-
 target_compile_definitions(${PROJECT_NAME} PRIVATE SYSTEM_SHADER_PATH=\"${CMAKE_INSTALL_PREFIX}/share/coffeechain/shaders\")
-
 target_link_libraries(${PROJECT_NAME} PRIVATE glfw m)
+
+include(CTest)
+add_executable(coffeechain-test1
+   test/main.c
+   test/printMap2D.c
+)
+target_include_directories(coffeechain-test1
+   PRIVATE include
+   PRIVATE ${PROJECT_BINARY_DIR}/include
+)
+target_link_directories(coffeechain-test1 PRIVATE ${PROJECT_BINARY_DIR})
+target_link_libraries(coffeechain-test1 CoffeeChain)
+add_test(NAME coffeechain-test1
+         COMMAND coffeechain-test1 ${PROJECT_SOURCE_DIR})
+
 
 if(WIN32)
    target_link_libraries(${PROJECT_NAME} PRIVATE shell32 kernel32)
@@ -60,6 +72,8 @@ if(WIN32)
       STATIC_DEFINE SHARED_EXPORTS_BUILT_AS_STATIC
    )
    install(FILES ${PROJECT_BINARY_DIR}/include/coffeechain/cce_exports.h DESTINATION include/coffeechain)
+else()
+   target_link_options(coffeechain-test1 PRIVATE -Wl,-rpath=${PROJECT_BINARY_DIR})
 endif()
 
 install(TARGETS ${PROJECT_NAME}

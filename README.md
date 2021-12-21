@@ -8,3 +8,7 @@ cd [Project dir]
 cmake -B ./build && cmake --build ./build
 
 cmake --install ./build
+
+For test:
+
+ctest --test-dir ./build
