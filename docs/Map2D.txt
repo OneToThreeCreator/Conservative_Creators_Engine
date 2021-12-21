@@ -1,0 +1,50 @@
+#include "map2D.h"
+
+2Dmap file structure:
+/* GL elements */
+uint32_t          elementsQuantity
+uint32_t          elementsWithoutColliderQuantity   // Define, from which element conversion to colliders takes place. You should have at least 1 non-converting object.
+struct MapElement elements  [elementsQuantity]      // To get collider of element x (first element is 0), use this formula: x - elementsWithoutColliderQuantity
+/* Game logic elements */
+uint16_t moveGroupsQuantity
+struct ElementGroups  moveGroups                    // Groups 1 - 255 can be used to move drawed MapElement as array "moveGroup1" , group 0 as "globalMove" (inverted!). Groups > 255 can only be used to move Colliders
+uint16_t moveGroupsQuantity
+struct ElementGroups  moveGroups                    // Groups 0 - 254 can be used to extend drawed MapElement as array "extensionGroup". Groups > 254 can only be used to extend Colliders
+uint32_t              collidersQuantity
+struct Collider       colliders [collidersQuantity] // To get collider x (first collider is 0), use this formula: elementsQuantity - elementsWithoutColliderQuantity + x
+uint16_t              collisionGroupsQuantity
+struct ElementGroup   collisionGroups   [groupsQuantity]
+uint16_t              collisionQuantity
+struct CollisionGroup collision[collisionQuantity]
+uint16_t              timersQuantity
+float                 timers
+uint32_t              logicQuantity
+struct ElementLogic   logic [logicQuantity]
+{
+   uint8_t  logicElementsQuantity;
+   uint16_t logicElements     [logicElementsQuantity]
+   uint8_t  operations;       [pow(2, logicElementsQuantity)]
+   uint64_t elementType;
+   uint8_t  actionsQuantity;
+   uint32_t actionIDs         [actionsQuantity] 
+   uint32_t actionsArgOffsets [actionsQuantity]     // From 2-st element to (end of last element + 1) (1-st element offset is always 0)
+   void     actionsArg        [actionArgOffsets[actionsQuantity]*actionsQuantity]
+}
+uint8_t  staticActionsQuantity;                     
+uint32_t staticActionIDs         [actionsQuantity]  // Runs when the map is loading
+uint16_t staticActionsArgOffsets [actionsQuantity]  // From 2-st element to (end of last element + 1) (1-st element offset is always 0)
+void     staticActionsArg        [actionArgOffsets[actionsQuantity]*actionsQuantity]
+uint8_t  exitMapsQuantity
+struct ExitMap2D exitMaps        [exitMapsQuantity]
+uint8_t  0 // For future compatibility
+uint8_t  0
+uint8_t  0
+uint8_t  0
+uint8_t  0
+uint8_t  0
+uint8_t  0
+uint8_t  0
+uint8_t  0
+uint8_t  0
+/* Game elements */
+Some data that engine doesn't know how to parse // Handles via external functions provided by the game itself
