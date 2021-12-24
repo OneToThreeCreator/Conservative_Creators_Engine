@@ -106,7 +106,7 @@ int main (int argc, char **argv)
          {2u, 2u, moveRightElements, aandb, 0x8 /*00001000 in hex*/, moveAndTimerActions, moveAndTimerOffsets, (void*) moveRight},
          
       };
-      double globalTimer = 0.2;
+      double globalTimer = 0.01;
       struct Map2Ddev map = {0u, 5u, 0u, elements, 1u, moveGroups, 0u, NULL, 0u, NULL, 0u, NULL, 0u, NULL, 1u, &globalTimer, 4u, logic,
                              4u, timerAndColorsActions, timerAndColorsOffsets, (void*) timerAndColors, 0u, NULL};
       char *path = getTemporaryDirectory(0u);
