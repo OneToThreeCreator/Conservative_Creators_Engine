@@ -1,3 +1,6 @@
+-I/media/data/onetothreecreator/CoffeeChain/coffeechain
+-I/media/data/onetothreecreator/CoffeeChain/coffeechain/include
+-I/media/data/onetothreecreator/CoffeeChain/cmake-build-Debug/coffeechain/include/coffeechain
 -I/usr/include/c++/11.1.0
 -I/usr/include/c++/11.1.0/x86_64-pc-linux-gnu
 -I/usr/include/c++/11.1.0/backward
@@ -5,6 +8,5 @@
 -I/usr/local/include
 -I/usr/lib/gcc/x86_64-pc-linux-gnu/11.1.0/include-fixed
 -I/usr/include
--I/media/data/onetothreecreator/CoffeeChain/CoffeeChain
--I/media/data/onetothreecreator/CoffeeChain/CoffeeChain/include
--I/media/data/onetothreecreator/CoffeeChain/cmake-build-Debug/CoffeeChain/include/coffeechain
+-target
+x86_64-pc-linux-gnu
