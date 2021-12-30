@@ -60,6 +60,9 @@
 #define CCE_PROCESS_TEMPORARY_BOOLS_ARRAY 0x10
 #define CCE_ENGINE_STOP 0x80
 
+#define MAX(x,y) (((x) > (y))?(x):(y))
+#define MIN(x,y) (((x) < (y))?(x):(y))
+
 struct UsedTemporaryBools
 {
    uint8_t flags; /* 0x1 - used, 0x4 - to be cleared */

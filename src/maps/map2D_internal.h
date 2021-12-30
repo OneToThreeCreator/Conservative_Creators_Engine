@@ -163,8 +163,6 @@ endBaseActions()
 processLogic(dynamicMap->logicQuantity, dynamicMap->logic, dynamicMap->timers, cce_actions, fourthLogicTypeFuncMap2D, currentMap); \
 endBaseActions()
 #define checkCollisionMap2D(element1, element2) checkCollision((element1)->x, (element1)->y, (element1)->width, (element1)->height, (element2)->x, (element2)->y, (element2)->width, (element2)->height)
-#define MAX(x,y) (((x) > (y))?(x):(y))
-#define MIN(x,y) (((x) < (y))?(x):(y))
 
 #define CCE_COLORGROUP_OFFSET 0u
 #define CCE_MOVEGROUP_OFFSET 1u

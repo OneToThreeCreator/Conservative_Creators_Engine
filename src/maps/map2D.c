@@ -845,9 +845,6 @@ static void terminateEngine2D (void)
    terminateEngine();
 }
 
-double timeFromLastFPSCheck = 0.0;
-uint32_t frames = 0u;
-
 int engine2D (void)
 {
    if (map2Dflags & CCE_INIT)
@@ -904,14 +901,6 @@ int engine2D (void)
       {
          maps = loadMap2DwithDependies(maps, (maps->main->exitMaps + closestMapPosition)->ID);
          setCurrentArrayOfMaps(maps);
-      }
-      ++frames;
-      timeFromLastFPSCheck += *cce_deltaTime;
-      if (timeFromLastFPSCheck >= 2.0)
-      {
-         printf("%lf FPS\n", frames / timeFromLastFPSCheck);
-         frames = 0u;
-         timeFromLastFPSCheck = 0.0;
       }
       processDynamicMap2DElements();
    }

@@ -66,16 +66,28 @@ void callActions (void (**doAction)(void*), uint8_t actionsQuantity, uint32_t *a
    }
 }
 
+// Workaround for increasing timers precision. Makes chains of timers independent of frametime
+double maxTimerCheckDelay = 0.0;
+
 CCE_OPTIONS uint8_t isTimerEnded (struct Timer *timer)
 {
    if (timer->initTime == 0.0)
       return 0u;
-   return (timer->initTime + timer->delay) <= *cce_currentTime;
+   double timerCheckDelay = *cce_currentTime - (timer->initTime + timer->delay);
+   if (timerCheckDelay >= 0.0)
+   {
+      if (timerCheckDelay < *cce_deltaTime && (maxTimerCheckDelay == 0 || maxTimerCheckDelay > timerCheckDelay))
+      {
+         maxTimerCheckDelay = timerCheckDelay;
+      }
+      return 1u;
+   }
+   return 0u;
 }
 
 CCE_OPTIONS void startTimer (struct Timer *timer)
 {
-   timer->initTime = *cce_currentTime;
+   timer->initTime = *cce_currentTime - maxTimerCheckDelay;
 }
 
 CCE_OPTIONS uint8_t getBool (uint16_t boolID)
@@ -207,6 +219,7 @@ void processLogic (uint32_t logicQuantity, struct ElementLogic *logic, struct Ti
    cce_byte isLogic;
    while (logic < endLogic)
    {
+      maxTimerCheckDelay = 0.0;
       boolSum = 0u;
       currentOperations = (*logic->operations);
       for (cce_byte j = logic->logicElementsQuantity - 1u;; --j)
@@ -216,7 +229,7 @@ void processLogic (uint32_t logicQuantity, struct ElementLogic *logic, struct Ti
          {
             case CCE_GLOBAL_BOOL_LOGIC_ELEMENT: 
             {
-               boolSum += ((uint_fast16_t) getBool(boolNumber) << j);
+               boolSum += (((uint_fast16_t) getBool(boolNumber)) << j);
                break;
             }
             case CCE_PLOT_NUMBER_LOGIC_ELEMENT:
@@ -226,13 +239,13 @@ void processLogic (uint32_t logicQuantity, struct ElementLogic *logic, struct Ti
             }
             case CCE_TIMER_LOGIC_ELEMENT:
             {
-               boolSum += ((uint_fast16_t) isTimerEnded(timers + boolNumber) << j);
+               boolSum += (((uint_fast16_t) isTimerEnded(timers + boolNumber)) << j);
                break;
             }
             default:
             {
                va_copy(argcp, argp);
-               boolSum += ((uint_fast16_t) fourth_if_func(boolNumber, argcp) << j); // x << j == x * pow(2, j)
+               boolSum += (((uint_fast16_t) fourth_if_func(boolNumber, argcp)) << j); // x << j == x * pow(2, j)
                va_end(argcp);
             }
          }
