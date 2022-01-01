@@ -32,9 +32,9 @@ extern C:
 #if defined(_WIN32) || defined(__WIN32__) || defined(_WIN64) || defined(__TOS_WIN__) || defined(__WINDOWS__) || \
     defined(__MINGW32__) || defined(__MINGW64__) || defined(__CYGWIN__)
 #include "cce_exports.h"
-#define CCE_OPTIONS CCE_EXPORTS
+#define CCE_PUBLIC_OPTIONS CCE_EXPORTS
 #else
-#define CCE_OPTIONS
+#define CCE_PUBLIC_OPTIONS
 #endif // Windows
 
 #define CCE_INCORRECT_ENUM 1u
@@ -187,49 +187,49 @@ struct Map2Ddev
    struct ExitMap2D      *exitMaps;
 };
 
-CCE_OPTIONS void setMap2Dpath (const char *path);
-CCE_OPTIONS void freeMap2D (struct Map2D *map);
-CCE_OPTIONS struct Map2D* loadMap2D (uint16_t number);
-CCE_OPTIONS struct Map2D* Map2DdevToMap2D (struct Map2Ddev *mapdev);
-CCE_OPTIONS void freeMap2Ddev (struct Map2Ddev *map);
-CCE_OPTIONS struct Map2Ddev* loadMap2Ddev (uint16_t number);
-CCE_OPTIONS int writeMap2Ddev (struct Map2Ddev *map, void (*writeFunc)(FILE*));
-CCE_OPTIONS uint8_t initEngine2D (uint16_t globalBoolsQuantity, uint32_t textureMaxWidth, uint32_t textureMaxHeight,
+CCE_PUBLIC_OPTIONS void cceSetMap2Dpath (const char *path);
+CCE_PUBLIC_OPTIONS void cceFreeMap2D (struct Map2D *map);
+CCE_PUBLIC_OPTIONS struct Map2D* cceLoadMap2D (uint16_t number);
+CCE_PUBLIC_OPTIONS struct Map2D* cceMap2DdevToMap2D (struct Map2Ddev *mapdev);
+CCE_PUBLIC_OPTIONS void cceFreeMap2Ddev (struct Map2Ddev *map);
+CCE_PUBLIC_OPTIONS struct Map2Ddev* cceLoadMap2Ddev (uint16_t number);
+CCE_PUBLIC_OPTIONS int cceWriteMap2Ddev (struct Map2Ddev *map, void (*writeFunc)(FILE*));
+CCE_PUBLIC_OPTIONS int cceInitEngine2D (uint16_t globalBoolsQuantity, uint32_t textureMaxWidth, uint32_t textureMaxHeight,
                       const char *windowLabel, const char *resourcePath);
-CCE_OPTIONS void setFlags2D (cce_flag flags);
-CCE_OPTIONS uint8_t registerAction (uint32_t ID, void (*action)(void*));
-CCE_OPTIONS int engine2D (void);
+CCE_PUBLIC_OPTIONS void cceSetFlags2D (cce_flag flags);
+CCE_PUBLIC_OPTIONS uint8_t cceRegisterAction (uint32_t ID, void (*action)(void*));
+CCE_PUBLIC_OPTIONS int cceEngine2D (void);
 
 // dynamicMap2D
 
-CCE_OPTIONS uint8_t getGroupValueDynamicMap2D (cce_enum group_type, uint16_t ID, struct cce_ivec2 *variable);
-CCE_OPTIONS struct ElementGroup getGroupDataDynamicMap2D (cce_enum group_type, uint16_t ID);
-CCE_OPTIONS struct Map2DCollider getColliderDataDynamicMap2D (uint32_t ID);
-CCE_OPTIONS struct CollisionGroup getCollisionDataDynamicMap2D (uint16_t ID);
-CCE_OPTIONS uint8_t createGroupDynamicMap2D (cce_enum group_type, uint16_t elementsQuantity, uint32_t *elementIDs, uint16_t *emptyGroupID);
-CCE_OPTIONS uint8_t addElementInGroupDynamicMap2D (cce_enum group_type, uint16_t ID, uint32_t elementID);
-CCE_OPTIONS void replaceMap2DElementDynamicMap2D (struct Map2DElementDev *element, uint32_t ID, uint8_t hasCollider);
-CCE_OPTIONS uint32_t createMap2DElementDynamicMap2D (struct Map2DElementDev *element, uint8_t hasCollider);
-CCE_OPTIONS uint8_t deleteElementFromGroupDynamicMap2D (cce_enum group_type, uint16_t ID, uint32_t elementID);
-CCE_OPTIONS void deleteMap2DElementDynamicMap2D (uint32_t ID);
-CCE_OPTIONS uint8_t deleteGroupDynamicMap2D (cce_enum group_type, uint16_t ID);
-CCE_OPTIONS void processDynamicMap2DElements (void);
-//CCE_OPTIONS void updateColliderDynamicMap2D (struct Map2DCollider *collider, uint32_t ID);
-CCE_OPTIONS void replaceColliderDynamicMap2D (struct Map2DCollider *collider, uint32_t ID);
-CCE_OPTIONS void updateCollisionDynamicMap2D (uint16_t ID, uint16_t group1ID, cce_ubyte isGroup1BelongsToCurrentMap2D,
+CCE_PUBLIC_OPTIONS uint8_t cceGetGroupValueDynamicMap2D (cce_enum group_type, uint16_t ID, struct cce_ivec2 *variable);
+CCE_PUBLIC_OPTIONS struct ElementGroup cceGetGroupDataDynamicMap2D (cce_enum group_type, uint16_t ID);
+CCE_PUBLIC_OPTIONS struct Map2DCollider cceGetColliderDataDynamicMap2D (uint32_t ID);
+CCE_PUBLIC_OPTIONS struct CollisionGroup cceGetCollisionDataDynamicMap2D (uint16_t ID);
+CCE_PUBLIC_OPTIONS uint8_t cceCreateGroupDynamicMap2D (cce_enum group_type, uint16_t elementsQuantity, uint32_t *elementIDs, uint16_t *emptyGroupID);
+CCE_PUBLIC_OPTIONS uint8_t cceAddElementInGroupDynamicMap2D (cce_enum group_type, uint16_t ID, uint32_t elementID);
+CCE_PUBLIC_OPTIONS void cceReplaceMap2DElementDynamicMap2D (struct Map2DElementDev *element, uint32_t ID, uint8_t hasCollider);
+CCE_PUBLIC_OPTIONS uint32_t cceCreateMap2DElementDynamicMap2D (struct Map2DElementDev *element, uint8_t hasCollider);
+CCE_PUBLIC_OPTIONS uint8_t cceDeleteElementFromGroupDynamicMap2D (cce_enum group_type, uint16_t ID, uint32_t elementID);
+CCE_PUBLIC_OPTIONS void cceDeleteMap2DElementDynamicMap2D (uint32_t ID);
+CCE_PUBLIC_OPTIONS uint8_t cceDeleteGroupDynamicMap2D (cce_enum group_type, uint16_t ID);
+//CCE_PUBLIC_OPTIONS void cceUpdateColliderDynamicMap2D (struct Map2DCollider *collider, uint32_t ID);
+CCE_PUBLIC_OPTIONS void cceReplaceColliderDynamicMap2D (struct Map2DCollider *collider, uint32_t ID);
+CCE_PUBLIC_OPTIONS void cceUpdateCollisionDynamicMap2D (uint16_t ID, uint16_t group1ID, cce_ubyte isGroup1BelongsToCurrentMap2D,
                                                uint16_t group2ID, cce_ubyte isGroup2BelongsToCurrentMap2D);
-CCE_OPTIONS uint16_t createCollisionDynamicMap2D (uint16_t group1ID, cce_ubyte isGroup1BelongsToCurrentMap2D, 
+CCE_PUBLIC_OPTIONS uint16_t cceCreateCollisionDynamicMap2D (uint16_t group1ID, cce_ubyte isGroup1BelongsToCurrentMap2D, 
                                       uint16_t group2ID, cce_ubyte isGroup2BelongsToCurrentMap2D);
-CCE_OPTIONS void deleteCollisionDynamicMap2D (uint16_t ID);
-CCE_OPTIONS void setTimerDynamicMap2D (uint16_t ID, float delay);
-CCE_OPTIONS uint16_t createTimerDynamicMap2D (float delay);
-CCE_OPTIONS void resetTimerDynamicMap2D (uint16_t ID);
-CCE_OPTIONS int8_t getTimerDynamicMap2D (uint16_t ID);
-CCE_OPTIONS void updateLogicElementByTruthTableDynamicMap2D (const uint16_t ID, const uint8_t logicElementsQuantity, const uint16_t *const logicElements, const cce_enum *const logicElementTypes, const uint_fast16_t *const truthTable);
-CCE_OPTIONS uint8_t updateLogicElementsByBooleanExpressionDynamicMap2D (const uint16_t ID, const uint16_t *const logicElements, const cce_enum *const logicElementTypes, const char *const booleanExpression);
-CCE_OPTIONS void updateLogicActionsDynamicMap2D (const uint16_t ID, const uint8_t actionsQuantity, uint32_t *actionIDs, const void **actionArgs, const size_t *const actionArgSizes);
-CCE_OPTIONS uint16_t findFreeLogicDynamicMap2D (void);
+CCE_PUBLIC_OPTIONS void cceDeleteCollisionDynamicMap2D (uint16_t ID);
+CCE_PUBLIC_OPTIONS void cceSetTimerDynamicMap2D (uint16_t ID, float delay);
+CCE_PUBLIC_OPTIONS uint16_t cceCreateTimerDynamicMap2D (float delay);
+CCE_PUBLIC_OPTIONS void cceResetTimerDynamicMap2D (uint16_t ID);
+CCE_PUBLIC_OPTIONS int8_t cceGetTimerDynamicMap2D (uint16_t ID);
+CCE_PUBLIC_OPTIONS void cceUpdateLogicElementByTruthTableDynamicMap2D (const uint16_t ID, const uint8_t logicElementsQuantity, const uint16_t *const logicElements, const cce_enum *const logicElementTypes, const uint_fast16_t *const truthTable);
+CCE_PUBLIC_OPTIONS uint8_t cceUpdateLogicElementsByBooleanExpressionDynamicMap2D (const uint16_t ID, const uint16_t *const logicElements, const cce_enum *const logicElementTypes, const char *const booleanExpression);
+CCE_PUBLIC_OPTIONS void cceUpdateLogicActionsDynamicMap2D (const uint16_t ID, const uint8_t actionsQuantity, uint32_t *actionIDs, const void **actionArgs, const size_t *const actionArgSizes);
+CCE_PUBLIC_OPTIONS uint16_t cceFindFreeLogicDynamicMap2D (void);
 
+#define cceCheckCollisionMap2D(element1, element2) cceCheckCollision((element1)->x, (element1)->y, (element1)->width, (element1)->height, (element2)->x, (element2)->y, (element2)->width, (element2)->height)
 #ifdef __cplusplus
 }
 #endif // __cplusplus

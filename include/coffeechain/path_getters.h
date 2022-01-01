@@ -30,17 +30,19 @@ extern C:
 #if defined(_WIN32) || defined(__WIN32__) || defined(_WIN64) || defined(__TOS_WIN__) || defined(__WINDOWS__) || \
     defined(__MINGW32__) || defined(__MINGW64__) || defined(__CYGWIN__)
 #include "cce_exports.h"
-#define CCE_OPTIONS CCE_EXPORTS
+#define CCE_PUBLIC_OPTIONS CCE_EXPORTS
 #else
-#define CCE_OPTIONS
+#define CCE_PUBLIC_OPTIONS
 #endif // Windows
 
-CCE_OPTIONS char*       getCurrentPath (char *pathBuffer, size_t pathBufferLength);
-CCE_OPTIONS char*       getAppDataPath (const char *restrict folderName, size_t spaceToLeave);
-CCE_OPTIONS char*       createNewPathFromOldPath (const char *const oldPath, const char *const appendPath, size_t leaveFreeSpace);
-CCE_OPTIONS char*       appendPath (char *const buffer, size_t bufferSize, const char *const append);
-CCE_OPTIONS char*       getTemporaryDirectory (size_t spaceToLeave);
-CCE_OPTIONS void        terminateTemporaryDirectory (void);
+CCE_PUBLIC_OPTIONS char* cceGetDirectory (char *path, size_t bufferSize);
+CCE_PUBLIC_OPTIONS char* cceGetCurrentPath (char *pathBuffer, size_t pathBufferLength);
+CCE_PUBLIC_OPTIONS void  cceDeleteDirectory (const char *path);
+CCE_PUBLIC_OPTIONS char* cceGetAppDataPath (const char *restrict folderName, size_t spaceToLeave);
+CCE_PUBLIC_OPTIONS char* cceAppendPath (char *const buffer, size_t bufferSize, const char *const append);
+CCE_PUBLIC_OPTIONS char* cceGetTemporaryDirectory (size_t spaceToLeave);
+CCE_PUBLIC_OPTIONS void  cceTerminateTemporaryDirectory (void);
+CCE_PUBLIC_OPTIONS char* cceConvertIntToBase64String (size_t number, char *restrict buffer, uint8_t symbolsQuantity);
 
 static inline void shortToString (char *str, const unsigned short number, const char *strEnd)
 {

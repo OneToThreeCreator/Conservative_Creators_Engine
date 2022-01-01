@@ -34,13 +34,13 @@ add_library(${PROJECT_NAME}
    #src/audio.c
    src/engine_common.c
    src/engine_common_glfw.c
-   src/log.c
    src/path_getters.c
    src/shader.c
    src/maps/base_actions.c
    src/maps/dynamic_map2D.c
    src/maps/map2D.c
    src/maps/map2D_file_IO.c
+   src/maps/log.c
    src/external/glad.c
    src/external/stb_libs.c
 )
@@ -54,7 +54,7 @@ if(CMAKE_BUILD_TYPE MATCHES "DEBUG")
    if(NOT MSVC)
       add_compile_options(-Wall -Wextra)
       if(${CMAKE_C_COMPILER_ID} MATCHES "GNU" OR ${CMAKE_C_COMPILER_ID} MATCHES "Clang")
-         add_compile_options(-Wshadow -Wpadded)
+         add_compile_options(-Wshadow)
       endif()
    else()
       add_compile_options(/W4)
@@ -83,17 +83,28 @@ endif()
 if(BUILD_TESTING)
    include(CTest)
    add_executable(coffeechain-test1
-      test/main.c
-      test/printMap2D.c
+      test1/main.c
+   )
+   add_executable(coffeechain-test2
+      test2/main.c
+      test2/printMap2D.c
    )
    target_include_directories(coffeechain-test1
       PRIVATE include
       PRIVATE ${PROJECT_BINARY_DIR}/include
    )
+   target_include_directories(coffeechain-test2
+      PRIVATE include
+      PRIVATE ${PROJECT_BINARY_DIR}/include
+   )
    target_link_directories(coffeechain-test1 PRIVATE ${PROJECT_BINARY_DIR})
+   target_link_directories(coffeechain-test2 PRIVATE ${PROJECT_BINARY_DIR})
    target_link_libraries(coffeechain-test1 ${PROJECT_NAME})
+   target_link_libraries(coffeechain-test2 ${PROJECT_NAME})
    add_test(NAME coffeechain-test1
-            COMMAND coffeechain-test1 ${PROJECT_SOURCE_DIR})
+            COMMAND coffeechain-test1)
+   add_test(NAME coffeechain-test2
+            COMMAND coffeechain-test2 ${PROJECT_SOURCE_DIR})
    
    if(NOT WIN32)
       target_link_options(coffeechain-test1 PRIVATE -Wl,-rpath=${PROJECT_BINARY_DIR})

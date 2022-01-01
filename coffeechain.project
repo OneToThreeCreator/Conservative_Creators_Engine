@@ -5,9 +5,12 @@
       <![CDATA[00020001N0005Debug0000000000000001N0007Release000000000000]]>
     </Plugin>
   </Plugins>
-  <VirtualDirectory Name="test">
-    <File Name="test/printMap2D.c"/>
-    <File Name="test/main.c"/>
+  <VirtualDirectory Name="test2">
+    <File Name="test2/main.c"/>
+    <File Name="test2/printMap2D.c"/>
+  </VirtualDirectory>
+  <VirtualDirectory Name="test1">
+    <File Name="test1/main.c"/>
   </VirtualDirectory>
   <VirtualDirectory Name="include">
     <VirtualDirectory Name="coffeechain">
@@ -38,7 +41,6 @@
     <File Name="src/engine_common_internal.h"/>
     <File Name="src/engine_common.c"/>
     <File Name="src/audio.h"/>
-    <File Name="src/log.h"/>
     <File Name="src/path_getters.h"/>
     <File Name="src/shader.h"/>
     <VirtualDirectory Name="external">
@@ -50,6 +52,8 @@
       <File Name="src/external/stb_libs.c"/>
     </VirtualDirectory>
     <VirtualDirectory Name="maps">
+      <File Name="src/maps/log.h"/>
+      <File Name="src/maps/log.c"/>
       <File Name="src/maps/map2D_internal.h"/>
       <File Name="src/maps/map2D.h"/>
       <File Name="src/maps/base_actions.h"/>
@@ -60,7 +64,6 @@
     </VirtualDirectory>
     <File Name="src/path_getters.c"/>
     <File Name="src/shader.c"/>
-    <File Name="src/log.c"/>
     <File Name="src/audio.c"/>
   </VirtualDirectory>
   <Dependencies Name="Debug"/>
@@ -82,7 +85,7 @@
       </Compiler>
       <Linker Options="" Required="yes"/>
       <ResourceCompiler Options="" Required="no"/>
-      <General OutputFile="lib$(ProjectName).so" IntermediateDirectory="" Command="$(WorkspacePath)/cmake-build-$(WorkspaceConfiguration)/$(ProjectName)/coffeechain-test1" CommandArguments="" UseSeparateDebugArgs="no" DebugArguments="" WorkingDirectory="$(ProjectPath)" PauseExecWhenProcTerminates="yes" IsGUIProgram="no" IsEnabled="yes"/>
+      <General OutputFile="lib$(ProjectName).so" IntermediateDirectory="" Command="$(WorkspacePath)/cmake-build-$(WorkspaceConfiguration)/$(ProjectName)/coffeechain-test2" CommandArguments="" UseSeparateDebugArgs="no" DebugArguments="" WorkingDirectory="$(ProjectPath)" PauseExecWhenProcTerminates="yes" IsGUIProgram="no" IsEnabled="yes"/>
       <BuildSystem Name="CMake">-DCMAKE_BUILD_TYPE=DEBUG</BuildSystem>
       <Environment EnvVarSetName="&lt;Use Defaults&gt;" DbgSetName="&lt;Use Defaults&gt;">
         <![CDATA[]]>

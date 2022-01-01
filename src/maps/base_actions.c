@@ -26,7 +26,6 @@
 
 #include "../engine_common.h"
 #include "../shader.h"
-#include "../log.h"
 #include "../path_getters.h"
 #include "map2D.h"
 #include "map2D_internal.h"
@@ -47,37 +46,37 @@ static void (*g_setUniformBufferToDefault)(GLuint, GLint);
 static void moveAction (void *data)
 {
    struct moveActionStruct *params = (struct moveActionStruct*) data;
-   moveGroupMap2D(params->groupID, params->x, params->y);
+   cceMoveGroupMap2D(params->groupID, params->x, params->y);
 }
 
 static void extendAction (void *data)
 {
    struct extendActionStruct *params = (struct extendActionStruct*) data;
-   extendGroupMap2D(params->groupID, params->x, params->y);
+   cceExtendGroupMap2D(params->groupID, params->x, params->y);
 }
 
 static void rotateAction (void *data)
 {
    struct rotateActionStruct *params = (struct rotateActionStruct*) data;
-   rotateGroupMap2D(params->groupID, params->angle, params->xOffset, params->yOffset);
+   cceRotateGroupMap2D(params->groupID, params->angle, params->xOffset, params->yOffset);
 }
 
 static void offsetTextureAction (void *data)
 {
    struct offsetTextureActionStruct *params = (struct offsetTextureActionStruct*) data;
-   offsetTextureGroupMap2D(params->groupID, params->offsetX, params->offsetY);
+   cceOffsetTextureGroupMap2D(params->groupID, params->offsetX, params->offsetY);
 }
 
 static void changeColorAction (void *data)
 {
    struct changeColorActionStruct *params = (struct changeColorActionStruct*) data;
-   changeColorGroupMap2D(params->groupID, params->red, params->green, params->blue, params->alpha);
+   cceChangeColorGroupMap2D(params->groupID, params->red, params->green, params->blue, params->alpha);
 }
 
 static void setBoolAction (void *data)
 {
    struct setBoolActionStruct *params = (struct setBoolActionStruct*) data;
-   setBool(params->boolID, params->action);
+   cceSetBool(params->boolID, params->action);
 }
 
 static void setPlotNumberAction (void *data)
@@ -87,12 +86,12 @@ static void setPlotNumberAction (void *data)
    {
       case CCE_INCREASE_PLOT_NUMBER:
       {
-         increasePlotNumber(params->value);
+         cceIncreasePlotNumber(params->value);
          break;
       }
       case CCE_SET_PLOT_NUMBER:
       {
-         setPlotNumber(params->value);
+         cceSetPlotNumber(params->value);
          break;
       }
    }
@@ -101,10 +100,10 @@ static void setPlotNumberAction (void *data)
 static void startTimerAction (void *data)
 {
    uint16_t ID = *((uint16_t*) data);
-   startTimer(currentMap->timers + ID);
+   cceStartTimer(currentMap->timers + ID);
 }
 
-void beginBaseActions (const struct Map2D *map)
+void cce__beginBaseActions (const struct Map2D *map)
 {
    currentMap = map;
    if ((g_UBOs + currentMap->UBO_ID)->flags & 0x4)
@@ -118,19 +117,19 @@ void beginBaseActions (const struct Map2D *map)
    GL_CHECK_ERRORS;
 }
 
-void endBaseActions (void)
+void cce__endBaseActions (void)
 {
    glUnmapBuffer(GL_UNIFORM_BUFFER);
    GL_CHECK_ERRORS;
    currentMap = NULL;
 }
 
-void setCurrentArrayOfMaps (const struct Map2Darray *maps)
+void cce__setCurrentArrayOfMaps (const struct Map2Darray *maps)
 {
    allMaps = maps;
 }
 
-void baseActionsInit (const struct DynamicMap2D *dynamic_map, struct UsedUBO *UBOs, const GLint *bufferUniformsOffsets, 
+void cce__baseActionsInit (const struct DynamicMap2D *dynamic_map, struct UsedUBO *UBOs, const GLint *bufferUniformsOffsets, 
                       const GLint *uniformLocations, GLuint shaderProgram, void (*setUniformBufferToDefault)(GLuint, GLint))
 {
    g_dynamicMap = dynamic_map;
@@ -139,14 +138,14 @@ void baseActionsInit (const struct DynamicMap2D *dynamic_map, struct UsedUBO *UB
    g_uniformLocations = uniformLocations;
    g_shaderProgram = shaderProgram;
    g_setUniformBufferToDefault = setUniformBufferToDefault;
-   registerAction(0u, moveAction);
-   registerAction(1u, extendAction);
-   registerAction(2u, rotateAction);
-   registerAction(3u, offsetTextureAction);
-   registerAction(4u, changeColorAction);
-   registerAction(5u, setBoolAction);
-   registerAction(6u, setPlotNumberAction);
-   registerAction(7u, startTimerAction);
+   cceRegisterAction(0u, moveAction);
+   cceRegisterAction(1u, extendAction);
+   cceRegisterAction(2u, rotateAction);
+   cceRegisterAction(3u, offsetTextureAction);
+   cceRegisterAction(4u, changeColorAction);
+   cceRegisterAction(5u, setBoolAction);
+   cceRegisterAction(6u, setPlotNumberAction);
+   cceRegisterAction(7u, startTimerAction);
    
 }
 
@@ -161,7 +160,7 @@ static void moveGroupInSpecificMap2D (const struct Map2D *map, uint16_t groupID,
 }
 
 /* 0 is global offset, 1 - 255 is plain offset */
-void moveGroupMap2D (uint16_t groupID, int32_t x, int32_t y)
+CCE_PUBLIC_OPTIONS void cceMoveGroupMap2D (uint16_t groupID, int32_t x, int32_t y)
 {
    if (groupID == 0u)
    {
@@ -187,7 +186,7 @@ void moveGroupMap2D (uint16_t groupID, int32_t x, int32_t y)
 }
 
 /* Group iteration is from 1, not 0 */
-void extendGroupMap2D (uint16_t groupID, int32_t x, int32_t y)
+CCE_PUBLIC_OPTIONS void cceExtendGroupMap2D (uint16_t groupID, int32_t x, int32_t y)
 {
    if (groupID == 0u) return;
    
@@ -201,13 +200,13 @@ void extendGroupMap2D (uint16_t groupID, int32_t x, int32_t y)
    }
 }
 
-float normalizeAngle (float angleInDegrees)
+CCE_PUBLIC_OPTIONS float cceNormalizeAngle (float angleInDegrees)
 {
    return angleInDegrees * (1.0f/180.0f);
 }
 
 /* Group iteration is from 1, not 0 */
-void rotateGroupMap2D (uint8_t groupID, float normalizedAngle, int32_t xOffset, int32_t yOffset)
+CCE_PUBLIC_OPTIONS void cceRotateGroupMap2D (uint8_t groupID, float normalizedAngle, int32_t xOffset, int32_t yOffset)
 {
    if (groupID == 0u) return;
    float sin = sinf(normalizedAngle * PI);
@@ -219,7 +218,7 @@ void rotateGroupMap2D (uint8_t groupID, float normalizedAngle, int32_t xOffset, 
 }
 
 /* Group iteration is from 1, not 0 */
-void changeColorGroupMap2D (uint8_t groupID, float r, float g, float b, float a)
+CCE_PUBLIC_OPTIONS void cceChangeColorGroupMap2D (uint8_t groupID, float r, float g, float b, float a)
 {
    if (groupID == 0u) return;
    *(((float*) (buf + *(g_uniformsOffsets + CCE_COLORGROUP_OFFSET))) + (groupID - 1u) * 4u)      = r;
@@ -228,7 +227,7 @@ void changeColorGroupMap2D (uint8_t groupID, float r, float g, float b, float a)
    *(((float*) (buf + *(g_uniformsOffsets + CCE_COLORGROUP_OFFSET))) + (groupID - 1u) * 4u + 3u) = a;
 }
 
-void offsetTextureGroupMap2D (uint8_t groupID, int32_t offsetX, int32_t offsetY)
+CCE_PUBLIC_OPTIONS void cceOffsetTextureGroupMap2D (uint8_t groupID, int32_t offsetX, int32_t offsetY)
 {
    if (groupID == 0u) return;
    *(((int32_t*) (buf + *(g_uniformsOffsets + CCE_TEXTUREOFFSET_OFFSET))) + (groupID - 1u) * 2u)      = offsetX;

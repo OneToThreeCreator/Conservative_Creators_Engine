@@ -28,13 +28,13 @@
 #include <AL/al.h>
 #include <AL/alc.h>
 #endif // __APPLE__
-#include "external/glad.h"
+#include "../external/glad.h"
 #include <stdlib.h>
 
-void openGLErrorPrint (GLenum error, size_t line, char *file);
-void criticalErrorPrint (const char *const msgAndFormat, ...);
-void infoPrint (const char *const msgAndFormat, ...);
-void errorPrint (const char *const msgAndFormat, ...);
-void openALErrorPrint (ALCenum error);
+void cce__openGLErrorPrint (GLenum error, size_t line, const char *file);
+void cce__criticalErrorPrint (const char *const msgAndFormat, ...);
+void cce__infoPrint (const char *const msgAndFormat, ...);
+void cce__errorPrint (const char *const msgAndFormat, ...);
+void cce__openALErrorPrint (ALCenum error);
 
 #endif // LOG_H

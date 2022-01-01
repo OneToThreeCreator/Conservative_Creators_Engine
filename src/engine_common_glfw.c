@@ -27,8 +27,8 @@
 #define CCE_FULLSCREEN 0x10
 #define CCE_WAYLAND 0x1
 
-extern void (*engineUpdate__api) (void);
-extern void (*terminateEngine__api) (void);
+extern void (*cce__engineUpdate__api) (void);
+extern void (*cce__terminateEngine__api) (void);
 
 static struct
 {
@@ -49,13 +49,13 @@ static struct RegisteredKeys
    uint16_t eventType; // 0x0 - boolChange, 0x1 - plotNumber, 0x2 - systemAction
    uint16_t number;
 } *cce_keys;
-static size_t cce_keysQuantity = 0u;
-static size_t cce_keysQuantityAllocated = CCE_ALLOCATION_STEP;
+static size_t keysQuantity = 0u;
+static size_t keysQuantityAllocated = CCE_ALLOCATION_STEP;
 
-static double cce__deltaTime;
-static double cce__lastTime = 0.0;
-const double *const cce_deltaTime = &cce__deltaTime;
-const double *const cce_currentTime = &cce__lastTime;
+static double deltaTime;
+static double lastTime = 0.0;
+CCE_PUBLIC_OPTIONS const double *const cceDeltaTime = &deltaTime;
+CCE_PUBLIC_OPTIONS const double *const cceCurrentTime = &lastTime;
 static uint8_t engineFlags = 0u;
 const uint8_t *const cce__flags = &engineFlags;
 static uint8_t internalFlags = 0u;
@@ -63,11 +63,11 @@ static uint8_t internalFlags = 0u;
 static void calculateInternalDeltaTime (void)
 {
    double currentTime = glfwGetTime();
-   cce__deltaTime = currentTime - cce__lastTime;
-   cce__lastTime = currentTime;
+   deltaTime = currentTime - lastTime;
+   lastTime = currentTime;
 }
 
-void engineUpdate__glfw (void)
+static void engineUpdate__glfw (void)
 {
    glfwPollEvents();
    if (glfwWindowShouldClose(g_GLFWstate.window))
@@ -95,19 +95,19 @@ void swapBuffers__glfw (void)
 
 static size_t registerKey__glfw (int glfwKey, int glfwKeyModifiers, uint16_t eventType, uint16_t number)
 {
-   //if (cce_keysQuantity >= cce_keysQuantityAllocated)
+   //if (keysQuantity >= keysQuantityAllocated)
    //{
-   //   cce_keysQuantityAllocated += CCE_ALLOCATION_STEP;
-   //   cce_keys = realloc(cce_keys, cce_keysQuantityAllocated);
+   //   keysQuantityAllocated += CCE_ALLOCATION_STEP;
+   //   cce_keys = realloc(cce_keys, keysQuantityAllocated);
    //}
-   (cce_keys + cce_keysQuantity)->key = glfwKey;
-   (cce_keys + cce_keysQuantity)->modifiers = glfwKeyModifiers;
-   (cce_keys + cce_keysQuantity)->eventType = eventType;
-   (cce_keys + cce_keysQuantity)->number = number;
-   return cce_keysQuantity++;
+   (cce_keys + keysQuantity)->key = glfwKey;
+   (cce_keys + keysQuantity)->modifiers = glfwKeyModifiers;
+   (cce_keys + keysQuantity)->eventType = eventType;
+   (cce_keys + keysQuantity)->number = number;
+   return keysQuantity++;
 }
 
-void toFullscreen__glfw (void)
+static void toFullscreen__glfw (void)
 {
    GLFWmonitor *monitor = glfwGetPrimaryMonitor();
    g_GLFWstate.vidMode = glfwGetVideoMode(monitor);
@@ -155,21 +155,21 @@ void toFullscreen__glfw (void)
    g_GLFWstate.flags |= CCE_FULLSCREEN;
 }
 
-void toWindow__glfw (void)
+static void toWindow__glfw (void)
 {
    glfwSetWindowMonitor(g_GLFWstate.window, NULL, g_GLFWstate.windowPositionX, g_GLFWstate.windowPositionY, g_GLFWstate.windowWidth, g_GLFWstate.windowHeight, g_GLFWstate.vidMode->refreshRate);
    g_GLFWstate.flags &= ~CCE_FULLSCREEN;
 }
 
-void showWindow__glfw (void)
+static void showWindow__glfw (void)
 {
    glfwShowWindow(g_GLFWstate.window);
 }
 
 static void keyCallback (GLFWwindow *window, int key, int scancode, int action, int modifiers)
 {
-   struct RegisteredKeys *keyInfo = cce_keys + binarySearch((((uint8_t*) cce_keys) + offsetof(struct RegisteredKeys, key)), cce_keysQuantity, sizeof(int), sizeof(struct RegisteredKeys), key);
-   if (keyInfo > cce_keys + cce_keysQuantity)
+   struct RegisteredKeys *keyInfo = cce_keys + cceBinarySearch((((uint8_t*) cce_keys) + offsetof(struct RegisteredKeys, key)), keysQuantity, sizeof(int), sizeof(struct RegisteredKeys), key);
+   if (keyInfo > cce_keys + keysQuantity)
    {
       return;
    }
@@ -184,7 +184,7 @@ static void keyCallback (GLFWwindow *window, int key, int scancode, int action, 
             {
                if (action != GLFW_REPEAT)
                {
-                  setBool(keyInfo->number, CCE_DISABLE_BOOL - action);
+                  cceSetBool(keyInfo->number, CCE_DISABLE_BOOL - action);
                }
                break;
             }
@@ -192,7 +192,7 @@ static void keyCallback (GLFWwindow *window, int key, int scancode, int action, 
             {
                if (action == GLFW_PRESS)
                {
-                  increasePlotNumber(keyInfo->number);
+                  cceIncreasePlotNumber(keyInfo->number);
                   break;
                }
                break;
@@ -311,7 +311,7 @@ struct cce_uvec2 getCurrentStep__glfw (void)
    }
 }
 
-void cce_setWindowParameters__glfw (cce_enum parameter, uint32_t a, uint32_t b)
+static void setWindowParameters__glfw (cce_enum parameter, uint32_t a, uint32_t b)
 {
    if (a > 0u && b > 0u)
    {
@@ -372,9 +372,9 @@ static int compare (const void *a, const void *b)
    return (num_a > num_b) - (num_a < num_b);
 }
 
-void terminateEngine__glfw (void);
+static void terminateEngine__glfw (void);
 
-int initEngine__glfw (const char *label, uint16_t globalBoolsQuantity)
+int cce__initEngine__glfw (const char *label, uint16_t globalBoolsQuantity)
 {
    //AL = initAL();
    if (glfwInit() != GLFW_TRUE)
@@ -512,28 +512,29 @@ int initEngine__glfw (const char *label, uint16_t globalBoolsQuantity)
    registerKey__glfw(GLFW_KEY_D,           GLFW_FALSE, 0x0, globalBoolsQuantity -  1u);
    
    registerKey__glfw(GLFW_KEY_F11, GLFW_FALSE, 0x2, 0x0);
-   qsort(cce_keys, cce_keysQuantity, sizeof(struct RegisteredKeys), compare);
+   qsort(cce_keys, keysQuantity, sizeof(struct RegisteredKeys), compare);
    
    
-   cce_setWindowParameters = cce_setWindowParameters__glfw;
-   showWindow = showWindow__glfw;
+   cceSetWindowParameters = setWindowParameters__glfw;
    if (internalFlags && CCE_WAYLAND)
    {
-      toWindow = doNothing;
+      cce__toWindow = cce__doNothing;
+      cce__showWindow = cce__doNothing;
    }
    else
    {
-      toWindow = toWindow__glfw;
+      cce__showWindow = showWindow__glfw;
+      cce__toWindow = toWindow__glfw;
    }
-   toFullscreen = toFullscreen__glfw;
-   swapBuffers = swapBuffers__glfw;
-   getCurrentStep = getCurrentStep__glfw;
-   engineUpdate__api = engineUpdate__glfw;
-   terminateEngine__api = terminateEngine__glfw;
+   cce__toFullscreen = toFullscreen__glfw;
+   cce__swapBuffers = swapBuffers__glfw;
+   cce__getCurrentStep = getCurrentStep__glfw;
+   cce__engineUpdate__api = engineUpdate__glfw;
+   cce__terminateEngine__api = terminateEngine__glfw;
    return 0;
 }
 
-void terminateEngine__glfw (void)
+static void terminateEngine__glfw (void)
 {
    free(cce_keys);
    glfwDestroyWindow(g_GLFWstate.window);

@@ -31,9 +31,9 @@ extern C:
 #if defined(_WIN32) || defined(__WIN32__) || defined(_WIN64) || defined(__TOS_WIN__) || defined(__WINDOWS__) || \
     defined(__MINGW32__) || defined(__MINGW64__) || defined(__CYGWIN__)
 #include "cce_exports.h"
-#define CCE_OPTIONS CCE_EXPORTS
+#define CCE_PUBLIC_OPTIONS CCE_EXPORTS
 #else
-#define CCE_OPTIONS
+#define CCE_PUBLIC_OPTIONS
 #endif // Windows
 
 struct moveActionStruct
@@ -55,14 +55,14 @@ struct rotateActionStruct
    float angle;
    int32_t xOffset;
    int32_t yOffset;
-   uint16_t groupID;
+   uint8_t groupID;
 };
 
 struct offsetTextureActionStruct
 {
    int32_t offsetX;
    int32_t offsetY;
-   uint16_t groupID;
+   uint8_t groupID;
 };
 
 struct changeColorActionStruct
@@ -71,7 +71,7 @@ struct changeColorActionStruct
    float green;
    float blue;
    float alpha;
-   uint16_t groupID;
+   uint8_t groupID;
 };
 
 struct setBoolActionStruct
@@ -89,12 +89,12 @@ struct setPlotNumberActionStruct
    cce_enum action;
 };
 
-CCE_OPTIONS void  moveGroupMap2D (uint16_t groupID, int32_t x, int32_t y);
-CCE_OPTIONS void  extendGroupMap2D (uint16_t groupID, int32_t x, int32_t y);
-CCE_OPTIONS float normalizeAngle (float angleInDegrees);
-CCE_OPTIONS void  rotateGroupMap2D (uint8_t groupID, float normalizedAngle, int32_t xOffset, int32_t yOffset);
-CCE_OPTIONS void  offsetTextureGroupMap2D (uint8_t groupID, int32_t offsetX, int32_t offsetY);
-CCE_OPTIONS void  changeColorGroupMap2D (uint8_t groupID, float r, float g, float b, float a);
+CCE_PUBLIC_OPTIONS void  cceMoveGroupMap2D (uint16_t groupID, int32_t x, int32_t y);
+CCE_PUBLIC_OPTIONS void  cceExtendGroupMap2D (uint16_t groupID, int32_t x, int32_t y);
+CCE_PUBLIC_OPTIONS float cceNormalizeAngle (float angleInDegrees);
+CCE_PUBLIC_OPTIONS void  cceRotateGroupMap2D (uint8_t groupID, float normalizedAngle, int32_t xOffset, int32_t yOffset);
+CCE_PUBLIC_OPTIONS void  cceOffsetTextureGroupMap2D (uint8_t groupID, int32_t offsetX, int32_t offsetY);
+CCE_PUBLIC_OPTIONS void  cceChangeColorGroupMap2D (uint8_t groupID, float r, float g, float b, float a);
 
 #ifdef __cplusplus
 }

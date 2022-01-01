@@ -49,16 +49,16 @@ static uint16_t                   g_temporaryBoolsQuantity;
 static uint16_t                   g_temporaryBoolsQuantityAllocated;
 static uint8_t                    g_flags;
 
-void (*engineUpdate__api) (void);
-void (*terminateEngine__api) (void);
-struct cce_uvec2 (*getCurrentStep) (void);
-void (*toFullscreen) (void);
-void (*toWindow) (void);
-void (*showWindow) (void);
-void (*swapBuffers) (void);
-CCE_OPTIONS void (*cce_setWindowParameters) (cce_enum parameter, uint32_t a, uint32_t b);
+void (*cce__engineUpdate__api) (void);
+void (*cce__terminateEngine__api) (void);
+struct cce_uvec2 (*cce__getCurrentStep) (void);
+void (*cce__toFullscreen) (void);
+void (*cce__toWindow) (void);
+void (*cce__showWindow) (void);
+void (*cce__swapBuffers) (void);
+CCE_PUBLIC_OPTIONS void (*cceSetWindowParameters) (cce_enum parameter, uint32_t a, uint32_t b);
 
-void callActions (void (**doAction)(void*), uint8_t actionsQuantity, uint32_t *actionIDs, uint32_t *actionArgOffsets, cce_void *actionArgs)
+void cce__callActions (void (**doAction)(void*), uint8_t actionsQuantity, uint32_t *actionIDs, uint32_t *actionArgOffsets, cce_void *actionArgs)
 {
    for (cce_ubyte j = 0u; j < actionsQuantity; ++j)
    {
@@ -67,16 +67,16 @@ void callActions (void (**doAction)(void*), uint8_t actionsQuantity, uint32_t *a
 }
 
 // Workaround for increasing timers precision. Makes chains of timers independent of frametime
-double maxTimerCheckDelay = 0.0;
+static double maxTimerCheckDelay = 0.0;
 
-CCE_OPTIONS uint8_t isTimerEnded (struct Timer *timer)
+CCE_PUBLIC_OPTIONS uint8_t cceIsTimerEnded (struct Timer *timer)
 {
    if (timer->initTime == 0.0)
       return 0u;
-   double timerCheckDelay = *cce_currentTime - (timer->initTime + timer->delay);
+   double timerCheckDelay = *cceCurrentTime - (timer->initTime + timer->delay);
    if (timerCheckDelay >= 0.0)
    {
-      if (timerCheckDelay < *cce_deltaTime && (maxTimerCheckDelay == 0 || maxTimerCheckDelay > timerCheckDelay))
+      if (timerCheckDelay < *cceDeltaTime && (maxTimerCheckDelay == 0 || maxTimerCheckDelay > timerCheckDelay))
       {
          maxTimerCheckDelay = timerCheckDelay;
       }
@@ -85,12 +85,12 @@ CCE_OPTIONS uint8_t isTimerEnded (struct Timer *timer)
    return 0u;
 }
 
-CCE_OPTIONS void startTimer (struct Timer *timer)
+CCE_PUBLIC_OPTIONS void cceStartTimer (struct Timer *timer)
 {
-   timer->initTime = *cce_currentTime - maxTimerCheckDelay;
+   timer->initTime = *cceCurrentTime - maxTimerCheckDelay;
 }
 
-CCE_OPTIONS uint8_t getBool (uint16_t boolID)
+CCE_PUBLIC_OPTIONS uint8_t cceGetBool (uint16_t boolID)
 {
    uint_fast16_t *boolean;
    if (boolID < g_globalBoolsQuantity)
@@ -105,7 +105,7 @@ CCE_OPTIONS uint8_t getBool (uint16_t boolID)
    return ((*boolean) & (((uint_fast16_t) 0x0001u) << ((boolID) & BITWIZE_AND_OF_FAST_SIZE))) > 0u;
 }
 
-CCE_OPTIONS void setBool (uint16_t boolID, cce_enum action)
+CCE_PUBLIC_OPTIONS void cceSetBool (uint16_t boolID, cce_enum action)
 {
    uint_fast16_t *boolean;
    if (boolID < g_globalBoolsQuantity)
@@ -138,17 +138,17 @@ CCE_OPTIONS void setBool (uint16_t boolID, cce_enum action)
    }
 }
 
-CCE_OPTIONS uint8_t checkPlotNumber (uint16_t value)
+CCE_PUBLIC_OPTIONS uint8_t cceCheckPlotNumber (uint16_t value)
 {
    return cce_Gvars.plotNumber > value;
 }
 
-CCE_OPTIONS void increasePlotNumber (uint16_t value)
+CCE_PUBLIC_OPTIONS void cceIncreasePlotNumber (uint16_t value)
 {
    cce_Gvars.plotNumber += value;
 }
 
-CCE_OPTIONS void setPlotNumber      (uint16_t value)
+CCE_PUBLIC_OPTIONS void cceSetPlotNumber      (uint16_t value)
 {
    cce_Gvars.plotNumber = value;
 }
@@ -165,7 +165,7 @@ static void updateTemporaryBoolsArray (void)
    }
 }
 
-uint16_t getFreeTemporaryBools (void)
+uint16_t cce__getFreeTemporaryBools (void)
 {
    g_flags |= CCE_PROCESS_TEMPORARY_BOOLS_ARRAY;
    for (struct UsedTemporaryBools *iterator = g_temporaryBools, *end = g_temporaryBools + g_temporaryBoolsQuantity; iterator < end; ++iterator)
@@ -190,25 +190,25 @@ uint16_t getFreeTemporaryBools (void)
    return g_temporaryBoolsQuantity++;
 }
 
-void releaseTemporaryBools (uint16_t ID)
+void cce__releaseTemporaryBools (uint16_t ID)
 {
    (g_temporaryBools + ID)->flags = 0x4;
    return;
 }
 
-void releaseUnusedTemporaryBools (uint16_t ID)
+void cce__releaseUnusedTemporaryBools (uint16_t ID)
 {
    (g_temporaryBools + ID)->flags = 0x0;
    return;
 }
 
-void setCurrentTemporaryBools (uint16_t temporaryBoolsID)
+void cce__setCurrentTemporaryBools (uint16_t temporaryBoolsID)
 {
    cce_Gvars.temporaryBools = (g_temporaryBools + temporaryBoolsID)->temporaryBools;
 }
 
-void processLogic (uint32_t logicQuantity, struct ElementLogic *logic, struct Timer *timers, void (**doAction)(void*),
-                   cce_ubyte (*fourth_if_func)(uint16_t, va_list), ...)
+void cce__processLogic (uint32_t logicQuantity, struct ElementLogic *logic, struct Timer *timers, void (**doAction)(void*),
+                        cce_ubyte (*fourth_if_func)(uint16_t, va_list), ...)
 {
    va_list argp, argcp;
    va_start(argp, fourth_if_func);
@@ -229,7 +229,7 @@ void processLogic (uint32_t logicQuantity, struct ElementLogic *logic, struct Ti
          {
             case CCE_GLOBAL_BOOL_LOGIC_ELEMENT: 
             {
-               boolSum += (((uint_fast16_t) getBool(boolNumber)) << j);
+               boolSum += (((uint_fast16_t) cceGetBool(boolNumber)) << j);
                break;
             }
             case CCE_PLOT_NUMBER_LOGIC_ELEMENT:
@@ -239,7 +239,7 @@ void processLogic (uint32_t logicQuantity, struct ElementLogic *logic, struct Ti
             }
             case CCE_TIMER_LOGIC_ELEMENT:
             {
-               boolSum += (((uint_fast16_t) isTimerEnded(timers + boolNumber)) << j);
+               boolSum += (((uint_fast16_t) cceIsTimerEnded(timers + boolNumber)) << j);
                break;
             }
             default:
@@ -353,15 +353,15 @@ void processLogic (uint32_t logicQuantity, struct ElementLogic *logic, struct Ti
       }
       if (isLogic)
       {
-         callActions(doAction, logic->actionsQuantity, logic->actionIDs, logic->actionsArgOffsets, logic->actionsArg);
+         cce__callActions(doAction, logic->actionsQuantity, logic->actionIDs, logic->actionsArgOffsets, logic->actionsArg);
       }
       ++logic;
    }
    va_end(argp);
 }
 
-cce_ubyte checkCollision (int32_t element1_x, int32_t element1_y, int32_t element1_width, int32_t element1_height,
-                          int32_t element2_x, int32_t element2_y, int32_t element2_width, int32_t element2_height)
+CCE_PUBLIC_OPTIONS cce_ubyte cceCheckCollision (int32_t element1_x, int32_t element1_y, int32_t element1_width, int32_t element1_height,
+                                                int32_t element2_x, int32_t element2_y, int32_t element2_width, int32_t element2_height)
 {
    if (element1_x < element2_x)
    {
@@ -389,7 +389,7 @@ cce_ubyte checkCollision (int32_t element1_x, int32_t element1_y, int32_t elemen
    return 1u;
 }
 
-struct ElementGroup* loadGroups (uint16_t groupsQuantity, FILE *map_f)
+struct ElementGroup* cce__loadGroups (uint16_t groupsQuantity, FILE *map_f)
 {
    if (!groupsQuantity)
    {
@@ -412,7 +412,7 @@ struct ElementGroup* loadGroups (uint16_t groupsQuantity, FILE *map_f)
    return groups;
 }
 
-void writeGroups (uint16_t groupsQuantity, struct ElementGroup *groups, FILE *map_f)
+void cce__writeGroups (uint16_t groupsQuantity, struct ElementGroup *groups, FILE *map_f)
 {
    for (struct ElementGroup *iterator = groups, *end = (groups + groupsQuantity); iterator < end; ++iterator)
    {
@@ -424,7 +424,7 @@ void writeGroups (uint16_t groupsQuantity, struct ElementGroup *groups, FILE *ma
    }
 }
 
-struct ElementLogic* loadLogic (uint8_t logicQuantity, FILE *map_f)
+struct ElementLogic* cce__loadLogic (uint8_t logicQuantity, FILE *map_f)
 {
    if (!logicQuantity)
    {
@@ -465,7 +465,7 @@ struct ElementLogic* loadLogic (uint8_t logicQuantity, FILE *map_f)
    return logic;
 }
 
-void writeLogic (uint8_t logicQuantity, struct ElementLogic *logic, FILE *map_f)
+void cce__writeLogic (uint8_t logicQuantity, struct ElementLogic *logic, FILE *map_f)
 {
    struct ElementLogic *end = (logic + logicQuantity - 1u);
    uint_fast32_t operationsQuantityInBytes;
@@ -493,7 +493,7 @@ void writeLogic (uint8_t logicQuantity, struct ElementLogic *logic, FILE *map_f)
    }
 }
 
-CCE_OPTIONS size_t binarySearch (const void *const array, const size_t arraySize, const size_t typeSize, const size_t step, const size_t value)
+CCE_PUBLIC_OPTIONS size_t cceBinarySearch (const void *const array, const size_t arraySize, const size_t typeSize, const size_t step, const size_t value)
 {
    if (!arraySize)
       return -1;
@@ -780,7 +780,7 @@ static int compare (const void *a, const void *b)
 }
 
 /* Parsing string to truth table. Has hardcoced limit to 32 elements (already 512MiB size), bigger amount could not fit into memory while parsing */
-CCE_OPTIONS uint_fast16_t* parseStringToLogicOperations (const char *const string, uint_fast8_t *const logicQuantity)
+CCE_PUBLIC_OPTIONS uint_fast16_t* cceParseStringToLogicOperations (const char *const string, uint_fast8_t *const logicQuantity)
 {
    char dictionary[33] = ""; //last is '\0'
    uint8_t dictionarySize = 0u;
@@ -933,7 +933,7 @@ CCE_OPTIONS uint_fast16_t* parseStringToLogicOperations (const char *const strin
          {
             if ((*iterator >= '0' && *iterator <= '9') || (*iterator >= 'A' && *iterator <= 'Z') || (*iterator >= 'a' && *iterator <= 'z'))
             {
-               stack->logicElementID = binarySearch(dictionary, dictionarySize, sizeof(char), sizeof(char), (*iterator));
+               stack->logicElementID = cceBinarySearch(dictionary, dictionarySize, sizeof(char), sizeof(char), (*iterator));
                stack->flags |= isInverted;
                isInverted = 0u;
             }
@@ -950,10 +950,10 @@ CCE_OPTIONS uint_fast16_t* parseStringToLogicOperations (const char *const strin
    return operations;
 }
 
-int initEngine (const char *label, uint16_t globalBoolsQuantity)
+int cce__initEngine (const char *label, uint16_t globalBoolsQuantity)
 {
    // We have only one api yet
-   if (initEngine__glfw(label, globalBoolsQuantity) != 0)
+   if (cce__initEngine__glfw(label, globalBoolsQuantity) != 0)
       return -1;
       
    g_temporaryBools = (struct UsedTemporaryBools*) calloc(CCE_ALLOCATION_STEP, sizeof(struct UsedTemporaryBools));
@@ -964,16 +964,16 @@ int initEngine (const char *label, uint16_t globalBoolsQuantity)
    return 0;
 }
 
-void engineUpdate (void)
+void cce__engineUpdate (void)
 {
-   engineUpdate__api();
+   cce__engineUpdate__api();
    if (g_flags & CCE_PROCESS_TEMPORARY_BOOLS_ARRAY)
    {
       updateTemporaryBoolsArray();
    }
 }
 
-void terminateEngine (void)
+void cce__terminateEngine (void)
 {
    //stopAL(AL);
    for (struct UsedTemporaryBools *iterator = g_temporaryBools, *end = g_temporaryBools + g_temporaryBoolsQuantity; iterator < end; ++iterator)
@@ -981,11 +981,11 @@ void terminateEngine (void)
       free(iterator->temporaryBools);
    }
    free(g_temporaryBools);
-   terminateEngine__api();
-   terminateTemporaryDirectory();
+   cce__terminateEngine__api();
+   cceTerminateTemporaryDirectory();
 }
 
-void doNothing (void)
+void cce__doNothing (void)
 {
    return;
 }

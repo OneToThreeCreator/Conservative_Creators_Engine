@@ -26,7 +26,6 @@
 
 #include "../engine_common.h"
 #include "../engine_common_internal.h"
-#include "../log.h"
 #include "../path_getters.h"
 #include "map2D.h"
 #include "map2D_internal.h"
@@ -39,31 +38,31 @@ static void (*cce_fileParseFunc)(FILE*, uint16_t);
 static void (*cce_callbackOnFreeing)(uint16_t);
 static void (***cce_actions)(void*);
 
-void initMap2DLoaders (void (***doAction)(void*))
+void cce__initMap2DLoaders (void (***doAction)(void*))
 {
    cce_actions = doAction;
 }
 
-void setMap2Dpath (const char *path)
+CCE_PUBLIC_OPTIONS void cceSetMap2Dpath (const char *path)
 {
    if (!path || *path == '\0')
       return;
    free(mapPath);
-   mapPath = createNewPathFromOldPath(path, "map_", 9u);
+   mapPath = cce__createNewPathFromOldPath(path, "map_", 9u);
    mapPathLength = strlen(mapPath);
 }
 
-void registerMapLoadingCallback (void (*fileParseFunc)(FILE*, uint16_t))
+CCE_PUBLIC_OPTIONS void cceRegisterMapLoadingCallback (void (*fileParseFunc)(FILE*, uint16_t))
 {
    cce_fileParseFunc = fileParseFunc;
 }
 
-void registerMapFreeingCallback (void (*callbackOnFreeing)(uint16_t))
+CCE_PUBLIC_OPTIONS void cceRegisterMapFreeingCallback (void (*callbackOnFreeing)(uint16_t))
 {
    cce_callbackOnFreeing = callbackOnFreeing;
 }
 
-void freeMap2D (struct Map2D *map)
+CCE_PUBLIC_OPTIONS void cceFreeMap2D (struct Map2D *map)
 {
    if (!map)
       return;
@@ -72,7 +71,7 @@ void freeMap2D (struct Map2D *map)
    if (map->VBO)
       glDeleteBuffers(1u, &(map->VBO));
    if (map->elementsQuantity)
-      releaseUBO(map->UBO_ID);
+      cce__releaseUBO(map->UBO_ID);
    if (map->collidersQuantity)
       free(map->colliders);
    if (map->moveGroupsQuantity)
@@ -121,7 +120,7 @@ void freeMap2D (struct Map2D *map)
    }
    if ((map->texturesMapReliesOn))
    {
-      releaseTextures(map->texturesMapReliesOn, map->texturesMapReliesOnQuantity);
+      cce__releaseTextures(map->texturesMapReliesOn, map->texturesMapReliesOnQuantity);
    }
    if ((map->exitMapsQuantity))
    {
@@ -131,18 +130,18 @@ void freeMap2D (struct Map2D *map)
    {
       if (map->logicQuantity)
       {
-         setCurrentTemporaryBools(map->temporaryBools);
+         cce__setCurrentTemporaryBools(map->temporaryBools);
       }
       cce_callbackOnFreeing(map->ID);
    }
    if (map->logicQuantity)
    {
-      releaseTemporaryBools(map->temporaryBools);
+      cce__releaseTemporaryBools(map->temporaryBools);
    }
    free(map);
 }
 
-void freeMap2Ddev (struct Map2Ddev *map)
+CCE_PUBLIC_OPTIONS void cceFreeMap2Ddev (struct Map2Ddev *map)
 {
    if (!map)
       return;
@@ -340,13 +339,13 @@ static void offsetCCEgroupsFromElementsToColliders (uint16_t groupsQuantity, str
                                                                                        (elementsQuantity) - (elementsWithoutColliderQuantity)  :  \
                                                                                         0u)
 
-struct Map2DCollider* elementsToColliders (uint32_t  elementsQuantity, uint32_t elementsWithoutColliderQuantity, struct Map2DElement *elements,
-                                           uint16_t **texturesMapReliesOn, uint16_t *texturesMapReliesOnQuantity,
-                                           uint16_t  moveGroupsQuantity, struct ElementGroup *moveGroups,
-                                           uint16_t  extensionGroupsQuantity, struct ElementGroup *extensionGroups,
-                                           GLuint *VAO, GLuint *VBO)
+static struct Map2DCollider* elementsToColliders (uint32_t  elementsQuantity, uint32_t elementsWithoutColliderQuantity, struct Map2DElement *elements,
+                                                  uint16_t **texturesMapReliesOn, uint16_t *texturesMapReliesOnQuantity,
+                                                  uint16_t  moveGroupsQuantity, struct ElementGroup *moveGroups,
+                                                  uint16_t  extensionGroupsQuantity, struct ElementGroup *extensionGroups,
+                                                  GLuint *VAO, GLuint *VBO)
 {
-   *texturesMapReliesOn = loadTexturesMap2D(elements, elementsQuantity, texturesMapReliesOnQuantity);
+   *texturesMapReliesOn = cce__loadTexturesMap2D(elements, elementsQuantity, texturesMapReliesOnQuantity);
    
    elements = (struct Map2DElement*) realloc(elements, (sizeof(struct Map2DElement) + 3u * sizeof(uint8_t)) * elementsQuantity);
    uint8_t *glGroups = (uint8_t*) ((void*) (elements + elementsQuantity));
@@ -395,13 +394,13 @@ struct Map2DCollider* elementsToColliders (uint32_t  elementsQuantity, uint32_t 
    return colliders;
 }
 
-struct Map2D* loadMap2D (uint16_t number)
+struct Map2D* cceLoadMap2D (uint16_t number)
 {
    shortToString(mapPath, number, ".c2m");
    FILE *map_f = fopen(mapPath, "rb");
    if (!map_f)
    {
-      criticalErrorPrint("ENGINE::MAP2D::FAILED_TO_LOAD:\n%s - no such file or directory", mapPath);
+      cce__criticalErrorPrint("ENGINE::MAP2D::FAILED_TO_LOAD:\n%s - no such file or directory", mapPath);
    }
    *(mapPath + mapPathLength) = '\0';
    
@@ -422,18 +421,18 @@ struct Map2D* loadMap2D (uint16_t number)
          fread(elements, sizeof(struct Map2DElement), map->elementsQuantity, map_f);
          // Game logic elements
          fread(&(map->moveGroupsQuantity), 2u/*uint16_t*/, 1u, map_f);
-         map->moveGroups = loadGroups(map->moveGroupsQuantity, map_f);
+         map->moveGroups = cce__loadGroups(map->moveGroupsQuantity, map_f);
          fread(&(map->extensionGroupsQuantity), 2u/*uint16_t*/, 1u, map_f);
-         map->extensionGroups = loadGroups(map->extensionGroupsQuantity, map_f);
+         map->extensionGroups = cce__loadGroups(map->extensionGroupsQuantity, map_f);
          colliders = elementsToColliders(map->elementsQuantity, elementsWithoutColliderQuantity, elements, &(map->texturesMapReliesOn), &(map->texturesMapReliesOnQuantity),
                                          map->moveGroupsQuantity, map->moveGroups, map->extensionGroupsQuantity, map->extensionGroups,  &(map->VAO), &(map->VBO));
          
-         map->UBO_ID = getFreeUBO();
+         map->UBO_ID = cce__getFreeUBO();
       }
       else
       {
          fread(&(map->moveGroupsQuantity), 2u/*uint16_t*/, 1u, map_f);
-         map->moveGroups = loadGroups(map->moveGroupsQuantity, map_f);
+         map->moveGroups = cce__loadGroups(map->moveGroupsQuantity, map_f);
       }
       uint32_t collidersQuantity;
       fread(&collidersQuantity, 4u, 1u, map_f);
@@ -445,7 +444,7 @@ struct Map2D* loadMap2D (uint16_t number)
       }
    }
    fread(&(map->collisionGroupsQuantity), 2u/*uint16_t*/, 1u, map_f);
-   map->collisionGroups = loadGroups(map->collisionGroupsQuantity, map_f);
+   map->collisionGroups = cce__loadGroups(map->collisionGroupsQuantity, map_f);
    fread(&(map->collisionQuantity), 2u/*uint16_t*/, 1u, map_f);
    if ((map->collisionQuantity))
    {
@@ -476,8 +475,8 @@ struct Map2D* loadMap2D (uint16_t number)
    fread(&(map->logicQuantity),  4u/*uint32_t*/, 1u, map_f);
    if ((map->logicQuantity))
    {
-      map->logic = loadLogic(map->logicQuantity, map_f);
-      map->temporaryBools = getFreeTemporaryBools();
+      map->logic = cce__loadLogic(map->logicQuantity, map_f);
+      map->temporaryBools = cce__getFreeTemporaryBools();
    }
    else
    {
@@ -488,7 +487,7 @@ struct Map2D* loadMap2D (uint16_t number)
    fread(&(staticActionsQuantity), 1u, 1u, map_f);
    if (staticActionsQuantity)
    {
-      beginBaseActions(map);
+      cce__beginBaseActions(map);
       uint32_t *staticActionsIDs = (uint32_t *) malloc(staticActionsQuantity * sizeof(uint32_t));
       fread(staticActionsIDs, 4u, staticActionsQuantity, map_f);
       uint32_t *staticActionsArgOffsets = (uint32_t *) malloc((staticActionsQuantity + 1u) * sizeof(uint32_t));
@@ -498,14 +497,14 @@ struct Map2D* loadMap2D (uint16_t number)
       fread( (staticActionsArgs), 1u, *(staticActionsArgOffsets + staticActionsQuantity), map_f);
       if (map->logicQuantity)
       {
-         setCurrentTemporaryBools(map->temporaryBools);
+         cce__setCurrentTemporaryBools(map->temporaryBools);
       }
-      callActions(*cce_actions, staticActionsQuantity, staticActionsIDs, staticActionsArgOffsets, staticActionsArgs);
+      cce__callActions(*cce_actions, staticActionsQuantity, staticActionsIDs, staticActionsArgOffsets, staticActionsArgs);
       
       free(staticActionsIDs);
       free(staticActionsArgOffsets);
       free(staticActionsArgs);
-      endBaseActions();
+      cce__endBaseActions();
    }
    fread(&(map->exitMapsQuantity), 1u, 1u, map_f);
    if (map->exitMapsQuantity)
@@ -520,19 +519,19 @@ struct Map2D* loadMap2D (uint16_t number)
       fread(&smth, 1u, 1u, map_f);
       if (smth)
       {
-         criticalErrorPrint("ENGINE::MAP2D_LOADER::PARSING_ERROR:\nfile of map %u contains fields that isn't implemented in current engine version", number);
+         cce__criticalErrorPrint("ENGINE::MAP2D_LOADER::PARSING_ERROR:\nfile of map %u contains fields that isn't implemented in current engine version", number);
       }
    }
    if (cce_fileParseFunc) cce_fileParseFunc(map_f, number);
    if (fclose(map_f) == -1)
    {
-      criticalErrorPrint("ENGINE::MAP2D_LOADER::FILE_UNEXPECTED_CLOSE:\nmap %u file was unexpectedly closed by external file handler", number);
+      cce__criticalErrorPrint("ENGINE::MAP2D_LOADER::FILE_UNEXPECTED_CLOSE:\nmap %u file was unexpectedly closed by external file handler", number);
    }
    return map;
 }
 
 /* Do not frees mapdev */
-struct Map2D* Map2DdevToMap2D (struct Map2Ddev *mapdev)
+struct Map2D* cceMap2DdevToMap2D (struct Map2Ddev *mapdev)
 {
    struct Map2D *map = (struct Map2D*) malloc(sizeof(struct Map2D));
    map->ID = mapdev->ID;
@@ -579,7 +578,7 @@ struct Map2D* Map2DdevToMap2D (struct Map2Ddev *mapdev)
          colliders = elementsToColliders(mapdev->elementsQuantity, mapdev->elementsWithoutColliderQuantity, elements, &(map->texturesMapReliesOn), &(map->texturesMapReliesOnQuantity),
                                          mapdev->moveGroupsQuantity, map->moveGroups, mapdev->extensionGroupsQuantity, map->extensionGroups, &(map->VAO), &(map->VBO));
          
-         map->UBO_ID = getFreeUBO();
+         map->UBO_ID = cce__getFreeUBO();
       }
       map->collidersQuantity = elementsCollidersQuantity + mapdev->collidersQuantity;
       map->colliders = (struct Map2DCollider*) realloc(colliders, (map->collidersQuantity) * sizeof(struct Map2DCollider));
@@ -658,7 +657,7 @@ struct Map2D* Map2DdevToMap2D (struct Map2Ddev *mapdev)
          dest->actionsArg = (cce_void *) malloc((*(src->actionsArgOffsets + src->actionsQuantity) - 1u)/* sizeof(cce_void)*/);
          memcpy(dest->actionsArg, src->actionsArg, (*(src->actionsArgOffsets + src->actionsQuantity) - 1u)/* sizeof(cce_void)*/);
       }
-      map->temporaryBools = getFreeTemporaryBools();
+      map->temporaryBools = cce__getFreeTemporaryBools();
    }
    else
    {
@@ -668,11 +667,11 @@ struct Map2D* Map2DdevToMap2D (struct Map2Ddev *mapdev)
    {
       if (mapdev->logicQuantity)
       {
-         setCurrentTemporaryBools(map->temporaryBools);
+         cce__setCurrentTemporaryBools(map->temporaryBools);
       }
-      beginBaseActions(map);
-      callActions(*cce_actions, mapdev->actionsQuantity, mapdev->actionIDs, mapdev->actionsArgOffsets, mapdev->actionsArg);
-      endBaseActions();
+      cce__beginBaseActions(map);
+      cce__callActions(*cce_actions, mapdev->actionsQuantity, mapdev->actionIDs, mapdev->actionsArgOffsets, mapdev->actionsArg);
+      cce__endBaseActions();
    }
    map->exitMapsQuantity = mapdev->exitMapsQuantity;
    if (mapdev->exitMapsQuantity)
@@ -683,13 +682,13 @@ struct Map2D* Map2DdevToMap2D (struct Map2Ddev *mapdev)
    return map;
 }
 
-struct Map2Ddev* loadMap2Ddev (uint16_t number)
+struct Map2Ddev* cceLoadMap2Ddev (uint16_t number)
 {
    shortToString(mapPath, number, ".c2m");
    FILE *map_f = fopen(mapPath, "rb");
    if (!map_f)
    {
-      criticalErrorPrint("ENGINE::MAP2Ddev::FAILED_TO_LOAD:\n%s - no such file or directory", mapPath);
+      cce__criticalErrorPrint("ENGINE::MAP2Ddev::FAILED_TO_LOAD:\n%s - no such file or directory", mapPath);
    }
    *(mapPath + mapPathLength) = '\0';
    struct Map2Ddev *map = (struct Map2Ddev*) calloc(1u, sizeof(struct Map2Ddev));
@@ -702,9 +701,9 @@ struct Map2Ddev* loadMap2Ddev (uint16_t number)
       fread((map->elements), sizeof(struct Map2DElement), (map->elementsQuantity), map_f);
    }
    fread(&(map->moveGroupsQuantity), 2u/*uint16_t*/, 1u, map_f);
-   map->moveGroups = loadGroups(map->moveGroupsQuantity, map_f);
+   map->moveGroups = cce__loadGroups(map->moveGroupsQuantity, map_f);
    fread(&(map->extensionGroupsQuantity), 2u/*uint16_t*/, 1u, map_f);
-   map->extensionGroups = loadGroups(map->extensionGroupsQuantity, map_f);
+   map->extensionGroups = cce__loadGroups(map->extensionGroupsQuantity, map_f);
    fread(&(map->collidersQuantity), 4u/*uint16_t*/, 1u, map_f);
    if ((map->collidersQuantity))
    {
@@ -712,7 +711,7 @@ struct Map2Ddev* loadMap2Ddev (uint16_t number)
       fread((map->colliders), sizeof(struct Map2DCollider), (map->collidersQuantity), map_f);
    }
    fread(&(map->collisionGroupsQuantity), 2u/*uint16_t*/, 1u, map_f);
-   map->collisionGroups = loadGroups(map->collisionGroupsQuantity, map_f);
+   map->collisionGroups = cce__loadGroups(map->collisionGroupsQuantity, map_f);
    fread(&(map->collisionQuantity), 2u/*uint16_t*/, 1u, map_f);
    if ((map->collisionQuantity))
    {
@@ -728,7 +727,7 @@ struct Map2Ddev* loadMap2Ddev (uint16_t number)
    fread(&(map->logicQuantity), 4u/*uint32_t*/, 1u, map_f);
    if (map->logicQuantity)
    {
-      map->logic = loadLogic(map->logicQuantity, map_f);
+      map->logic = cce__loadLogic(map->logicQuantity, map_f);
    }
    fread(&(map->actionsQuantity), 1u/*uint8_t*/, 1u, map_f);
    if (map->actionsQuantity)
@@ -748,24 +747,24 @@ struct Map2Ddev* loadMap2Ddev (uint16_t number)
       fread(&smth, 1u, 1u, map_f);
       if (smth)
       {
-         criticalErrorPrint("ENGINE::MAP2Ddev_LOADER::PARSING_ERROR:\nfile of map %u contains fields that isn't implemented in current engine version", number);
+         cce__criticalErrorPrint("ENGINE::MAP2Ddev_LOADER::PARSING_ERROR:\nfile of map %u contains fields that isn't implemented in current engine version", number);
       }
    }
    if (cce_fileParseFunc) cce_fileParseFunc(map_f, number);
    if (fclose(map_f) == -1)
    {
-      criticalErrorPrint("ENGINE::MAP2Ddev_LOADER::FILE_UNEXPECTED_CLOSE:\nmap %u file was unexpectedly close by external file handler", number);
+      cce__criticalErrorPrint("ENGINE::MAP2Ddev_LOADER::FILE_UNEXPECTED_CLOSE:\nmap %u file was unexpectedly close by external file handler", number);
    }
    return map;
 }
 
-int writeMap2Ddev (struct Map2Ddev *map, void (*writeFunc)(FILE*))
+int cceWriteMap2Ddev (struct Map2Ddev *map, void (*writeFunc)(FILE*))
 {
    shortToString(mapPath, map->ID, ".c2m");
    FILE *map_f = fopen(mapPath, "wb");
    if (!map_f)
    {
-      infoPrint("ENGINE::MAP2Ddev::FAILED_TO_OPEN_FILE:\n%s - cannot open file. Are you haven't enough free space left? Are you have a directory with same name? Does directory really exist?\n", mapPath);
+      cce__infoPrint("ENGINE::MAP2Ddev::FAILED_TO_OPEN_FILE:\n%s - cannot open file. Are you haven't enough free space left? Are you have a directory with same name? Does directory really exist?\n", mapPath);
       return -1;
    }
    *(mapPath + mapPathLength) = '\0';
@@ -778,12 +777,12 @@ int writeMap2Ddev (struct Map2Ddev *map, void (*writeFunc)(FILE*))
    fwrite(&(map->moveGroupsQuantity), 2u/*uint16_t*/, 1u, map_f);
    if ((map->moveGroupsQuantity))
    {
-      writeGroups(map->moveGroupsQuantity, map->moveGroups, map_f);
+      cce__writeGroups(map->moveGroupsQuantity, map->moveGroups, map_f);
    }
    fwrite(&(map->extensionGroupsQuantity), 2u/*uint16_t*/, 1u, map_f);
    if ((map->extensionGroupsQuantity))
    {
-      writeGroups(map->extensionGroupsQuantity, map->extensionGroups, map_f);
+      cce__writeGroups(map->extensionGroupsQuantity, map->extensionGroups, map_f);
    }
    fwrite(&(map->collidersQuantity), 4u/*uint32_t*/, 1u, map_f);
    if ((map->collidersQuantity))
@@ -793,7 +792,7 @@ int writeMap2Ddev (struct Map2Ddev *map, void (*writeFunc)(FILE*))
    fwrite(&(map->collisionGroupsQuantity), 2u/*uint16_t*/, 1u, map_f);
    if ((map->collisionGroupsQuantity))
    {
-      writeGroups(map->collisionGroupsQuantity, map->collisionGroups, map_f);
+      cce__writeGroups(map->collisionGroupsQuantity, map->collisionGroups, map_f);
    }
    fwrite(&(map->collisionQuantity), 2u/*uint16_t*/, 1u, map_f);
    if ((map->collisionQuantity))
@@ -808,7 +807,7 @@ int writeMap2Ddev (struct Map2Ddev *map, void (*writeFunc)(FILE*))
    fwrite(&(map->logicQuantity), 4u/*uint32_t*/, 1u, map_f);
    if (map->logicQuantity)
    {
-      writeLogic(map->logicQuantity, map->logic, map_f);
+      cce__writeLogic(map->logicQuantity, map->logic, map_f);
    }
    fwrite(&(map->actionsQuantity), 1u/*uint8_t*/, 1u, map_f);
    if (map->actionsQuantity)
@@ -827,7 +826,7 @@ int writeMap2Ddev (struct Map2Ddev *map, void (*writeFunc)(FILE*))
    if (writeFunc) writeFunc(map_f);
    if (fclose(map_f) == -1)
    {
-      errorPrint("ENGINE::MAP2Ddev_MAPWRITER::FILE_UNEXPECTED_CLOSE:\nmap %u file was unexpectedly closed by external file handler", map->ID);
+      cce__errorPrint("ENGINE::MAP2Ddev_MAPWRITER::FILE_UNEXPECTED_CLOSE:\nmap %u file was unexpectedly closed by external file handler", map->ID);
    }
    return 0;
 }

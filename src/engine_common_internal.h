@@ -63,6 +63,9 @@
 #define MAX(x,y) (((x) > (y))?(x):(y))
 #define MIN(x,y) (((x) < (y))?(x):(y))
 
+#define MACRO_TO_STR_IMPL(x) #x 
+#define MACRO_TO_STR(x) MACRO_TO_STR_IMPL(x)
+
 struct UsedTemporaryBools
 {
    uint8_t flags; /* 0x1 - used, 0x4 - to be cleared */
@@ -71,29 +74,26 @@ struct UsedTemporaryBools
 
 extern const uint8_t *const cce__flags;
 
-int initEngine (const char *label, uint16_t globalBoolsQuantity);
-cce_ubyte checkCollision (int32_t element1_x, int32_t element1_y, int32_t element1_width, int32_t element1_height, int32_t element2_x, int32_t element2_y, int32_t element2_width, int32_t element2_height);
-void processLogic (uint32_t logicQuantity, struct ElementLogic *logic, struct Timer *timers, void (**doAction)(void*),
+int cce__initEngine (const char *label, uint16_t globalBoolsQuantity);
+void cce__processLogic (uint32_t logicQuantity, struct ElementLogic *logic, struct Timer *timers, void (**doAction)(void*),
                    cce_ubyte (*fourth_if_func)(uint16_t, va_list), ...);
-void terminateEngine (void);
-struct ElementGroup* loadGroups (uint16_t groupsQuantity, FILE *map_f);
-void writeGroups (uint16_t groupsQuantity, struct ElementGroup *groups, FILE *map_f);
-struct ElementLogic* loadLogic (uint8_t logicQuantity, FILE *map_f);
-void writeLogic (uint8_t logicQuantity, struct ElementLogic *logic, FILE *map_f);
-void callActions (void (**doAction)(void*), uint8_t actionsQuantity, uint32_t *actionsIDs, uint32_t *actionsArgOffsets, cce_void *actionsArg);
-uint16_t getFreeTemporaryBools (void);
-void releaseTemporaryBools (uint16_t ID);
-void releaseUnusedTemporaryBools (uint16_t ID);
-void setCurrentTemporaryBools (uint16_t temporaryBoolsID);
-void engineUpdate (void);
-void doNothing (void);
+void cce__terminateEngine (void);
+struct ElementGroup* cce__loadGroups (uint16_t groupsQuantity, FILE *map_f);
+void cce__writeGroups (uint16_t groupsQuantity, struct ElementGroup *groups, FILE *map_f);
+struct ElementLogic* cce__loadLogic (uint8_t logicQuantity, FILE *map_f);
+void cce__writeLogic (uint8_t logicQuantity, struct ElementLogic *logic, FILE *map_f);
+void cce__callActions (void (**doAction)(void*), uint8_t actionsQuantity, uint32_t *actionsIDs, uint32_t *actionsArgOffsets, cce_void *actionsArg);
+uint16_t cce__getFreeTemporaryBools (void);
+void cce__releaseTemporaryBools (uint16_t ID);
+void cce__releaseUnusedTemporaryBools (uint16_t ID);
+void cce__setCurrentTemporaryBools (uint16_t temporaryBoolsID);
+void cce__engineUpdate (void);
+void cce__doNothing (void);
 
-extern void (*toFullscreen) (void);
-extern void (*toWindow) (void);
-extern void (*showWindow) (void);
-extern void (*swapBuffers) (void);
-extern struct cce_uvec2 (*getCurrentStep) (void);
-
-uint8_t checkDirectoryExistance (const char *restrict path);
+extern void (*cce__toFullscreen) (void);
+extern void (*cce__toWindow) (void);
+extern void (*cce__showWindow) (void);
+extern void (*cce__swapBuffers) (void);
+extern struct cce_uvec2 (*cce__getCurrentStep) (void);
 
 #endif // ENGINE_COMMON_INTERNAL_H

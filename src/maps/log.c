@@ -21,9 +21,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdarg.h>
-#include "engine_common_internal.h"
-#include "external/glad.h"
-#include <GLFW/glfw3.h>
+#include "map2D_internal.h"
 //#include "log.h"
 #ifdef __APPLE__
 #include <OpenAL/al.h>
@@ -33,7 +31,7 @@
 #include <AL/alc.h>
 #endif // __APPLE__
 
-void openGLErrorPrint (GLenum error, size_t line, char *file)
+void cce__openGLErrorPrint (GLenum error, size_t line, const char *file)
 {
    switch (error)
    {
@@ -80,7 +78,7 @@ void openGLErrorPrint (GLenum error, size_t line, char *file)
    }
 }
 
-void openALErrorPrint (ALenum error)
+void cce__openALErrorPrint (ALenum error)
 {
    switch (error)
    {
@@ -117,17 +115,17 @@ void openALErrorPrint (ALenum error)
    }
 }
 
-void errorPrint (const char *const msgAndFormat, ...)
+void cce__errorPrint (const char *const msgAndFormat, ...)
 {
    va_list args;
    va_start(args, msgAndFormat);
    vfprintf(stderr, msgAndFormat, args);
-   fputc('\n', stdout);
+   fputc('\n', stderr);
    va_end(args);
    return;
 }
 
-void infoPrint (const char *const msgAndFormat, ...)
+void cce__infoPrint (const char *const msgAndFormat, ...)
 {
    va_list args;
    va_start(args, msgAndFormat);
@@ -137,13 +135,13 @@ void infoPrint (const char *const msgAndFormat, ...)
    return;
 }
 
-void criticalErrorPrint (const char *const msgAndFormat, ...)
+void cce__criticalErrorPrint (const char *const msgAndFormat, ...)
 {
    va_list args;
    va_start(args, msgAndFormat);
    vfprintf(stderr, msgAndFormat, args);
    fprintf(stderr, "\nCritical!\nShutting down engine...\n");
    va_end(args);
-   terminateEngine();
+   cce__terminateEngine2D();
    exit(-1);
 }

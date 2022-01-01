@@ -34,7 +34,7 @@ unsigned int makeVFshaderProgram  (const char *const vertexPath, const char *con
    char *shaderSrc = fileRead(vertexPath);
    if (shaderSrc == NULL)
    {
-      fprintf(stderr, "OPENGL::SHADER::VERTEX::FAILED_TO_LOAD:\n%s", vertexPath);
+      fprintf(stderr, "OPENGL::SHADER::VERTEX::FAILED_TO_LOAD:\n%s\n", vertexPath);
       goto FINAL;
    }
    char *shaderModifiedSrc = addStringsInShader(shadersVersion, vertexShaderAdditionalString, shaderSrc);
@@ -47,7 +47,7 @@ unsigned int makeVFshaderProgram  (const char *const vertexPath, const char *con
    shaderSrc = fileRead(fragmentPath);
    if (shaderSrc == NULL)
    {
-      fprintf(stderr, "OPENGL::SHADER::FRAGMENT::FAILED_TO_LOAD:\n%s", fragmentPath);
+      fprintf(stderr, "OPENGL::SHADER::FRAGMENT::FAILED_TO_LOAD:\n%s\n", fragmentPath);
       goto FINAL;
    }
    shaderModifiedSrc = addStringsInShader(shadersVersion, vertexShaderAdditionalString, shaderSrc);
@@ -72,7 +72,7 @@ unsigned int makeVGFshaderProgram (const char *const vertexPath, const char *con
    char *shaderSrc = fileRead(vertexPath);
    if (shaderSrc == NULL)
    {
-      fprintf(stderr, "OPENGL::SHADER::VERTEX::FAILED_TO_LOAD:\n%s", vertexPath);
+      fprintf(stderr, "OPENGL::SHADER::VERTEX::FAILED_TO_LOAD:\n%s\n", vertexPath);
       goto FINAL;
    }
    char *shaderModifiedSrc = addStringsInShader(shadersVersion, vertexShaderAdditionalString, shaderSrc);
@@ -85,7 +85,7 @@ unsigned int makeVGFshaderProgram (const char *const vertexPath, const char *con
    shaderSrc = fileRead(geometryPath);
    if (shaderSrc == NULL)
    {
-      fprintf(stderr, "OPENGL::SHADER::GEOMETRY::FAILED_TO_LOAD:\n%s", fragmentPath);
+      fprintf(stderr, "OPENGL::SHADER::GEOMETRY::FAILED_TO_LOAD:\n%s\n", fragmentPath);
       goto FINAL;
    }
    shaderModifiedSrc = addStringsInShader(shadersVersion, geometryShaderAdditionalString, shaderSrc);
@@ -98,7 +98,7 @@ unsigned int makeVGFshaderProgram (const char *const vertexPath, const char *con
    shaderSrc = fileRead(fragmentPath);
    if (shaderSrc == NULL)
    {
-      fprintf(stderr, "OPENGL::SHADER::FRAGMENT::FAILED_TO_LOAD:\n%s", fragmentPath);
+      fprintf(stderr, "OPENGL::SHADER::FRAGMENT::FAILED_TO_LOAD:\n%s\n", fragmentPath);
       goto FINAL;
    }
    shaderModifiedSrc = addStringsInShader(shadersVersion, fragmentShaderAdditionalString, shaderSrc);
@@ -160,7 +160,7 @@ unsigned int compileShader (const char *shaderSource, GLenum shaderType)
    {
       char infoLog[512];
       glGetShaderInfoLog(shader, 512, NULL, infoLog);
-      fprintf(stderr, "OPENGL::SHADER::FAILED_TO_COMPILE:\n%s", infoLog);
+      fprintf(stderr, "OPENGL::SHADER::FAILED_TO_COMPILE:\n%s\n", infoLog);
       return 0u;
    }
    return shader;
@@ -177,7 +177,7 @@ unsigned int createVFshaderProgram (unsigned int vertexShader, unsigned int frag
    if(!success) {
       char infoLog[512];
       glGetProgramInfoLog(shaderProgram, 512, NULL, infoLog);
-      fprintf(stderr, "OPENGL::SHADER::FAILED_TO_LINK:\n%s", infoLog);
+      fprintf(stderr, "OPENGL::SHADER::FAILED_TO_LINK:\n%s\n", infoLog);
       return 0u;
    }
    return shaderProgram;
@@ -195,7 +195,7 @@ unsigned int createVGFshaderProgram (unsigned int vertexShader, unsigned int geo
    if(!success) {
       char infoLog[512];
       glGetProgramInfoLog(shaderProgram, 512, NULL, infoLog);
-      fprintf(stderr, "OPENGL::SHADER::FAILED_TO_LINK:\n%s", infoLog);
+      fprintf(stderr, "OPENGL::SHADER::FAILED_TO_LINK:\n%s\n", infoLog);
       return 0u;
    }
    return shaderProgram;

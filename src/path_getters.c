@@ -45,7 +45,6 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdio.h>
-#include "log.h"
 #include "path_getters.h"
 
 #ifdef __OPTIMIZE_SIZE__
@@ -60,7 +59,7 @@ typedef uint_fast32_t cce_uint;
 static char *tmpPath = NULL;
 static size_t tmpPathLength;
 
-CCE_OPTIONS char* createNewPathFromOldPath (const char *const oldPath, const char *const appendPath, size_t freeSpaceToLeave)
+char* cce__createNewPathFromOldPath (const char *const oldPath, const char *const appendPath, size_t freeSpaceToLeave)
 {
    char *newPath;
    size_t oldPathSize = strlen(oldPath);
@@ -86,7 +85,7 @@ CCE_OPTIONS char* createNewPathFromOldPath (const char *const oldPath, const cha
    return newPath;
 }
 
-CCE_OPTIONS char* appendPath (char *const buffer, size_t bufferSize, const char *const append)
+CCE_PUBLIC_OPTIONS char* cceAppendPath (char *const buffer, size_t bufferSize, const char *const append)
 {
    size_t oldPathLength = strnlen(buffer, bufferSize);
    size_t appendPathLength = strlen(append);
@@ -103,12 +102,12 @@ CCE_OPTIONS char* appendPath (char *const buffer, size_t bufferSize, const char 
       #endif // WINDOWS_SYSTEM
       ++oldPathLength;
    }
-   memcpy(buffer + oldPathLength, appendPath, appendPathLength);
+   memcpy(buffer + oldPathLength, append, appendPathLength);
    *(buffer + oldPathLength + appendPathLength) = '\0';
    return buffer;
 }
 
-CCE_OPTIONS char* convertIntToBase64String (size_t number, char *restrict buffer, uint8_t symbolsQuantity)
+CCE_PUBLIC_OPTIONS char* cceConvertIntToBase64String (size_t number, char *restrict buffer, uint8_t symbolsQuantity)
 {
    static const char
    dictionary[64] = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 
@@ -129,38 +128,102 @@ CCE_OPTIONS char* convertIntToBase64String (size_t number, char *restrict buffer
 #include <unistd.h>
 #include <ftw.h>
 
-CCE_OPTIONS char* getCurrentPath (char *pathBuffer, size_t pathBufferLength)
+CCE_PUBLIC_OPTIONS char* cceGetCurrentPath (char *pathBuffer, size_t pathBufferLength)
 {
    return getcwd(pathBuffer, pathBufferLength);
 }
 
-uint8_t checkDirectoryExistance (const char *restrict path)
+CCE_PUBLIC_OPTIONS char* cceGetDirectory (char *path, size_t bufferSize)
 {
    struct stat st;
-   int st_state = stat(path, &st);
-   if (st_state)
+   int mkdirState, statState = stat(path, &st);
+   if (statState != 0)
    {
       switch (errno)
       {
          case ENOENT:
          {
             errno = 0u;
-            return 1u;
-         }
-         case EFAULT:
-         case ELOOP:
-         case ENOMEM:
-         {
-            return 3u;
+            mkdirState = mkdir(path, S_IRWXU | S_IRWXG);
+            if (mkdirState != 0)
+            {
+               if (errno == EEXIST)
+               {
+                  // Dangling pointer found
+                  errno = 0u;
+                  break;
+               }
+               // Don't write error handling code twice, just use existing one (no-break)
+            }
+            else
+            {
+               return path;
+            }
          }
          default:
          {
-            errno = 0u;
-            return 2u;
+            fprintf(stderr, "DIRECTORY::FAILED_TO_GET:\n%s - %s\n", path, strerror(errno));
+            return NULL;
          }
       }
    }
-   return !S_ISDIR(st.st_mode) * 2u;
+   else if (S_ISDIR(st.st_mode))
+   {
+      return path;
+   }
+   size_t length = strnlen(path, bufferSize);
+   if (length + 1u >= bufferSize)
+   {
+      return NULL;
+   }
+   size_t symbolsRemaining = bufferSize - (length + 1u);
+   for (size_t symbolsQuantity = 1u; symbolsQuantity <= symbolsRemaining; ++symbolsQuantity)
+   {
+      for (size_t number = 0u; number < (1 << (symbolsQuantity * 6u)); ++number)
+      {
+         cceConvertIntToBase64String(number, path + length, symbolsQuantity);
+         *(path + length + symbolsQuantity) = '\0';
+         statState = stat(path, &st);
+         if (statState != 0)
+         {
+            switch (errno)
+            {
+               case ENOENT:
+               {
+                  errno = 0u;
+                  mkdirState = mkdir(path, S_IRWXU | S_IRWXG);
+                  if (mkdirState != 0)
+                  {
+                     if (errno == EEXIST)
+                     {
+                        // Dangling pointer found
+                        errno = 0u;
+                        break;
+                     }
+                     // Don't write error handling code twice, just use existing one (no-break)
+                  }
+                  else
+                  {
+                     return path;
+                  }
+               }
+               default:
+               {
+                  *(path + length) = '\0';
+                  fprintf(stderr, "DIRECTORY::FAILED_TO_GET:\n%s - %s\n", path, strerror(errno));
+                  return NULL;
+               }
+            }
+         }
+         else if (S_ISDIR(st.st_mode))
+         {
+            return path;
+         }
+      }
+   }
+   *(path + length) = '\0';
+   fprintf(stderr, "DIRECTORY::FAILED_TO_GET:\n%s - %s\n", path, strerror(errno));
+   return NULL;
 }
 
 #if (defined(__APPLE__) && defined(__MACH__))
@@ -171,16 +234,17 @@ uint8_t checkDirectoryExistance (const char *restrict path)
 #define APPDATA_APPEND_SIZE 14u // strlen("/.local/share/") == 14
 #endif
 
-CCE_OPTIONS char* getAppDataPath (const char *restrict folderName, size_t spaceToLeave)
+CCE_PUBLIC_OPTIONS char* cceGetAppDataPath (const char *restrict folderName, size_t spaceToLeave)
 {
    struct stat st;
+   int statState;
    char *restrict appDataPath;
    const char *restrict path = getenv("XDG_DATA_HOME");
    size_t pathLength, folderNameLength = strlen(folderName);
-   if (path && checkDirectoryExistance(path))
+   if ((path != NULL) && (*path != '\0') && (stat(path, &st) != 0) && !S_ISDIR(st.st_mode))
    {
       pathLength = strlen(path) + 1u; // '/'
-      appDataPath = malloc((pathLength + folderNameLength + spaceToLeave + 1u) * sizeof(char));
+      appDataPath = malloc((pathLength + folderNameLength + spaceToLeave + 1u + 1u) * sizeof(char)); /* One symbol just in case */
       memcpy(appDataPath, path, pathLength - 1u);
       if (*(appDataPath + pathLength - 2u) == '/')
       {
@@ -189,25 +253,29 @@ CCE_OPTIONS char* getAppDataPath (const char *restrict folderName, size_t spaceT
       else
       {
          --pathLength;
-         appDataPath = realloc(appDataPath, (pathLength + folderNameLength + spaceToLeave + 1u) * sizeof(char));
       }
    }
    else
    {
       path = getenv("HOME");
-      if (!path || !checkDirectoryExistance(path))
+      if ((path == NULL) || (*path == '\0') || (stat(path, &st) != 0) || !S_ISDIR(st.st_mode))
       {
+         errno = 0u;
          struct passwd *pw = getpwuid(getuid());
          path = pw->pw_dir;
+         if ((path == NULL) || (stat(path, &st) != 0) || !S_ISDIR(st.st_mode))
+         {
+            perror("DIRECTORY::HOME::CANNOT_GET");
+            return NULL;
+         }
       }
       pathLength = strlen(path);
-      appDataPath = malloc((pathLength + folderNameLength + APPDATA_APPEND_SIZE + spaceToLeave + 1u) * sizeof(char)); 
+      appDataPath = malloc((pathLength + folderNameLength + APPDATA_APPEND_SIZE + spaceToLeave + 1u + 1u) * sizeof(char)); /* One symbol just in case */
       memcpy(appDataPath, path, pathLength);
       memcpy(appDataPath + pathLength, DEFAULT_APPDATA_FOLDER, APPDATA_APPEND_SIZE + 1u);
-      stat(appDataPath, &st);
-      if(!(S_ISDIR(st.st_mode)))
+      if((stat(appDataPath, &st) != 0) || !(S_ISDIR(st.st_mode)))
       {
-         appDataPath = realloc(appDataPath, (pathLength + 2u + 1u + spaceToLeave) * sizeof(char)); // strlen("/.") == 2
+         errno = 0u;
          *(appDataPath + pathLength + 0u) = '/';
          *(appDataPath + pathLength + 1u) = '.';
          pathLength += 2u;
@@ -218,28 +286,24 @@ CCE_OPTIONS char* getAppDataPath (const char *restrict folderName, size_t spaceT
       }
    }
    memcpy(appDataPath + pathLength, folderName, folderNameLength + 1u);
-   switch (checkDirectoryExistance(appDataPath))
+   pathLength += folderNameLength;
+   char *result = cceGetDirectory(appDataPath, pathLength + 1u + 1u + spaceToLeave);
+   if (!result)
    {
-      case 1u:
-      {
-         mkdir(path, S_IRWXU | S_IRWXG);
-         break;
-      }
-      case 2u:
-      {
-         criticalErrorPrint("DIRECTORY::FAILED_TO_CREATE:\n%s - Cannot create directory when there is file with same name.", path);
-         break;
-      }
+      free(appDataPath);
+      return NULL;
    }
-   return appDataPath;
+   result = realloc(appDataPath, strnlen(result, pathLength + 1u + 1u + spaceToLeave) + 1u + spaceToLeave);
+   return result;
 }
 
-CCE_OPTIONS char* getTemporaryDirectory (size_t spaceToLeave)
+CCE_PUBLIC_OPTIONS char* cceGetTemporaryDirectory (size_t spaceToLeave)
 {
    if (!tmpPath)
    {
       char *path = getenv("TMPDIR");
-      if (!path || *path == '\0' || !checkDirectoryExistance(path))
+      struct stat st;
+      if (!path || *path == '\0' || (stat(path, &st) != 0u) || !S_ISDIR(st.st_mode))
       {
          path = "/tmp";
       }
@@ -249,16 +313,16 @@ CCE_OPTIONS char* getTemporaryDirectory (size_t spaceToLeave)
       memcpy(tmpPath, path, tmpPathLength);
       *(tmpPath + tmpPathLength) = '/';
       memcpy(tmpPath + tmpPathLength + isMissingSlash, CCE_TMPDIR_NAME_TEMPLATE, CCE_TMPDIR_NAME_TEMPLATE_SIZE + 1u);
-      tmpPathLength += CCE_TMPDIR_NAME_TEMPLATE_SIZE + isMissingSlash + 1u;
+      tmpPathLength += CCE_TMPDIR_NAME_TEMPLATE_SIZE + isMissingSlash;
       path = mkdtemp(tmpPath);
       
       if (!path)
       {
          free(tmpPath);
-         criticalErrorPrint("DIRECTORY::TEMPORARY::FAILED_TO_CREATE:\nmkdtemp() returned NULL", NULL);
+         perror("DIRECTORY::TEMPORARY::FAILED_TO_CREATE");
+         return NULL;
       }
       tmpPath = path;
-      *(tmpPath + tmpPathLength - 1u) = '/';
       *(tmpPath + tmpPathLength) = '\0';
    }
    char *buffer = malloc((tmpPathLength + spaceToLeave + 1u) * sizeof(char));
@@ -286,19 +350,24 @@ static int removeCallback (const char *path, const struct stat *st, int type, st
    }
 }
 
-CCE_OPTIONS void terminateTemporaryDirectory (void)
+CCE_PUBLIC_OPTIONS void cceDeleteDirectory (const char *path)
+{
+   int nftwState = nftw(path, removeCallback, FOPEN_MAX, FTW_DEPTH | FTW_MOUNT | FTW_PHYS);
+   if (nftwState != 0)
+   {
+      fprintf(stderr, "DIRECTORY::FAILED_TO_REMOVE:\n%s path cannot be removed - %s", path, strerror(errno));
+   }
+}
+
+CCE_PUBLIC_OPTIONS void cceTerminateTemporaryDirectory (void)
 {
    if (!tmpPath)
    {
       return;
    }
-   int error = nftw(tmpPath, removeCallback, FOPEN_MAX, FTW_DEPTH | FTW_MOUNT | FTW_PHYS);
+   cceDeleteDirectory(tmpPath);
    free(tmpPath);
    tmpPath = NULL;
-   if (error)
-   {
-      criticalErrorPrint("DIRECTORY::TEMPORARY::FAILED_TO_REMOVE:\nnftw indicates an error", NULL);
-   }
 }
 
 #elif defined(WINDOWS_SYSTEM)
@@ -309,85 +378,176 @@ CCE_OPTIONS void terminateTemporaryDirectory (void)
 #include <shellapi.h>
 #include <time.h>
 
-CCE_OPTIONS char* getCurrentPath (char *pathBuffer, size_t pathBufferLength)
+static void printSystemError (char *message)
 {
-   return GetCurrentDirectory(pathBufferLength, pathBuffer);
-}
-
-uint8_t checkDirectoryExistance (const char *restrict path)
-{
-   DWORD dwAttrib = GetFileAttributes(path);
-   if (dwAttrib != INVALID_FILE_ATTRIBUTES)
+   DWORD error = GetLastError();
+   char *errorString;
+   FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+                 NULL, error, 0u, (LPTSTR) &errorString, 0u, NULL);
+   if (errorString == NULL)
    {
-      return (GetLastError() != ERROR_PATH_NOT_FOUND) + 1u;
+      fprintf(stderr, "%s: error code %u", message, error);
    }
-   return ((!(dwAttrib & FILE_ATTRIBUTE_DIRECTORY)) * 2u);
+   else
+   {
+      fprintf(stderr, "%s: %s", message, errorString);
+      LocalFree(errorString);
+   }
 }
 
-CCE_OPTIONS char* getAppDataPath (const char *restrict folderName, size_t spaceToLeave)
+static char* getErrorMessage (DWORD error)
+{
+   static char errorString[256u];
+   FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+                 NULL, error, 0u, (LPTSTR) errorString, 256u, NULL);
+   return errorString;
+}
+
+CCE_PUBLIC_OPTIONS char* cceGetCurrentPath (char *pathBuffer, size_t pathBufferLength)
+{
+   return GetCurrentDirectoryA(pathBufferLength, pathBuffer);
+}
+
+CCE_PUBLIC_OPTIONS char* cceGetDirectory (char *path, size_t bufferSize)
+{
+   DWORD attributes = GetFileAttributesA(path);
+   DWORD error;
+   if (attributes == INVALID_FILE_ATTRIBUTES)
+   {
+      error = GetLastError();
+      switch (error)
+      {
+         case ERROR_PATH_NOT_FOUND:
+         {
+            SetLastError(ERROR_SUCCESS);
+            if (CreateDirectoryA(path, NULL) == 0u) // CreateDirectoryA returns zero if failed
+            {
+               error = GetLastError();
+               // Don't write error handling code twice, just use existing one
+            }
+            else
+            {
+               return path;
+            }
+         }
+         default:
+         {
+            fprintf(stderr, "DIRECTORY::FAILED_TO_GET:\n%s - %s\n", path, getErrorMessage(error));
+            return NULL;
+         }
+      }
+   }
+   if (attributes & FILE_ATTRIBUTE_DIRECTORY)
+   {
+      return path;
+   }
+   
+   size_t length = strnlen(path, bufferSize);
+   if (length + 1u >= bufferSize)
+   {
+      return NULL;
+   }
+   size_t symbolsRemaining = bufferSize - (length + 1u);
+   for (size_t symbolsQuantity = 1u; symbolsQuantity <= symbolsRemaining; ++symbolsQuantity)
+   {
+      for (size_t number = 0u; number < (1 << (symbolsQuantity * 6u)); ++number)
+      {
+         cceConvertIntToBase64String(number, path + length, symbolsQuantity);
+         *(path + length + symbolsQuantity) = '\0';
+         attributes = GetFileAttributesA(path);
+         if (attributes == INVALID_FILE_ATTRIBUTES)
+         {
+            error = GetLastError();
+            switch (error)
+            {
+               case ERROR_PATH_NOT_FOUND:
+               {
+                  SetLastError(ERROR_SUCCESS);
+                  if (CreateDirectoryA(path, NULL) == 0u) // CreateDirectoryA returns zero if failed
+                  {
+                     error = GetLastError();
+                     // Don't write error handling code twice, just use existing one
+                  }
+                  else
+                  {
+                     return path;
+                  }
+               }
+               default:
+               {
+                  *(path + length) = '\0';
+                  fprintf(stderr, "DIRECTORY::FAILED_TO_GET:\n%s - %s\n", path, getErrorMessage(error));
+                  return NULL;
+               }
+            }
+         }
+         else if (attributes & FILE_ATTRIBUTE_DIRECTORY)
+         {
+            return path;
+         }
+      }
+   }
+   *(path + length) = '\0';
+   fprintf(stderr, "DIRECTORY::FAILED_TO_GET:\n%s - %s\n", path, getErrorMessage(error));
+   return NULL;
+}
+
+CCE_PUBLIC_OPTIONS char* cceGetAppDataPath (const char *restrict folderName, size_t spaceToLeave)
 {
    char *restrict appDataPath;
    const char *restrict path = getenv("APPDATA");
    size_t pathLength, folderNameLength = strlen(folderName);
-   if (path)
+   if (path && (*path != '\0'))
    {
       pathLength = strlen(path);
-      appDataPath = malloc((pathLength + folderNameLength + spaceToLeave + 1u) * sizeof(char));
+      appDataPath = malloc((pathLength + folderNameLength + spaceToLeave + 1u + 1u) * sizeof(char)); // One symbol just in case
       memcpy(appDataPath, path, pathLength);
       (*(appDataPath + pathLength)) = '\\';
    }
    else
    {
       appDataPath = malloc(MAX_PATH * sizeof(char));
-      if (!SUCCEEDED(SHGetFolderPath(NULL, CSIDL_APPDATA | CSIDL_FLAG_CREATE, NULL, 0, appDataPath))
+      if (SHGetFolderPathA(NULL, CSIDL_APPDATA | CSIDL_FLAG_CREATE, NULL, 0, appDataPath) != S_OK)
       {
-         criticalErrorPrint("DIRECTORY::APPDATA::FAILED_TO_RETRIEVE:\nFunction SHGetFolderPath exited with an error", NULL);
+         printSystemError("DIRECTORY::APPDATA::FAILED_TO_RETRIEVE");
+         free(appDataPath);
+         return NULL;
       }
       pathLength = strlen(appDataPath);
-      appDataPath = realloc(appDataPath, (pathLength + folderNameLength + spaceToLeave + 1u) * sizeof(char));
+      appDataPath = realloc(appDataPath, (pathLength + folderNameLength + spaceToLeave + 1u + 1u) * sizeof(char)); // One symbol just in case
       (*(appDataPath + pathLength)) = '\\';
    }
    memcpy(appDataPath + pathLength + 1u, folderName, folderNameLength + 1u);
-   switch (checkDirectoryExistance(appDataPath))
-   {
-      case 1u:
-      {
-         CreateDirectory(appDataPath, NULL);
-         break;
-      }
-      case 2u:
-      {
-         criticalErrorPrint("DIRECTORY::FAILED_TO_CHECK\n%s - Cannot check directory existence (is there a file with same name?).", appDataPath);
-         break;
-      }
-   }
-   return appDataPath;
+   cceGetDirectory(appDataPath, pathLength + folderNameLength + spaceToLeave + 1u + 1u);
+   return realloc(appDataPath, strnlen(appDataPath, pathLength + folderNameLength + spaceToLeave + 1u + 1u) + spaceToLeave + 1u);
 }
 
-CCE_OPTIONS char* getTemporaryDirectory (size_t spaceToLeave);
+CCE_PUBLIC_OPTIONS char* cceGetTemporaryDirectory (size_t spaceToLeave);
 {
    if (!tmpPath)
    {
       tmpPath = malloc(MAX_PATH * sizeof(char));
-      tmpPathLength = GetTempPath(tmpPath, tmpPath, MAX_PATH);
+      tmpPathLength = GetTempPathA(tmpPath, tmpPath, MAX_PATH);
       if (!tmpPathLength)
       {
          free(tmpPath);
-         criticalErrorPrint("DIRECTORY::TEMPORARY::FAILED_TO_GET_TEMPORARY_PATH:\GetTempPath() returned length 0", NULL);
+         printError("DIRECTORY::TEMPORARY::FAILED_TO_GET_TEMPORARY_PATH");
+         return NULL;
       }
       char *path = malloc(MAX_PATH * sizeof(char));
-      tmpPathLength = GetLongPathName(tmpPath, path, MAX_PATH);
+      tmpPathLength = GetLongPathNameA(tmpPath, path, MAX_PATH);
       if (!tmpPathLength)
       {
          free(tmpPath);
-         criticalErrorPrint("DIRECTORY::TEMPORARY::FAILED_TO_GET_LONG_PATH:\GetLongPathName() returned length 0", NULL);
+         printError("DIRECTORY::TEMPORARY::FAILED_TO_GET_LONG_PATH");
+         return NULL;
       }
       
       if (tmpPathLength > MAX_PATH)
       {
          free(path);
          tmpPath = realloc(tmpPath, tmpPathLength + CCE_TMPDIR_NAME_TEMPLATE_SIZE + 2u);
-         GetLongPathName(tmpPath, tmpPath, tmpPathLength + 1u);
+         GetLongPathNameA(tmpPath, tmpPath, tmpPathLength + 1u);
       }
       else
       {
@@ -405,37 +565,45 @@ CCE_OPTIONS char* getTemporaryDirectory (size_t spaceToLeave);
    return memcpy(buffer, tmpPath, tmpPathLength + 1u);
 }
 
-CCE_OPTIONS void terminateTemporaryDirectory (void)
+CCE_PUBLIC_OPTIONS void cceDeleteDirectory (const char *aPath)
 {
-   if (!tmpPath)
-   {
-      return;
-   }
    WIN32_FIND_DATA fileData;
-   size_t bufferSize = strlen(tmpPath);
-   size_t pathLength;
+   size_t bufferSize;
+   size_t pathLength = strlen(aPath);
    size_t fileNameLength;
    HANDLE file;
    char *path
-   if (bufferSize > MAX_PATH)
+   if (pathLength > MAX_PATH)
    {
-      path = createNewPathFromOldPath(tmpPath, "*", 22u);
-      bufferSize += 23u; // +Null-terminator
+      bufferSize = pathLength + 23u; // +Null-terminator
    }
    else
    {
-      path = createNewPathFromOldPath(tmpPath, "*", MAX_PATH - bufferSize);
-      bufferSize = MAX_PATH; // +Null-terminator
+      bufferSize = MAX_PATH; // Null-terminator included by default
    }
-   pathLength = strlen(path) - 1u;
+   path = malloc(bufferSize * sizeof(char));
+   memcpy(path, aPath, pathLength);
+   if ((path + pathLength - 1u) != '\\' && (path + pathLength - 1u) != '/')
+   {
+      (path + pathLength) = '\\'
+      ++pathLength;
+   }
+   *(path + pathLength) = '*';
+   *(path + pathLength + 1u) = '\0';
    for (;;)
    {
-      file = FindFirstFile(path, &fileData);
+      file = FindFirstFileA(path, &fileData);
       for (;;)
       {
          fileNameLength = strlen(fileData.cFileName);
          if ((*(fileData.cFileName) == '.') && (fileNameLength < 3u))
             continue;
+         
+         if ((pathLength + fileNameLength + 1u) > bufferSize)
+         {
+            bufferSize = pathLength + fileNameLength + 23u;
+            path = realloc(path, bufferSize * sizeof(char));
+         }
          
          memcpy(path + pathLength, fileData.cFileName, fileNameLength + 1u);
          
@@ -452,14 +620,12 @@ CCE_OPTIONS void terminateTemporaryDirectory (void)
             remove(path);
          }
          
-         if (!FindNextFile(file, &fileData))
+         if (!FindNextFileA(file, &fileData))
          {
-            RemoveDirectory(path);
-            if (!(strcmp(path, tmpPath)))
+            RemoveDirectoryA(path);
+            if (!(strcmp(path, aPath)))
             {
                free(path);
-               free(tmpPath);
-               tmpPath = NULL
                return;
             }
             while (*(path + pathLength - 1u) != '\\')
@@ -472,5 +638,16 @@ CCE_OPTIONS void terminateTemporaryDirectory (void)
          }
       }
    }
+}
+
+CCE_PUBLIC_OPTIONS void cceTerminateTemporaryDirectory (void)
+{
+   if (!tmpPath)
+   {
+      return;
+   }
+   cceDeleteDirectory(tmpPath);
+   free(tmpPath);
+   tmpPath = NULL;
 }
 #endif

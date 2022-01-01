@@ -32,9 +32,9 @@ extern C:
 #if defined(_WIN32) || defined(__WIN32__) || defined(_WIN64) || defined(__TOS_WIN__) || defined(__WINDOWS__) || \
     defined(__MINGW32__) || defined(__MINGW64__) || defined(__CYGWIN__)
 #include "cce_exports.h"
-#define CCE_OPTIONS CCE_EXPORTS
+#define CCE_PUBLIC_OPTIONS CCE_EXPORTS
 #else
-#define CCE_OPTIONS
+#define CCE_PUBLIC_OPTIONS
 #endif // Windows
 
 #ifdef __OPTIMIZE_SIZE__
@@ -114,19 +114,21 @@ struct Timer
    double delay;
 };
 
-CCE_OPTIONS extern const double *const cce_deltaTime;
-CCE_OPTIONS extern const double *const cce_currentTime;
-CCE_OPTIONS void startTimer      (struct Timer *timer);
-CCE_OPTIONS uint8_t isTimerEnded (struct Timer *timer);
-CCE_OPTIONS uint8_t getBool         (uint16_t boolID);
-CCE_OPTIONS void setBool            (uint16_t boolID, cce_enum action);
-CCE_OPTIONS void setPlotNumber      (uint16_t value);
-CCE_OPTIONS void increasePlotNumber (uint16_t value);
-CCE_OPTIONS uint8_t checkPlotNumber (uint16_t value);
-CCE_OPTIONS size_t binarySearch (const void *const array, const size_t arraySize, const size_t typeSize, const size_t step, const size_t value);
-CCE_OPTIONS uint_fast16_t* parseStringToLogicOperations (const char *const string, uint_fast8_t *const logicQuantity);
+CCE_PUBLIC_OPTIONS extern const double *const cceDeltaTime;
+CCE_PUBLIC_OPTIONS extern const double *const cceCurrentTime;
+CCE_PUBLIC_OPTIONS void cceStartTimer      (struct Timer *timer);
+CCE_PUBLIC_OPTIONS uint8_t cceIsTimerEnded (struct Timer *timer);
+CCE_PUBLIC_OPTIONS uint8_t cceGetBool         (uint16_t boolID);
+CCE_PUBLIC_OPTIONS void cceSetBool            (uint16_t boolID, cce_enum action);
+CCE_PUBLIC_OPTIONS void cceSetPlotNumber      (uint16_t value);
+CCE_PUBLIC_OPTIONS void cceIncreasePlotNumber (uint16_t value);
+CCE_PUBLIC_OPTIONS uint8_t cceCheckPlotNumber (uint16_t value);
+CCE_PUBLIC_OPTIONS size_t cceBinarySearch (const void *const array, const size_t arraySize, const size_t typeSize, const size_t step, const size_t value);
+CCE_PUBLIC_OPTIONS uint_fast16_t* cceParseStringToLogicOperations (const char *const string, uint_fast8_t *const logicQuantity);
+CCE_PUBLIC_OPTIONS cce_ubyte cceCheckCollision (int32_t element1_x, int32_t element1_y, int32_t element1_width, int32_t element1_height,
+                                                int32_t element2_x, int32_t element2_y, int32_t element2_width, int32_t element2_height);
 
-CCE_OPTIONS extern void (*cce_setWindowParameters) (cce_enum parameter, uint32_t a, uint32_t b);
+CCE_PUBLIC_OPTIONS extern void (*cceSetWindowParameters) (cce_enum parameter, uint32_t a, uint32_t b);
 
 #ifdef __cplusplus
 }

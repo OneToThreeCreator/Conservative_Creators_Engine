@@ -32,7 +32,7 @@ int main (int argc, char **argv)
    char path[256];
    if (argc < 2)
    {
-      getCurrentPath(path, 256);
+      cceGetCurrentPath(path, 256);
    }
    else
    {
@@ -49,16 +49,16 @@ int main (int argc, char **argv)
       {
          char *appendString = argv[1];
          appendString += (appendString[0] == '.') * 2;
-         getCurrentPath(path, 256);
+         cceGetCurrentPath(path, 256);
          strncat(path, appendString, 256 - strnlen(path, 256));
       }
    }
    const uint32_t globalBoolsQuantity = 32768u;
-   if (initEngine2D(globalBoolsQuantity, 48u, 48u, "CoffeeChain TEST", path) != 0)
+   if (cceInitEngine2D(globalBoolsQuantity, 48u, 48u, "CoffeeChain TEST", path) != 0)
    {
       return -1;
    }
-   setFlags2D(CCE_RENDER_ONLY_CURRENT_MAP | CCE_PROCESS_LOGIC_ONLY_FOR_CURRENT_MAP);
+   cceSetFlags2D(CCE_RENDER_ONLY_CURRENT_MAP | CCE_PROCESS_LOGIC_ONLY_FOR_CURRENT_MAP);
    {
       struct Map2DElement elements[] = {
          {3, 3, 10u, 10u, {0.0f, 0.0f, 0.0f, 0.0f, 0u}, 0, 0u, 0u, 2u},
@@ -117,28 +117,27 @@ int main (int argc, char **argv)
       *(uint16_t*) (moveRight + 2u) = 0u;
       *((uint16_t*) (moveRight + 2u) + 1u) = timerID;
       
-      uint_fast16_t *aandb = parseStringToLogicOperations("a & b", NULL);
+      uint_fast16_t *aandb = cceParseStringToLogicOperations("a & b", NULL);
       
       struct ElementLogic logic[] = {
-         {2u, 2u, moveUpElements,    aandb, 0x8 /*00001000 in hex*/, moveAndTimerActions, moveAndTimerOffsets, (void*) moveUp},
-         {2u, 2u, moveDownElements,  aandb, 0x8 /*00001000 in hex*/, moveAndTimerActions, moveAndTimerOffsets, (void*) moveDown},
-         {2u, 2u, moveLeftElements,  aandb, 0x8 /*00001000 in hex*/, moveAndTimerActions, moveAndTimerOffsets, (void*) moveLeft},
-         {2u, 2u, moveRightElements, aandb, 0x8 /*00001000 in hex*/, moveAndTimerActions, moveAndTimerOffsets, (void*) moveRight},
-         
+         {2u, 2u, moveUpElements,    aandb, 0x8  /*00001000 in hex*/, moveAndTimerActions, moveAndTimerOffsets, (void*) moveUp},
+         {2u, 2u, moveDownElements,  aandb, 0x8  /*00001000 in hex*/, moveAndTimerActions, moveAndTimerOffsets, (void*) moveDown},
+         {2u, 2u, moveLeftElements,  aandb, 0x8  /*00001000 in hex*/, moveAndTimerActions, moveAndTimerOffsets, (void*) moveLeft},
+         {2u, 2u, moveRightElements, aandb, 0x8  /*00001000 in hex*/, moveAndTimerActions, moveAndTimerOffsets, (void*) moveRight},         
       };
       double globalTimer = 0.02;
       struct Map2Ddev map = {0u, 5u, 0u, elements, 1u, moveGroups, 0u, NULL, 0u, NULL, 0u, NULL, 0u, NULL, 1u, &globalTimer, 4u, logic,
                              4u, timerAndColorsActions, timerAndColorsOffsets, (void*) timerAndColors, 0u, NULL};
-      char *path = getTemporaryDirectory(0u);
-      setMap2Dpath(path);
+      char *path = cceGetTemporaryDirectory(0u);
+      cceSetMap2Dpath(path);
       free(path);
-      writeMap2Ddev(&map, NULL);
+      cceWriteMap2Ddev(&map, NULL);
       free(aandb);
    }
    {
       struct Map2DElementDev player = {-1, -1, 2u, 2u, {0.0f, 0.0f, 0.0f, 0.0f, 0u}, 0u, 0u, 0u, 0u, 0u, 0u, 1u};
-      createMap2DElementDynamicMap2D(&player, 1u);
+      cceCreateMap2DElementDynamicMap2D(&player, 1u);
    }
    printf("Initialization complete\n");
-   return engine2D();
+   return cceEngine2D();
 }
