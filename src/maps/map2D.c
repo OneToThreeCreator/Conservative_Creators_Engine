@@ -58,7 +58,8 @@ static GLint *uniformLocations;
 
 static uint32_t actionsQuantity;
 
-static char *texturesPath;
+static char *texturesPath = NULL;
+static size_t texturesPathLength;
 
 static cce_flag map2Dflags;
 
@@ -189,7 +190,7 @@ static GLuint createTextureArray (uint16_t newSize)
    GLuint texture;
    glGenTextures(1, &texture);
    glBindTexture(GL_TEXTURE_2D_ARRAY, texture);
-   glTexImage3D(GL_TEXTURE_2D_ARRAY, 0, GL_RGBA8, g_texturesWidth, g_texturesHeight, newSize, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+   glTexImage3D(GL_TEXTURE_2D_ARRAY, 0, GL_RGBA, g_texturesWidth, g_texturesHeight, newSize, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
    GL_CHECK_ERRORS;   
    
    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_REPEAT);
@@ -326,6 +327,8 @@ CCE_PUBLIC_OPTIONS int cceInitEngine2D (uint16_t globalBoolsQuantity, uint32_t t
       iterator->flags = 0u;
       cce_setUniformBufferToDefault(iterator->UBO, *(bufferUniformsOffsets + 6));
    }
+   glEnable(GL_BLEND);
+   glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
    cce__initMap2DLoaders(&cce_actions);
    cceAppendPath(pathBuffer, pathLength + 11u, "maps");
    cceSetMap2Dpath(pathBuffer);
@@ -336,13 +339,14 @@ CCE_PUBLIC_OPTIONS int cceInitEngine2D (uint16_t globalBoolsQuantity, uint32_t t
    g_texturesWidth = textureMaxWidth;
    g_texturesHeight = textureMaxHeight;
    g_textures = (struct LoadedTextures*) calloc(CCE_ALLOCATION_STEP, sizeof(struct LoadedTextures));
-   g_textures->flags = 0x40u;
    g_texturesQuantity = 0u;
    g_texturesQuantityAllocated = CCE_ALLOCATION_STEP;
    glTexturesArray = createTextureArray(CCE_ALLOCATION_STEP);
    glTexturesArraySize = CCE_ALLOCATION_STEP;
    stbi_set_flip_vertically_on_load(1);
-   texturesPath = cce__createNewPathFromOldPath(resourcePath, "textures/img_", 9u);
+   cceAppendPath(pathBuffer, pathLength + 11u, "textures");
+   cceSetTexturesPath(resourcePath);
+   *(pathBuffer + pathLength) = '\0';
    cce__baseActionsInit(g_dynamicMap, g_UBOs, bufferUniformsOffsets, uniformLocations, shaderProgram, cce_setUniformBufferToDefault);
    g_dynamicMap = cce__initDynamicMap2D();
    cceSetFlags2D(CCE_DEFAULT);
@@ -366,12 +370,18 @@ CCE_PUBLIC_OPTIONS uint8_t cceRegisterAction (uint32_t ID, void (*action)(void*)
    return 0u;
 }
 
+CCE_PUBLIC_OPTIONS void cceSetTexturesPath (const char *path)
+{
+   free(texturesPath);
+   texturesPath = cce__createNewPathFromOldPath(path, "img_", 10u);
+   texturesPathLength = strlen(texturesPath);
+}
+
 void cce__updateTexturesArray (void)
 {
    int width, height, nrChannels;
    uint8_t arrayResized = 0u;
    cce_ubyte *data;
-   uint16_t emptyLoadedTexturesInRow = 0u;
    GLuint textureArray;
    if (glTexturesArraySize < g_texturesQuantityAllocated)
    {
@@ -379,38 +389,36 @@ void cce__updateTexturesArray (void)
       glBindBuffer(GL_READ_BUFFER, glTexturesArray);
       GL_CHECK_ERRORS;
       arrayResized = 1u;
+      glBindTexture(GL_TEXTURE_2D_ARRAY, textureArray);
    }
    else
    {
       textureArray = glTexturesArray;
    }
-   
-   for (struct LoadedTextures *iterator = g_textures, *end = g_textures + g_texturesQuantity;; ++iterator)
+   for (struct LoadedTextures *iterator = g_textures, *end = g_textures + g_texturesQuantity; iterator < end; ++iterator)
    {
-      if ((iterator >= end))
+      if (iterator->dependantMapsQuantity > 0u)
       {
-         g_texturesQuantity -= emptyLoadedTexturesInRow;
-         break;
-      }
-      if (iterator->dependantMapsQuantity)
-      {
-         emptyLoadedTexturesInRow = 0u;
-         if ((iterator->flags & 0x80u))
+         if ((iterator->flags & CCE_LOADEDTEXTURES_TOBELOADED))
          {
             shortToString(texturesPath, iterator->ID, ".png");
             data = stbi_load(texturesPath, &width, &height, &nrChannels, 4);
+            *(texturesPath + texturesPathLength) = '\0';
             if (!data)
             {
-               data = stbi_load("./textures/img_dummy.png", &width, &height, &nrChannels, 4);
+               memcpy((texturesPath + texturesPathLength), "dummy.png", 10u);
+               data = stbi_load(texturesPath, &width, &height, &nrChannels, 4);
+               *(texturesPath + texturesPathLength) = '\0';
                if (!data)
                {
+                  shortToString(texturesPath, iterator->ID, ".png");
                   cce__criticalErrorPrint("ENGINE::TEXTURE::DUMMY::FAILED_TO_LOAD:\nFailed to load dummy texture requested because %s was not found.", texturesPath);
                }
             }
-            
             glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, g_texturesWidth - width, g_texturesHeight - height, (iterator - g_textures), width, height, 1, GL_RGBA, GL_UNSIGNED_BYTE, data);
             GL_CHECK_ERRORS;
             stbi_image_free(data);
+            iterator->flags &= ~CCE_LOADEDTEXTURES_TOBELOADED;
          }
          else if (arrayResized)
          {
@@ -421,7 +429,6 @@ void cce__updateTexturesArray (void)
       else 
       {
          iterator->ID = 0u;
-         ++emptyLoadedTexturesInRow;
       }
    }
    if (arrayResized)
@@ -430,6 +437,7 @@ void cce__updateTexturesArray (void)
       GL_CHECK_ERRORS;
       glTexturesArray = textureArray;
    }
+   map2Dflags &= ~CCE_PROCESS_TEXTURES;
    return;
 }
 
@@ -494,34 +502,38 @@ static void extendLoadedTextures (uint16_t amount)
    g_textures = realloc(g_textures, g_texturesQuantityAllocated * sizeof(struct LoadedTextures));
 }
 
-uint16_t cce__loadTextureDynamicMap2D (struct DynamicMap2DElement *element)
+uint16_t cce__loadTexture (uint32_t textureID)
 {
+   if (textureID == 0u)
+      return 0u;
    map2Dflags |= CCE_PROCESS_TEXTURES;
    uint16_t current_g_texture = 0u;
    for (;;)
    {
       if (current_g_texture < g_texturesQuantity)
       {
-         extendLoadedTextures(CCE_ALLOCATION_STEP);
+         current_g_texture = g_texturesQuantity;
          ++g_texturesQuantity;
+         if (g_texturesQuantity > g_texturesQuantityAllocated)
+         {
+            extendLoadedTextures(CCE_ALLOCATION_STEP);
+         }
          break;
       }
-      if ((g_textures + current_g_texture)->ID == element->textureInfo.ID)
+      if ((g_textures + current_g_texture)->ID == (textureID - 1u))
       {
          ++((g_textures + current_g_texture)->dependantMapsQuantity);
-         element->textureInfo.ID = current_g_texture;
-         return current_g_texture;;
+         return current_g_texture + 1u;
       }
       if ((g_textures + current_g_texture)->dependantMapsQuantity == 0u)
       {
          uint16_t i = current_g_texture;
          while (i < g_texturesQuantity)
          {
-            if ((g_textures + i)->ID == element->textureInfo.ID)
+            if ((g_textures + i)->ID == (textureID - 1u))
             {
                ++((g_textures + i)->dependantMapsQuantity);
-               element->textureInfo.ID = i;
-               return i;
+               return i + 1u;
             }
             ++i;
          }
@@ -529,11 +541,10 @@ uint16_t cce__loadTextureDynamicMap2D (struct DynamicMap2DElement *element)
       }
       ++current_g_texture;
    }
-   (g_textures + current_g_texture)->ID = element->textureInfo.ID;
-   element->textureInfo.ID = current_g_texture;
-   (g_textures + current_g_texture)->flags = 0x80u;
+   (g_textures + current_g_texture)->ID = (textureID - 1u);
+   (g_textures + current_g_texture)->flags = CCE_LOADEDTEXTURES_TOBELOADED;
    (g_textures + current_g_texture)->dependantMapsQuantity = 1u;
-   return current_g_texture;
+   return current_g_texture + 1u;
 }
 
 uint16_t* cce__loadTexturesMap2D (struct Map2DElement *elements, uint32_t elementsQuantity, uint16_t *texturesLoadedMapReliesOnQuantity)
@@ -548,7 +559,7 @@ uint16_t* cce__loadTexturesMap2D (struct Map2DElement *elements, uint32_t elemen
       if (ID == 0u) continue;
       for (uint32_t *jiterator = texturesMapReliesOn, *jend = texturesMapReliesOn + texturesMapReliesOnQuantity; jiterator < jend; ++jiterator)
       {
-         if ((*jiterator) == ID)
+         if ((*jiterator) == (ID - 1u))
          {
             isLoaded = 1u;
             break;
@@ -561,7 +572,7 @@ uint16_t* cce__loadTexturesMap2D (struct Map2DElement *elements, uint32_t elemen
             texturesMapReliesOnAllocated += CCE_ALLOCATION_STEP;
             texturesMapReliesOn = (uint32_t*) realloc(texturesMapReliesOn, texturesMapReliesOnAllocated * sizeof(uint32_t));
          }
-         (*(texturesMapReliesOn + texturesMapReliesOnQuantity)) = ID;
+         (*(texturesMapReliesOn + texturesMapReliesOnQuantity)) = (ID - 1u); // 0u is invalid for openGL shaders, but perfectly fine here
          ++texturesMapReliesOnQuantity;
       }
    }
@@ -585,10 +596,12 @@ uint16_t* cce__loadTexturesMap2D (struct Map2DElement *elements, uint32_t elemen
                tmp = (*jiterator);
                (*jiterator) = (*kiterator);
                (*kiterator) = tmp;
-               (*literator) = current_g_texture;
+               (*literator) = current_g_texture + 1u;
+               elements->textureInfo.ID = current_g_texture + 1u;
                ++((g_textures + current_g_texture)->dependantMapsQuantity);
                ++literator;
                ++kiterator;
+               ++elements;
                isLoaded = 1u;
                break;
             }
@@ -618,11 +631,12 @@ uint16_t* cce__loadTexturesMap2D (struct Map2DElement *elements, uint32_t elemen
    uint16_t *iterator = freeLoadedTextures, *iend = freeLoadedTextures + freeLoadedTexturesQuantity;
    while ((literator < end) && (iterator < iend))
    {
-      ((g_textures + (*iterator))->ID) = (*kiterator) + 1u; // 0u is invalid for openGL shaders, but perfectly fine here
-      (*literator) = (*iterator);
+      ((g_textures + (*iterator))->ID) = *kiterator;
+      (*literator) = (*iterator) + 1u;
+      elements->textureInfo.ID = (*iterator) + 1u;
       ((g_textures + (*iterator))->dependantMapsQuantity) = 1;
-      ((g_textures + (*iterator))->flags) = 0x80;
-      ++literator, ++kiterator, ++iterator;
+      ((g_textures + (*iterator))->flags) = CCE_LOADEDTEXTURES_TOBELOADED;
+      ++literator, ++kiterator, ++iterator, ++elements;
    }
    free(freeLoadedTextures);
    uint16_t current_g_texture = g_texturesQuantity;
@@ -630,20 +644,18 @@ uint16_t* cce__loadTexturesMap2D (struct Map2DElement *elements, uint32_t elemen
    {
       if (current_g_texture >= g_texturesQuantity)
       {
-         cce__errorPrint("ENGINE::LOAD_TEXTURES_MAP_2D::NO_FREE_TEXTURE_SPACE_LEFT:\nCannot load texture because no free space left. \
-                             Make bigger texture atlases or increase maxSimultaneouslyLoadedTexturesQuantity to avoid this.", NULL);
-         while (literator < end)
+         ++g_texturesQuantity;
+         if (g_texturesQuantity > g_texturesQuantityAllocated)
          {
-            (*literator) = 0u;
-            ++literator;
+            extendLoadedTextures(CCE_ALLOCATION_STEP);
          }
-         break;
       }
       ((g_textures + current_g_texture)->ID) = (*kiterator);
       (*literator) = current_g_texture + 1u; // 0u is invalid for openGL shaders (it's the way to say "We don't need texture here"), but perfectly fine here
+      elements->textureInfo.ID = current_g_texture + 1u;
       ((g_textures + current_g_texture)->dependantMapsQuantity) = 1;
-      ((g_textures + current_g_texture)->flags) = 0x80;
-      ++literator, ++kiterator, ++current_g_texture;
+      ((g_textures + current_g_texture)->flags) = CCE_LOADEDTEXTURES_TOBELOADED;
+      ++literator, ++kiterator, ++current_g_texture, ++elements;
    }
    *texturesLoadedMapReliesOnQuantity = texturesMapReliesOnQuantity;
    return (uint16_t*) realloc(texturesMapReliesOn, texturesMapReliesOnQuantity * sizeof(uint16_t));
@@ -653,9 +665,18 @@ void cce__releaseTextures (uint16_t *texturesMapReliesOn, uint16_t texturesMapRe
 {
    for (uint16_t *iterator = texturesMapReliesOn, *end = texturesMapReliesOn + texturesMapReliesOnQuantity; iterator < end; ++iterator)
    {
-      --((g_textures + (*iterator))->dependantMapsQuantity);
+      --((g_textures + (*(iterator) - 1u))->dependantMapsQuantity);
    }
    free(texturesMapReliesOn);
+   return;
+}
+
+void cce__releaseTexture (uint16_t textureID)
+{
+   if (textureID == 0u)
+      return;
+   
+   --((g_textures + (textureID - 1u))->dependantMapsQuantity);
    return;
 }
 
@@ -851,8 +872,15 @@ CCE_PUBLIC_OPTIONS int cceEngine2D (void)
    int32_t closestMapDistance = 0u, currentDistance;
    while (!(*cce__flags & CCE_ENGINE_STOP))
    {
+      cce__processDynamicMap2DElements();
+      
+      if (map2Dflags & CCE_PROCESS_TEXTURES)
+         cce__updateTexturesArray();
+      
       glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
       glClear(GL_COLOR_BUFFER_BIT);
+      GL_CHECK_ERRORS;
+      glBindTexture(GL_TEXTURE_2D_ARRAY, glTexturesArray);
       GL_CHECK_ERRORS;
       if (maps->main->exitMapsQuantity)
       {
@@ -890,7 +918,6 @@ CCE_PUBLIC_OPTIONS int cceEngine2D (void)
          maps = loadMap2DwithDependies(maps, (maps->main->exitMaps + closestMapPosition)->ID);
          cce__setCurrentArrayOfMaps(maps);
       }
-      cce__processDynamicMap2DElements();
    }
    for (struct Map2D **iterator = maps->dependies, **end = maps->dependies + maps->main->exitMapsQuantity; iterator < end; ++iterator)
    {

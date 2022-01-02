@@ -40,6 +40,8 @@ struct LoadedTextures
    uint8_t  flags; /* 0x80 - to be loaded, 0x40 - after that point there's no busy LoadedTextures */
 };
 
+#define CCE_LOADEDTEXTURES_TOBELOADED 0x1u
+
 struct Map2Darray
 {
    struct Map2D *main;
@@ -147,10 +149,11 @@ void cce__endBaseActions (void);
 
 cce_ubyte cce__fourthLogicTypeFuncMap2D(uint16_t ID, va_list argp);
 cce_ubyte cce__fourthLogicTypeFuncDynamicMap2D(uint16_t ID, va_list argp);
-uint16_t cce__loadTextureDynamicMap2D (struct DynamicMap2DElement *element);
+uint16_t cce__loadTexture (uint32_t ID);
 void cce__processDynamicMap2DElements (void);
 uint16_t* cce__loadTexturesMap2D (struct Map2DElement *elements, uint32_t elementsQuantity, uint16_t *texturesLoadedMapReliesOnQuantity);
 void cce__releaseTextures (uint16_t *texturesMapReliesOn, uint16_t texturesMapReliesOnQuantity);
+void cce__releaseTexture (uint16_t textureID);
 uint16_t cce__getFreeUBO (void);
 void cce__releaseUBO (uint16_t ID);
 void cce__releaseUnusedUBO (uint16_t ID);

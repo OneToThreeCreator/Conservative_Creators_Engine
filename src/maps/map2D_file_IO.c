@@ -346,7 +346,6 @@ static struct Map2DCollider* elementsToColliders (uint32_t  elementsQuantity, ui
                                                   GLuint *VAO, GLuint *VBO)
 {
    *texturesMapReliesOn = cce__loadTexturesMap2D(elements, elementsQuantity, texturesMapReliesOnQuantity);
-   
    elements = (struct Map2DElement*) realloc(elements, (sizeof(struct Map2DElement) + 3u * sizeof(uint8_t)) * elementsQuantity);
    uint8_t *glGroups = (uint8_t*) ((void*) (elements + elementsQuantity));
    memset(glGroups, 0, elementsQuantity * (3u * sizeof(uint8_t)));

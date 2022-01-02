@@ -62,7 +62,7 @@ static GLuint makeVAOdynamicMap2D (uint32_t elementsQuantityAllocated, GLuint *V
    GL_CHECK_ERRORS;
    glVertexAttribPointer( 3,  4, GL_FLOAT, GL_FALSE, sizeof(struct DynamicMap2DElement), (void*)(offsetof(struct DynamicMap2DElement, textureInfo) + offsetof(struct Texture, startX)));
    GL_CHECK_ERRORS;
-   glVertexAttribIPointer(4,  1, GL_UNSIGNED_INT,    sizeof(struct DynamicMap2DElement), (void*)(offsetof(struct DynamicMap2DElement, textureInfo) + offsetof(struct Texture, ID)));
+   glVertexAttribIPointer(4,  1, GL_UNSIGNED_SHORT,  sizeof(struct DynamicMap2DElement), (void*)(offsetof(struct DynamicMap2DElement, textureElementReliesOn)));
    GL_CHECK_ERRORS;
    glVertexAttribIPointer(5,  1, GL_UNSIGNED_BYTE,   sizeof(struct DynamicMap2DElement), (void*)(offsetof(struct DynamicMap2DElement, moveGroup)));
    GL_CHECK_ERRORS;
@@ -554,6 +554,7 @@ CCE_PUBLIC_OPTIONS void cceReplaceMap2DElementDynamicMap2D (struct Map2DElementD
 CCE_PUBLIC_OPTIONS void cceDeleteMap2DElementDynamicMap2D (uint32_t ID)
 {
    deleteGroupsFromElementDynamicMap2D((g_dynamicMap->elements + ID));
+   cce__releaseTexture((g_dynamicMap->elements + ID)->textureElementReliesOn);
    memcpy((g_dynamicMap->elements + ID), &nullElement, sizeof(struct DynamicMap2DElement));
    (g_dynamicMap->elements + ID)->flags = 0x0u;
    flags |= CCE_DYNAMIC_MAP2D_TO_BE_PROCESSED;
@@ -616,9 +617,8 @@ void cce__processDynamicMap2DElements (void)
    {
       if (iterator->flags & 0x4u)
       {
-         cce__loadTextureDynamicMap2D(iterator);
+         iterator->textureElementReliesOn = cce__loadTexture(iterator->textureInfo.ID);
          memcpy(bufferPtr + (iterator - g_dynamicMap->elements), iterator, sizeof(struct DynamicMap2DElement));
-         iterator->textureElementReliesOn = iterator->textureInfo.ID;
          uint8_t isMoveGroup = iterator->moveGroup > 0u, isGlobalOffset = iterator->flags & CCE_GLOBAL_OFFSET_MASK;
          iterator->moveGroupsQuantity += isMoveGroup + isGlobalOffset;
          if (isMoveGroup || isGlobalOffset)

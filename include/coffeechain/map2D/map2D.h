@@ -198,6 +198,7 @@ CCE_PUBLIC_OPTIONS int cceInitEngine2D (uint16_t globalBoolsQuantity, uint32_t t
                       const char *windowLabel, const char *resourcePath);
 CCE_PUBLIC_OPTIONS void cceSetFlags2D (cce_flag flags);
 CCE_PUBLIC_OPTIONS uint8_t cceRegisterAction (uint32_t ID, void (*action)(void*));
+CCE_PUBLIC_OPTIONS void cceSetTexturesPath (const char *path);
 CCE_PUBLIC_OPTIONS int cceEngine2D (void);
 
 // dynamicMap2D
