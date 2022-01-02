@@ -54,18 +54,24 @@ int main (int argc, char **argv)
       }
    }
    const uint32_t globalBoolsQuantity = 32768u;
-   if (cceInitEngine2D(globalBoolsQuantity, 48u, 48u, "CoffeeChain TEST", path) != 0)
+   if (cceInitEngine2D(globalBoolsQuantity, 16u, 16u, "CoffeeChain TEST", path) != 0)
    {
       return -1;
    }
+   cceAppendPath(path, 256, "test2/textures");
+   cceSetTexturesPath(path);
    cceSetFlags2D(CCE_RENDER_ONLY_CURRENT_MAP | CCE_PROCESS_LOGIC_ONLY_FOR_CURRENT_MAP);
    {
+      char *path = cceGetTemporaryDirectory(0u);
+      cceSetMap2Dpath(path);
+      free(path);
+      
       struct Map2DElement elements[] = {
-         {3, 3, 10u, 10u, {0.0f, 0.0f, 0.0f, 0.0f, 0u}, 0, 0u, 0u, 2u},
-         {-11, -11, 10u, 24u, {0.0f, 0.0f, 0.0f, 0.0f, 0u}, 0, 0u, 0u, 1u},
-         {3, -11, 10u, 10u, {0.0f, 0.0f, 0.0f, 0.0f, 0u}, 0, 0u, 0u, 2u},
-         {0, -11, 2u, 24u,  {0.0f, 0.0f, 0.0f, 0.0f, 0u}, 0, 0u, 0u, 3u},
-         {2, 0, 11u, 2u,  {0.0f, 0.0f, 0.0f, 0.0f, 0u}, 0, 0u, 0u, 3u},
+         {3, 3, 10u, 10u, {0.0f, 0.0f, 5.0f, 5.0f, 2u}, 0, 0u, 0u, 0u},
+         {-11, -11, 10u, 24u, {0.0f, 0.0f, 1.0f, 1.0f, 0u}, 0, 0u, 0u, 1u},
+         {3, -11, 10u, 10u, {0.0f, 0.0f, 1.0f, 1.0f, 0u}, 0, 0u, 0u, 2u},
+         {0, -11, 2u, 24u,  {0.0f, 0.0f, 1.0f, 1.0f, 0u}, 0, 0u, 0u, 3u},
+         {2, 0, 11u, 2u,  {0.0f, 0.0f, 1.0f, 1.0f, 0u}, 0, 0u, 0u, 3u},
       };
       struct ElementGroup moveGroups[1u] = {
          {NULL, 0u},
@@ -128,14 +134,11 @@ int main (int argc, char **argv)
       double globalTimer = 0.02;
       struct Map2Ddev map = {0u, 5u, 0u, elements, 1u, moveGroups, 0u, NULL, 0u, NULL, 0u, NULL, 0u, NULL, 1u, &globalTimer, 4u, logic,
                              4u, timerAndColorsActions, timerAndColorsOffsets, (void*) timerAndColors, 0u, NULL};
-      char *path = cceGetTemporaryDirectory(0u);
-      cceSetMap2Dpath(path);
-      free(path);
       cceWriteMap2Ddev(&map, NULL);
       free(aandb);
    }
    {
-      struct Map2DElementDev player = {-1, -1, 2u, 2u, {0.0f, 0.0f, 0.0f, 0.0f, 0u}, 0u, 0u, 0u, 0u, 0u, 0u, 1u};
+      struct Map2DElementDev player = {-1, -1, 2u, 2u, {0.0f, 0.0f, 1.0f, 1.0f, 1u}, 0u, 0u, 0u, 0u, 0u, 0u, 0u};
       cceCreateMap2DElementDynamicMap2D(&player, 1u);
    }
    printf("Initialization complete\n");
