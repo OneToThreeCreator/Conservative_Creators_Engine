@@ -32,17 +32,31 @@ find_package(glfw3 3.3 REQUIRED)
 
 add_library(${PROJECT_NAME}
    #src/audio.c
+   #src/audio.h
    src/engine_common.c
+   include/coffeechain/engine_common.h
+   src/engine_common_internal.h
    src/engine_common_glfw.c
+   src/engine_common_glfw.h
    src/path_getters.c
+   src/path_getters.h
    src/shader.c
+   src/shader.h
    src/maps/base_actions.c
+   src/maps/base_actions.h
    src/maps/dynamic_map2D.c
    src/maps/map2D.c
+   include/coffeechain/map2D/map2D.h
+   src/maps/map2D_internal.h
    src/maps/map2D_file_IO.c
    src/maps/log.c
+   src/maps/log.h
    src/external/glad.c
+   src/external/glad.h
+   src/external/khrplatform.h
    src/external/stb_libs.c
+   src/external/stb_image.h
+   #src/external/stb_vorbis.h
 )
 
 set_target_properties(${PROJECT_NAME} PROPERTIES 
