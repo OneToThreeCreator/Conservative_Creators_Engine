@@ -127,6 +127,11 @@ static void setDynamicTimerDelayAction (void *data)
    }
 }
 
+static void setGridSizeAction (void *data)
+{
+   cceSetGridMultiplier(*((float*) data));
+}
+
 void cce__beginBaseActions (const struct Map2D *map)
 {
    currentMap = map;
@@ -188,6 +193,7 @@ void cce__baseActionsInit (const struct DynamicMap2D *dynamic_map, struct UsedUB
    cceRegisterAction(6, setPlotNumberAction);
    cceRegisterAction(7, startTimerAction);
    cceRegisterAction(8, setDynamicTimerDelayAction);
+   cceRegisterAction(9, setGridSizeAction);
 }
 
 static inline void moveElements (int32_t *firstElementX, int32_t *firstElementY, ptrdiff_t step, struct ElementGroup *group, int32_t x, int32_t y)

@@ -182,6 +182,7 @@ int main (int argc, char **argv)
    }
    initPlayer(globalBoolsQuantity);
    createAdditionalDynamicElement((struct cce_ivec2) {2, 2}, globalBoolsQuantity);
+   cceSetGridMultiplier(10.0f);
    printf("Initialization complete\n");
    return cceEngine2D();
 }

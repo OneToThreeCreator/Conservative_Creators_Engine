@@ -201,6 +201,12 @@ static GLuint createTextureArray (uint16_t newSize)
    return texture;
 }
 
+CCE_PUBLIC_OPTIONS void cceSetGridMultiplier (float multiplier)
+{
+   struct cce_uvec2 aspectRatio = cce__getCurrentStep();
+   glUniform2f(*uniformLocations, aspectRatio.x * multiplier, aspectRatio.y * multiplier);
+}
+
 CCE_PUBLIC_OPTIONS int cceInitEngine2D (uint16_t globalBoolsQuantity, uint32_t textureMaxWidth, uint32_t textureMaxHeight,
                                         const char *windowLabel, const char *resourcePath)
 {
@@ -354,6 +360,8 @@ CCE_PUBLIC_OPTIONS int cceInitEngine2D (uint16_t globalBoolsQuantity, uint32_t t
    cceSetFlags2D(CCE_DEFAULT);
    map2Dflags &= ~CCE_INIT;
    free(pathBuffer);
+   glUseProgram(shaderProgram);
+   cceSetGridMultiplier(1.0f);
    return 0;
 }
 
@@ -860,14 +868,9 @@ CCE_PUBLIC_OPTIONS int cceEngine2D (void)
 {
    if (map2Dflags & CCE_INIT)
       return -1;
-   glUseProgram(shaderProgram);
    cce__showWindow();
    cce__engineUpdate();
    GL_CHECK_ERRORS;
-   {
-      struct cce_uvec2 aspectRatio = cce__getCurrentStep();
-      glUniform2f(*uniformLocations, aspectRatio.x, aspectRatio.y);
-   }
    struct Map2Darray *maps = loadMap2DwithDependies(NULL, 0u);
    cce__setCurrentArrayOfMaps(maps);
    uint32_t closestMapPosition;

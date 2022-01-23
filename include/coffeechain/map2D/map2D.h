@@ -169,6 +169,7 @@ struct Map2Ddev
    struct ExitMap2D      *exitMaps;
 };
 
+CCE_PUBLIC_OPTIONS void cceSetGridMultiplier (float multiplier);
 CCE_PUBLIC_OPTIONS void cceSetMap2Dpath (const char *path);
 CCE_PUBLIC_OPTIONS void cceFreeMap2D (struct Map2D *map);
 CCE_PUBLIC_OPTIONS struct Map2D* cceLoadMap2D (uint16_t number);
