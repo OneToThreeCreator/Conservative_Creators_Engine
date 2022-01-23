@@ -33,6 +33,7 @@ void initPlayer (uint32_t globalBoolsQuantity)
    cceCreateMap2DElementDynamicMap2D(&player, 1);
 
    uint_fast16_t *aandb = cceParseStringToLogicOperations("a & b", NULL);
+   printf("aandb == %lx\n", *aandb);
    uint16_t logicIDs[5];
    uint16_t timerID = cceCreateTimerDynamicMap2D(0.03f);
    uint16_t moveElements[2] = {globalBoolsQuantity - 12, timerID};

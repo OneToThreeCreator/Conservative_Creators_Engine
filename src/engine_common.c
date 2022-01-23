@@ -216,6 +216,8 @@ void cce__processLogic (uint32_t logicQuantity, struct ElementLogic *logic, stru
    va_start(argp, fourth_if_func);
    uint_fast32_t boolSum;
    uint16_t boolNumber;
+   //logicQuantity = (logicQuantity > 0) * 2u;
+   //printf("logicQuantity = %u\n", logicQuantity);
    struct ElementLogic *endLogic = (logic + logicQuantity);
    uint_fast16_t currentOperations;
    cce_byte isLogic;
@@ -224,35 +226,35 @@ void cce__processLogic (uint32_t logicQuantity, struct ElementLogic *logic, stru
       maxTimerCheckDelay = 0.0;
       boolSum = 0u;
       currentOperations = (*logic->operations);
-      for (cce_ubyte j = logic->logicElementsQuantity - 1u;; --j)
+      for (cce_ubyte j = 0;; ++j)
       {
          boolNumber = (*((logic->logicElements) + j));
          switch (((logic->elementType) >> (j * 2u)) & 0x3)
          {
             case 0x0:
             {
-               boolSum += (((uint_fast16_t) cceGetBool(boolNumber)) << j);
+               boolSum += (((uint_fast16_t) cceGetBool(boolNumber)) << (logic->logicElementsQuantity - 1u - j));
                break;
             }
             case 0x1:
             {
-               boolSum += (((uint_fast16_t) (cce_Gvars.plotNumber > boolNumber)) << j);
+               boolSum += (((uint_fast16_t) (cce_Gvars.plotNumber > boolNumber)) << (logic->logicElementsQuantity - 1u - j));
                break;
             }
             case 0x2:
             {
-               boolSum += (((uint_fast16_t) cceIsTimerEnded(timers + boolNumber)) << j);
+               boolSum += (((uint_fast16_t) cceIsTimerEnded(timers + boolNumber)) << (logic->logicElementsQuantity - 1u - j));
                break;
             }
             default:
             {
                va_copy(argcp, argp);
-               boolSum += (((uint_fast16_t) fourth_if_func(boolNumber, argcp)) << j); // x << j == x * pow(2, j)
+               boolSum += (((uint_fast16_t) fourth_if_func(boolNumber, argcp)) << (logic->logicElementsQuantity - 1u - j)); // x << j == x * pow(2, j)
                va_end(argcp);
             }
          }
          // Some dark portable (probably) magic for checking results and exit earlier if only false or only true is possible (and no other options).
-         switch (j)
+         switch (logic->logicElementsQuantity - 1u - j)
          {
             #if UINT_FAST16_MAX < UINT64_MAX
             case 6u:
@@ -262,7 +264,7 @@ void cce__processLogic (uint32_t logicQuantity, struct ElementLogic *logic, stru
             {
                cce_byte state = 0;
                for (uint_fast16_t *iterator = (logic->operations + (boolSum >> SHIFT_OF_FAST_SIZE),
-               *end = (logic->operations + (boolSum >> SHIFT_OF_FAST_SIZE) + (1 << (j - 3u))/sizeof(uint_fast16_t); iterator < end; ++iterator)
+               *end = (logic->operations + (boolSum >> SHIFT_OF_FAST_SIZE) + (1 << (logic->logicElementsQuantity - j - 1u - 3u))/sizeof(uint_fast16_t); iterator < end; ++iterator)
                {
                   if (!(*iterator))
                   {
@@ -332,7 +334,7 @@ void cce__processLogic (uint32_t logicQuantity, struct ElementLogic *logic, stru
             case 1u:
             case 0u:
             {
-               uint_fast16_t mask = ((((uint_fast16_t) 1) << (1u << j)) - 1u) << (boolSum & BITWIZE_AND_OF_FAST_SIZE);
+               uint_fast16_t mask = ((((uint_fast16_t) 1) << (1u << (logic->logicElementsQuantity - 1u - j))) - 1u) << (boolSum & BITWIZE_AND_OF_FAST_SIZE);
                currentOperations &= mask;
                if (!currentOperations)
                {
@@ -582,9 +584,9 @@ static uint_fast16_t* generateOperationsFromLogicElement (uint8_t ID, uint8_t is
    size_t operationsQuantity = (0x01 << (logicElementsQuantity - (3u + SHIFT_OF_FAST_SIZE))) * isLogicQuantityHigherThanVariableSize + (!isLogicQuantityHigherThanVariableSize);
    uint_fast16_t *operations = calloc(operationsQuantity, sizeof(uint_fast16_t));
    uint_fast16_t step;
-   if ((logicElementsQuantity - ID) < (3u + SHIFT_OF_FAST_SIZE)) 
+   if (ID < (3u + SHIFT_OF_FAST_SIZE)) 
    {
-      step = 1u << (logicElementsQuantity - ID - 1u);
+      step = 1u << ID;
       for (uint_fast16_t mask = (UINT_FAST16_MAX >> (sizeof(uint_fast16_t) * 8u - step)) << (!isInverted * step);; mask <<= step * 2u)
       {
          *operations |= mask;
@@ -600,7 +602,7 @@ static uint_fast16_t* generateOperationsFromLogicElement (uint8_t ID, uint8_t is
    }
    else
    {
-      step = 1u << (logicElementsQuantity - ID - (3u + SHIFT_OF_FAST_SIZE));
+      step = 1u << (ID - (3u + SHIFT_OF_FAST_SIZE));
       for (uint_fast16_t *iterator = operations + (!isInverted * step), *end = operations + operationsQuantity; iterator < end; iterator += step * 2u)
       {
          memset(iterator, 1u, step * sizeof(uint_fast16_t));
