@@ -183,9 +183,7 @@ static void keyCallback (GLFWwindow *window, int key, int scancode, int action, 
             case 0x0u:
             {
                if (action != GLFW_REPEAT)
-               {
-                  cceSetBool(keyInfo->number, CCE_DISABLE_BOOL - action);
-               }
+                  cceSetBool(keyInfo->number, action + CCE_DISABLE_BOOL);
                break;
             }
             case 0x1u:
@@ -497,19 +495,19 @@ int cce__initEngine__glfw (const char *label, uint16_t globalBoolsQuantity)
    }
    cce_keys = malloc(14u * sizeof(struct RegisteredKeys));
    
-   registerKey__glfw(GLFW_KEY_UP,          GLFW_FALSE, 0x0, globalBoolsQuantity - 12u);
-   registerKey__glfw(GLFW_KEY_DOWN,        GLFW_FALSE, 0x0, globalBoolsQuantity - 11u);
-   registerKey__glfw(GLFW_KEY_LEFT,        GLFW_FALSE, 0x0, globalBoolsQuantity - 10u);
-   registerKey__glfw(GLFW_KEY_RIGHT,       GLFW_FALSE, 0x0, globalBoolsQuantity -  9u);
-   registerKey__glfw(GLFW_KEY_Z,           GLFW_FALSE, 0x0, globalBoolsQuantity -  8u);
-   registerKey__glfw(GLFW_KEY_X,           GLFW_FALSE, 0x0, globalBoolsQuantity -  7u);
-   registerKey__glfw(GLFW_KEY_C,           GLFW_FALSE, 0x0, globalBoolsQuantity -  6u);
-   registerKey__glfw(GLFW_KEY_S,           GLFW_FALSE, 0x0, globalBoolsQuantity -  5u);
-   registerKey__glfw(GLFW_KEY_LEFT_SHIFT,  GLFW_FALSE, 0x0, globalBoolsQuantity -  4u);
-   registerKey__glfw(GLFW_KEY_RIGHT_SHIFT, GLFW_FALSE, 0x0, globalBoolsQuantity -  4u);
-   registerKey__glfw(GLFW_KEY_ENTER,       GLFW_FALSE, 0x0, globalBoolsQuantity -  3u);
-   registerKey__glfw(GLFW_KEY_A,           GLFW_FALSE, 0x0, globalBoolsQuantity -  2u);
-   registerKey__glfw(GLFW_KEY_D,           GLFW_FALSE, 0x0, globalBoolsQuantity -  1u);
+   registerKey__glfw(GLFW_KEY_UP,          GLFW_FALSE, 0x0, globalBoolsQuantity - 12);
+   registerKey__glfw(GLFW_KEY_DOWN,        GLFW_FALSE, 0x0, globalBoolsQuantity - 11);
+   registerKey__glfw(GLFW_KEY_LEFT,        GLFW_FALSE, 0x0, globalBoolsQuantity - 10);
+   registerKey__glfw(GLFW_KEY_RIGHT,       GLFW_FALSE, 0x0, globalBoolsQuantity -  9);
+   registerKey__glfw(GLFW_KEY_A,           GLFW_FALSE, 0x0, globalBoolsQuantity -  8);
+   registerKey__glfw(GLFW_KEY_S,           GLFW_FALSE, 0x0, globalBoolsQuantity -  7);
+   registerKey__glfw(GLFW_KEY_D,           GLFW_FALSE, 0x0, globalBoolsQuantity -  6);
+   registerKey__glfw(GLFW_KEY_W,           GLFW_FALSE, 0x0, globalBoolsQuantity -  5);
+   registerKey__glfw(GLFW_KEY_LEFT_SHIFT,  GLFW_FALSE, 0x0, globalBoolsQuantity -  4);
+   registerKey__glfw(GLFW_KEY_RIGHT_SHIFT, GLFW_FALSE, 0x0, globalBoolsQuantity -  4);
+   registerKey__glfw(GLFW_KEY_ENTER,       GLFW_FALSE, 0x0, globalBoolsQuantity -  3);
+   registerKey__glfw(GLFW_KEY_Q,           GLFW_FALSE, 0x0, globalBoolsQuantity -  2);
+   registerKey__glfw(GLFW_KEY_E,           GLFW_FALSE, 0x0, globalBoolsQuantity -  1);
    
    registerKey__glfw(GLFW_KEY_F11, GLFW_FALSE, 0x2, 0x0);
    qsort(cce_keys, keysQuantity, sizeof(struct RegisteredKeys), compare);

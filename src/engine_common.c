@@ -71,8 +71,8 @@ static double maxTimerCheckDelay = 0.0;
 
 CCE_PUBLIC_OPTIONS uint8_t cceIsTimerEnded (struct Timer *timer)
 {
-   if (timer->initTime == 0.0)
-      return 0u;
+   if (timer->initTime <= 0.0 || timer->delay == 0.0)
+      return 1;
    double timerCheckDelay = *cceCurrentTime - (timer->initTime + timer->delay);
    if (timerCheckDelay >= 0.0)
    {
@@ -80,9 +80,9 @@ CCE_PUBLIC_OPTIONS uint8_t cceIsTimerEnded (struct Timer *timer)
       {
          maxTimerCheckDelay = timerCheckDelay;
       }
-      return 1u;
+      return 1;
    }
-   return 0u;
+   return 0;
 }
 
 CCE_PUBLIC_OPTIONS void cceStartTimer (struct Timer *timer)
@@ -100,6 +100,7 @@ CCE_PUBLIC_OPTIONS uint8_t cceGetBool (uint16_t boolID)
    else
    {
       boolean = cce_Gvars.temporaryBools;
+      boolID -= g_globalBoolsQuantity;
    }
    boolean += ((boolID) >> (3u + SHIFT_OF_FAST_SIZE));
    return ((*boolean) & (((uint_fast16_t) 0x0001u) << ((boolID) & BITWIZE_AND_OF_FAST_SIZE))) > 0u;
@@ -115,6 +116,7 @@ CCE_PUBLIC_OPTIONS void cceSetBool (uint16_t boolID, cce_enum action)
    else
    {
       boolean = cce_Gvars.temporaryBools;
+      boolID -= g_globalBoolsQuantity;
    }
    boolean += ((boolID) >> (3u + SHIFT_OF_FAST_SIZE));
    register uint_fast16_t mask = (((uint_fast16_t) 0x0001u) << ((boolID) & BITWIZE_AND_OF_FAST_SIZE));
@@ -222,22 +224,22 @@ void cce__processLogic (uint32_t logicQuantity, struct ElementLogic *logic, stru
       maxTimerCheckDelay = 0.0;
       boolSum = 0u;
       currentOperations = (*logic->operations);
-      for (cce_byte j = logic->logicElementsQuantity - 1u;; --j)
+      for (cce_ubyte j = logic->logicElementsQuantity - 1u;; --j)
       {
          boolNumber = (*((logic->logicElements) + j));
          switch (((logic->elementType) >> (j * 2u)) & 0x3)
          {
-            case CCE_GLOBAL_BOOL_LOGIC_ELEMENT: 
+            case 0x0:
             {
                boolSum += (((uint_fast16_t) cceGetBool(boolNumber)) << j);
                break;
             }
-            case CCE_PLOT_NUMBER_LOGIC_ELEMENT:
+            case 0x1:
             {
                boolSum += (((uint_fast16_t) (cce_Gvars.plotNumber > boolNumber)) << j);
                break;
             }
-            case CCE_TIMER_LOGIC_ELEMENT:
+            case 0x2:
             {
                boolSum += (((uint_fast16_t) cceIsTimerEnded(timers + boolNumber)) << j);
                break;
@@ -330,7 +332,7 @@ void cce__processLogic (uint32_t logicQuantity, struct ElementLogic *logic, stru
             case 1u:
             case 0u:
             {
-               uint_fast16_t mask = ((1u << (1u << j)) - 1u) << (boolSum & BITWIZE_AND_OF_FAST_SIZE);
+               uint_fast16_t mask = ((((uint_fast16_t) 1) << (1u << j)) - 1u) << (boolSum & BITWIZE_AND_OF_FAST_SIZE);
                currentOperations &= mask;
                if (!currentOperations)
                {
@@ -442,7 +444,7 @@ struct ElementLogic* cce__loadLogic (uint8_t logicQuantity, FILE *map_f)
       fread( (iterator->logicElements),         2u/*uint16_t*/,  (iterator->logicElementsQuantity),                         map_f);
       
       isLogicQuantityHigherThanThree = iterator->logicElementsQuantity > 3u;
-      operationsQuantityInBytes = (0x01 << ((iterator->logicElementsQuantity) - 3u) * isLogicQuantityHigherThanThree) + (!isLogicQuantityHigherThanThree);
+      operationsQuantityInBytes = ((0x01 << ((iterator->logicElementsQuantity) - 3u)) * isLogicQuantityHigherThanThree) + (!isLogicQuantityHigherThanThree);
       (iterator->operations) = (uint_fast16_t*) calloc((operationsQuantityInBytes > sizeof(uint_fast16_t)) ? operationsQuantityInBytes : sizeof(uint_fast16_t), 1u);
       if (operationsQuantityInBytes > sizeof(uint_fast16_t))
       {
@@ -476,7 +478,7 @@ void cce__writeLogic (uint8_t logicQuantity, struct ElementLogic *logic, FILE *m
       fwrite( (iterator->logicElements),         2u/*uint16_t*/,  (iterator->logicElementsQuantity),                         map_f);
       
       isLogicQuantityHigherThanThree = iterator->logicElementsQuantity > 3u;
-      operationsQuantityInBytes = (0x01 << ((iterator->logicElementsQuantity) - 3u) * isLogicQuantityHigherThanThree) + (!isLogicQuantityHigherThanThree);
+      operationsQuantityInBytes = ((0x01 << ((iterator->logicElementsQuantity) - 3u)) * isLogicQuantityHigherThanThree) + (!isLogicQuantityHigherThanThree);
       if (operationsQuantityInBytes > sizeof(uint_fast16_t))
       {
          fwrite( (iterator->operations),         sizeof(uint_fast16_t), operationsQuantityInBytes >> SHIFT_OF_FAST_SIZE,     map_f);
@@ -610,7 +612,7 @@ static uint_fast16_t* generateOperationsFromLogicElement (uint8_t ID, uint8_t is
 static struct operationsStack* computeStackDownToPriority (uint_fast32_t priority, struct operationsStack *stack, uint8_t logicQuantity)
 {
    uint8_t isLogicQuantityHigherThanVariableSize = logicQuantity > (3u + SHIFT_OF_FAST_SIZE);
-   size_t operationsQuantity = (0x01 << (logicQuantity - (3u + SHIFT_OF_FAST_SIZE))) * isLogicQuantityHigherThanVariableSize + (!isLogicQuantityHigherThanVariableSize);
+   size_t operationsQuantity = (((size_t) 0x01) << (logicQuantity - (3u + SHIFT_OF_FAST_SIZE))) * isLogicQuantityHigherThanVariableSize + (!isLogicQuantityHigherThanVariableSize);
    uint_fast16_t *operations, *prevOperations, *end;
    struct operationsStack *iterator = stack;
    
@@ -801,6 +803,10 @@ CCE_PUBLIC_OPTIONS uint_fast16_t* cceParseStringToLogicOperations (const char *c
             }
          }
       }
+   }
+   if (dictionarySize > 32)
+   {
+      return NULL;
    }
    qsort(dictionary, dictionarySize, sizeof(char), compare);
    

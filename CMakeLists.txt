@@ -22,8 +22,8 @@ cmake_minimum_required(VERSION 3.13)
 
 project(coffeechain VERSION 0.1 DESCRIPTION "open 2D engine for creating games - shared library" LANGUAGES C)
 
-option(BUILD_SHARED_LIBS "Build CoffeeChain as shared library" ON)
-option(BUILD_TESTING     "Build CoffeeChain test program" ON)
+option(BUILD_SHARED_LIBS     "Build CoffeeChain as shared library" ON)
+option(BUILD_TESTING         "Build CoffeeChain test program" ON)
 
 set(CMAKE_C_STANDARD 99)
 set(CMAKE_C_STANDARD_REQUIRED True)
@@ -43,7 +43,7 @@ add_library(${PROJECT_NAME}
    src/shader.c
    src/shader.h
    src/maps/base_actions.c
-   src/maps/base_actions.h
+   include/coffeechain/map2D/base_actions.h
    src/maps/dynamic_map2D.c
    src/maps/map2D.c
    include/coffeechain/map2D/map2D.h

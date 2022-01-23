@@ -33,22 +33,14 @@
 #define CCE_DYNAMIC_MAP2D_TO_BE_PROCESSED 0x1
 
 static struct DynamicMap2D *g_dynamicMap = NULL;
-static struct DynamicMap2DElement nullElement = {0, 0, 0u, 0u, {0, 0, 0, 0, 0u}, 0u, NULL, 0u, NULL, 0u, NULL, {{0u, 0u}}, 0x4u, 0, 0u, 0u, 0u};
+static struct DynamicMap2DElement nullElement = {NULL, NULL, NULL, 0, 0, 0u, 0u, {0, 0, 0, 0, 0u}, 0u, 0u, 0u, 0u, 0x4u, 0, 0u, 0u, 0u, 0u, 0u};
 static cce_ubyte flags;
 
-static GLuint makeVAOdynamicMap2D (uint32_t elementsQuantityAllocated, GLuint *VBO)
+static void bindVBOtoVAO (GLuint VBO, GLuint VAO)
 {
-   GLuint VAO;
-   glGenVertexArrays(1, &VAO);
-   GL_CHECK_ERRORS;
-   glGenBuffers(1, VBO);
-   GL_CHECK_ERRORS;
    glBindVertexArray(VAO);
    GL_CHECK_ERRORS;
-   glBindBuffer(GL_ARRAY_BUFFER, *VBO);
-   GL_CHECK_ERRORS;
-   
-   glBufferData(GL_ARRAY_BUFFER, (sizeof(struct DynamicMap2DElement) * elementsQuantityAllocated), NULL, GL_DYNAMIC_DRAW);
+   glBindBuffer(GL_ARRAY_BUFFER, VBO);
    GL_CHECK_ERRORS;
    
    /* Warning! Members of struct DynamicMap2DElement must follow one by one, otherwise the code below will not work propertly. Probably compiler-dependant. */
@@ -84,7 +76,6 @@ static GLuint makeVAOdynamicMap2D (uint32_t elementsQuantityAllocated, GLuint *V
    }
    glBindBuffer(GL_ARRAY_BUFFER, 0);
    glBindVertexArray(0);
-   return VAO;
 }
 
 const struct DynamicMap2D* cce__initDynamicMap2D (void)
@@ -98,15 +89,23 @@ const struct DynamicMap2D* cce__initDynamicMap2D (void)
       iterator->flags = 0x0;
    }
    g_dynamicMap->objectBufferAllocatedSpace = g_dynamicMap->elementsAllocatedQuantity;
-   g_dynamicMap->VAO = makeVAOdynamicMap2D(g_dynamicMap->objectBufferAllocatedSpace, &(g_dynamicMap->VBO));
+   glGenVertexArrays(1, &g_dynamicMap->VAO);
+   GL_CHECK_ERRORS;
+   glGenBuffers(1, &g_dynamicMap->VBO);
+   GL_CHECK_ERRORS;
+   glBindBuffer(GL_ARRAY_BUFFER, g_dynamicMap->VBO);
+   GL_CHECK_ERRORS;
+   glBufferData(GL_ARRAY_BUFFER, (sizeof(struct DynamicMap2DElement) * g_dynamicMap->objectBufferAllocatedSpace), NULL, GL_DYNAMIC_DRAW);
+   GL_CHECK_ERRORS;
+   bindVBOtoVAO(g_dynamicMap->VBO, g_dynamicMap->VAO);
    g_dynamicMap->moveGroupsQuantity = 0u;
    g_dynamicMap->moveGroupsAllocatedQuantity = CCE_ALLOCATION_STEP;
    g_dynamicMap->moveGroups = (struct DynamicElementGroup*) calloc(g_dynamicMap->moveGroupsAllocatedQuantity, sizeof(struct DynamicElementGroup));
-   g_dynamicMap->moveGroupValues = (struct cce_ivec2*) calloc(g_dynamicMap->moveGroupsAllocatedQuantity, sizeof(struct cce_uvec2));
+   g_dynamicMap->moveGroupValues = (struct cce_ivec2*) calloc(g_dynamicMap->moveGroupsAllocatedQuantity, sizeof(struct cce_ivec2));
    g_dynamicMap->extensionGroupsQuantity = 0u;
    g_dynamicMap->extensionGroupsAllocatedQuantity = CCE_ALLOCATION_STEP;
    g_dynamicMap->extensionGroups = (struct DynamicElementGroup*) calloc(g_dynamicMap->extensionGroupsAllocatedQuantity, sizeof(struct DynamicElementGroup));
-   g_dynamicMap->extensionGroupValues = (struct cce_ivec2*) calloc(g_dynamicMap->extensionGroupsAllocatedQuantity, sizeof(struct cce_uvec2));
+   g_dynamicMap->extensionGroupValues = (struct cce_ivec2*) calloc(g_dynamicMap->extensionGroupsAllocatedQuantity, sizeof(struct cce_ivec2));
    g_dynamicMap->collisionGroupsQuantity = 0u;
    g_dynamicMap->collisionGroupsAllocatedQuantity = CCE_ALLOCATION_STEP;
    g_dynamicMap->collisionGroups = (struct DynamicElementGroup*) calloc(g_dynamicMap->collisionGroupsAllocatedQuantity, sizeof(struct DynamicElementGroup));
@@ -118,7 +117,7 @@ const struct DynamicMap2D* cce__initDynamicMap2D (void)
    g_dynamicMap->timers = (struct Timer*) malloc(g_dynamicMap->timersAllocatedQuantity * sizeof(struct Timer));
    g_dynamicMap->logicQuantity = 0u;
    g_dynamicMap->logicAllocatedQuantity = CCE_ALLOCATION_STEP;
-   g_dynamicMap->logic = (struct ElementLogic*) malloc(g_dynamicMap->logicAllocatedQuantity * sizeof(struct ElementLogic));
+   g_dynamicMap->logic = (struct ElementLogic*) calloc(g_dynamicMap->logicAllocatedQuantity, sizeof(struct ElementLogic));
    
    g_dynamicMap->temporaryBools = cce__getFreeTemporaryBools();
    
@@ -134,14 +133,14 @@ CCE_PUBLIC_OPTIONS uint8_t cceGetGroupValueDynamicMap2D (cce_enum group_type, ui
       {
          if (ID >= (g_dynamicMap->moveGroupsQuantity))
             return CCE_OUT_OF_BOUNDS;
-         variable = (g_dynamicMap->moveGroupValues + ID);
+         *variable = *(g_dynamicMap->moveGroupValues + ID);
          break;
       }
       case CCE_EXTENSION_GROUP:
       {
          if (ID >= (g_dynamicMap->extensionGroupsQuantity))
             return CCE_OUT_OF_BOUNDS;
-         variable = (g_dynamicMap->extensionGroupValues + ID);
+         *variable = *(g_dynamicMap->extensionGroupValues + ID);
          break;
       }
       default:
@@ -254,7 +253,7 @@ static struct DynamicElementGroup* getGroupDynamicMap2D (cce_enum group_type, ui
       (*groupsAllocatedQuantity) = (ID & ~(CCE_ALLOCATION_STEP - 1u)) + CCE_ALLOCATION_STEP;
       if (groupValues)
       {
-         (*groupValues) = (struct cce_ivec2*) realloc((*groupValues), (*groupsAllocatedQuantity) * sizeof(struct cce_uvec2));
+         (*groupValues) = (struct cce_ivec2*) realloc((*groupValues), (*groupsAllocatedQuantity) * sizeof(struct cce_ivec2));
          memset((*groupValues) + lastGroupsAllocatedQuantity, 0u, ((*groupsAllocatedQuantity) - lastGroupsAllocatedQuantity) * sizeof(struct cce_uvec2));
       }
       (*groups) = (struct DynamicElementGroup*) realloc((*groups), (*groupsAllocatedQuantity) * sizeof(struct DynamicElementGroup));
@@ -291,14 +290,14 @@ CCE_PUBLIC_OPTIONS struct Map2DCollider cceGetColliderDataDynamicMap2D (uint32_t
       for (uint16_t *iterator = (g_dynamicMap->elements + ID)->moveGroups, *end = (g_dynamicMap->elements + ID)->moveGroups + (g_dynamicMap->elements + ID)->moveGroupsQuantity;
       iterator < end; ++iterator)
       {
-         cceGetGroupValueDynamicMap2D(CCE_MOVE_GROUP, *iterator, &tmp);
+         cceGetGroupValueDynamicMap2D(CCE_MOVE_GROUP, (g_dynamicMap->elements + ID)->moveGroups - iterator, &tmp);
          coordOffset.x += tmp.x;
          coordOffset.y += tmp.y;
       }
       for (uint16_t *iterator = (g_dynamicMap->elements + ID)->extensionGroups, *end = (g_dynamicMap->elements + ID)->extensionGroups + (g_dynamicMap->elements + ID)->extensionGroupsQuantity;
       iterator < end; ++iterator)
       {
-         cceGetGroupValueDynamicMap2D(CCE_EXTENSION_GROUP, *iterator, &tmp);
+         cceGetGroupValueDynamicMap2D(CCE_EXTENSION_GROUP, (g_dynamicMap->elements + ID)->extensionGroups - iterator, &tmp);
          sizeOffset.x += tmp.x;
          sizeOffset.y += tmp.y;
       }
@@ -372,13 +371,14 @@ CCE_PUBLIC_OPTIONS uint8_t cceAddElementInGroupDynamicMap2D (cce_enum group_type
          return 0u;
       }
    }
-   ++(group->elementsQuantity);
-   if (group->elementsQuantity > group->elementsAllocatedQuantity)
+
+   if (group->elementsQuantity >= group->elementsAllocatedQuantity)
    {
       group->elementsAllocatedQuantity += CCE_ALLOCATION_STEP;
       group->elementIDs = realloc(group->elementIDs, (group->elementsAllocatedQuantity) * sizeof(uint32_t));
    }
-   *(group->elementIDs) = elementID;
+   *(group->elementIDs + group->elementsQuantity) = elementID;
+   ++(group->elementsQuantity);
    
    uint16_t  *elementGroupLength;
    uint16_t **elementGroup = getElementGroupPointersDynamicMap2D(group_type, g_dynamicMap->elements + elementID, &elementGroupLength);
@@ -408,14 +408,15 @@ static void updateMap2DElementDynamicMap2D (struct Map2DElementDev *element, uin
    dynamicElement->extensionGroup = element->extensionGroup;
    if (hasCollider)
    {
+      if (!(element->isGlobalOffset))
+         cceAddElementInGroupDynamicMap2D(CCE_MOVE_GROUP, 0u, ID);
+
       if (element->moveGroup)
          cceAddElementInGroupDynamicMap2D(CCE_MOVE_GROUP, element->moveGroup, ID);
 
       if (element->extensionGroup)
          cceAddElementInGroupDynamicMap2D(CCE_EXTENSION_GROUP, element->extensionGroup - 1u, ID);
 
-      if (element->isGlobalOffset)
-         cceAddElementInGroupDynamicMap2D(CCE_MOVE_GROUP, 0u, ID);
    }
    dynamicElement->flags = 0x1u + (hasCollider << 1u) + 0x4u + 0x8u + ((element->isGlobalOffset) << 4u);
    
@@ -556,7 +557,7 @@ CCE_PUBLIC_OPTIONS void cceDeleteMap2DElementDynamicMap2D (uint32_t ID)
    deleteGroupsFromElementDynamicMap2D((g_dynamicMap->elements + ID));
    cce__releaseTexture((g_dynamicMap->elements + ID)->textureElementReliesOn);
    memcpy((g_dynamicMap->elements + ID), &nullElement, sizeof(struct DynamicMap2DElement));
-   (g_dynamicMap->elements + ID)->flags = 0x0u;
+   (g_dynamicMap->elements + ID)->flags = 0x4;
    flags |= CCE_DYNAMIC_MAP2D_TO_BE_PROCESSED;
    return;
 }
@@ -579,7 +580,7 @@ CCE_PUBLIC_OPTIONS uint8_t cceDeleteGroupDynamicMap2D (cce_enum group_type, uint
       return CCE_ELEMENT_DOES_NOT_EXIST;
    }
    uint16_t elementsQuantity = ((*groups) + ID)->elementsQuantity;
-   ((*groups) + ID)->elementsQuantity = 0u;
+   ((*groups) + ID)->elementsQuantity = 0;
    for (uint32_t *iterator = ((*groups) + ID)->elementIDs, *end = ((*groups) + ID)->elementIDs + elementsQuantity; iterator < end; ++iterator)
    {
       cceDeleteElementFromGroupDynamicMap2D(group_type, ID, *iterator);
@@ -605,20 +606,21 @@ void cce__processDynamicMap2DElements (void)
       glCopyBufferSubData(GL_COPY_READ_BUFFER, GL_ARRAY_BUFFER, 0u, 0u, (g_dynamicMap->objectBufferAllocatedSpace) * sizeof(struct DynamicMap2DElement));
       glDeleteBuffers(1u, &g_dynamicMap->VBO);
       g_dynamicMap->VBO = newBuffer;
+      bindVBOtoVAO(g_dynamicMap->VBO, g_dynamicMap->VAO);
       g_dynamicMap->objectBufferAllocatedSpace = g_dynamicMap->elementsAllocatedQuantity;
    }
    else
    {
       glBindBuffer(GL_ARRAY_BUFFER, g_dynamicMap->VBO);
    }
-   void *bufferPtr = glMapBuffer(GL_ARRAY_BUFFER, GL_WRITE_ONLY);
+   cce_void *bufferPtr = glMapBuffer(GL_ARRAY_BUFFER, GL_WRITE_ONLY);
    
    for (struct DynamicMap2DElement *iterator = g_dynamicMap->elements, *end = (g_dynamicMap->elements) + (g_dynamicMap->elementsQuantity); iterator < end; ++iterator)
    {
       if (iterator->flags & 0x4u)
       {
          iterator->textureElementReliesOn = cce__loadTexture(iterator->textureInfo.ID);
-         memcpy(bufferPtr + (iterator - g_dynamicMap->elements), iterator, sizeof(struct DynamicMap2DElement));
+         memcpy(bufferPtr + ((iterator - g_dynamicMap->elements) * sizeof(struct DynamicMap2DElement)), iterator, sizeof(struct DynamicMap2DElement));
          uint8_t isMoveGroup = iterator->moveGroup > 0u, isGlobalOffset = iterator->flags & CCE_GLOBAL_OFFSET_MASK;
          iterator->moveGroupsQuantity += isMoveGroup + isGlobalOffset;
          if (isMoveGroup || isGlobalOffset)
@@ -643,7 +645,7 @@ void cce__processDynamicMap2DElements (void)
             for (uint16_t *jiterator = iterator->moveGroups, *end = iterator->moveGroups + iterator->moveGroupsQuantity;
             jiterator < end; ++jiterator)
             {
-               cceGetGroupValueDynamicMap2D(CCE_MOVE_GROUP, *jiterator, &tmp);
+               cceGetGroupValueDynamicMap2D(CCE_MOVE_GROUP, (iterator->moveGroups - jiterator), &tmp);
                globalGroupOffset.x += tmp.x;
                globalGroupOffset.y += tmp.y;
             }
@@ -652,7 +654,7 @@ void cce__processDynamicMap2DElements (void)
             for (uint16_t *jiterator = iterator->extensionGroups, *end = iterator->extensionGroups + iterator->extensionGroupsQuantity;
             jiterator < end; ++jiterator)
             {
-               cceGetGroupValueDynamicMap2D(CCE_EXTENSION_GROUP, *jiterator, &tmp);
+               cceGetGroupValueDynamicMap2D(CCE_EXTENSION_GROUP, (iterator->extensionGroups - jiterator), &tmp);
                globalGroupOffset.x += tmp.x;
                globalGroupOffset.y += tmp.y;
             }
@@ -727,14 +729,14 @@ cce_ubyte cce__fourthLogicTypeFuncDynamicMap2D(uint16_t ID, va_list argp)
    uint8_t element1Size, element2Size, isDifferent;
    if ((g_dynamicMap->collision + ID)->flags & 0x2)
    {
-      group1IDs = ((map->collisionGroups + (g_dynamicMap->collision + ID)->group1)->elementIDs);
+      group1IDs = (map->collisionGroups + (g_dynamicMap->collision + ID)->group1)->elementIDs;
       group1lastID = (group1IDs + (map->collisionGroups + (g_dynamicMap->collision + ID)->group1)->elementsQuantity - 1u);
       elements1 = (cce_void*) map->colliders;
       element1Size = sizeof(struct Map2DCollider);
    }
    else
    {
-      group1IDs = ((map->collisionGroups + (g_dynamicMap->collision + ID)->group1)->elementIDs);
+      group1IDs = (map->collisionGroups + (g_dynamicMap->collision + ID)->group1)->elementIDs;
       group1lastID = (group1IDs + (map->collisionGroups + (g_dynamicMap->collision + ID)->group1)->elementsQuantity - 1u);
       elements1 = (cce_void*) g_dynamicMap->elements;
       element1Size = sizeof(struct DynamicMap2DElement);
@@ -805,7 +807,7 @@ CCE_PUBLIC_OPTIONS void cceDeleteCollisionDynamicMap2D (uint16_t ID)
    (g_dynamicMap->collision + ID)->flags = 0x0;
 }
 
-CCE_PUBLIC_OPTIONS void cceSetTimerDynamicMap2D (uint16_t ID, float delay)
+static inline struct Timer* getTimerDynamicMap2D (uint16_t ID)
 {
    if (ID > g_dynamicMap->timersAllocatedQuantity)
    {
@@ -818,8 +820,19 @@ CCE_PUBLIC_OPTIONS void cceSetTimerDynamicMap2D (uint16_t ID, float delay)
    {
       ++(g_dynamicMap->timersQuantity);
    }
-   (g_dynamicMap->timers + ID)->initTime = *cceCurrentTime;
-   (g_dynamicMap->timers + ID)->delay = delay;
+   return (g_dynamicMap->timers + ID);
+}
+
+CCE_PUBLIC_OPTIONS void cceSetTimerDelayDynamicMap2D (uint16_t ID, float delay)
+{
+   struct Timer *timer = getTimerDynamicMap2D(ID);
+   timer->delay = delay;
+}
+
+CCE_PUBLIC_OPTIONS void cceStartTimerDynamicMap2D (uint16_t ID)
+{
+   struct Timer *timer = getTimerDynamicMap2D(ID);
+   timer->initTime = *cceCurrentTime;
 }
 
 CCE_PUBLIC_OPTIONS uint16_t cceCreateTimerDynamicMap2D (float delay)
@@ -833,38 +846,61 @@ CCE_PUBLIC_OPTIONS uint16_t cceCreateTimerDynamicMap2D (float delay)
          ++(g_dynamicMap->timersQuantity);
          break;
       }
-      if (!(iterator->initTime))
+      if (iterator->initTime == 0.0)
       {
          timerID = iterator - g_dynamicMap->timers;
          break;
       }
    }
-   cceSetTimerDynamicMap2D(timerID, delay);
+   struct Timer *timer = getTimerDynamicMap2D(timerID);
+   timer->initTime = -1.0;
+   timer->delay = delay;
    return timerID;
 }
 
-CCE_PUBLIC_OPTIONS void cceResetTimerDynamicMap2D (uint16_t ID)
+CCE_PUBLIC_OPTIONS struct Timer cceGetTimerDynamicMap2D (uint16_t ID)
 {
-   if (ID > g_dynamicMap->timersQuantity) return;
-   (g_dynamicMap->timers + ID)->initTime = *cceCurrentTime;
+   if (ID > g_dynamicMap->timersQuantity) return (struct Timer) {0.0, 0.0};
+   return (struct Timer) {(g_dynamicMap->timers + ID)->initTime, (g_dynamicMap->timers + ID)->delay};
 }
 
-CCE_PUBLIC_OPTIONS int8_t cceGetTimerDynamicMap2D (uint16_t ID)
-{
-   if (ID > g_dynamicMap->timersQuantity) return -1;
-   struct Timer *timer = (g_dynamicMap->timers + ID);
-   return ((*cceCurrentTime) >= (timer->initTime + timer->delay));
-}
-
-static void updateLogicElementCommonDynamicMap2D (uint16_t ID, uint8_t logicElementsQuantity, const uint16_t *const logicElements, const cce_enum *const logicElementTypes)
+static inline void updateLogicElementCommonDynamicMap2D (uint16_t ID, uint8_t logicElementsQuantity, const uint16_t *const logicElements, const cce_enum *const logicElementTypes)
 {
    struct ElementLogic *logic = (g_dynamicMap->logic + ID);
    logic->logicElementsQuantity = logicElementsQuantity;
-   logic->logicElements = (uint16_t*) malloc(logicElementsQuantity * sizeof(uint16_t));
+   logic->logicElements = (uint16_t*) realloc(logic->logicElements, logicElementsQuantity * sizeof(uint16_t));
    memcpy(logic->logicElements, logicElements, logicElementsQuantity * sizeof(uint16_t));
+   size_t i = 0;
+   logic->elementType = 0;
+   for (const cce_enum *iterator = logicElementTypes, *end = logicElementTypes + logicElementsQuantity; iterator < end; ++iterator, i += 2)
+   {
+      switch (*iterator)
+      {
+         /*case CCE_GLOBAL_BOOL_LOGIC_ELEMENT:
+         {
+            logic->elementType |= (((uint64_t) 0x0) << i);
+            break;
+         }*/
+         case CCE_PLOT_NUMBER_LOGIC_ELEMENT:
+         {
+            logic->elementType |= (((uint64_t) 0x1) << i);
+            break;
+         }
+         case CCE_TIMER_LOGIC_ELEMENT:
+         {
+            logic->elementType |= (((uint64_t) 0x2) << i);
+            break;
+         }
+         case CCE_COLLISION_LOGIC_ELEMENT:
+         {
+            logic->elementType |= (((uint64_t) 0x3) << i);
+            break;
+         }
+      }
+   }
 }
 
-CCE_PUBLIC_OPTIONS void cceUpdateLogicElementByTruthTableDynamicMap2D (const uint16_t ID, const uint8_t logicElementsQuantity, const uint16_t *const logicElements, const cce_enum *const logicElementTypes, const uint_fast16_t *const truthTable)
+CCE_PUBLIC_OPTIONS void cceUpdateLogicElementsByTruthTableDynamicMap2D (const uint16_t ID, const uint8_t logicElementsQuantity, const uint16_t *const logicElements, const cce_enum *const logicElementTypes, const uint_fast16_t *const truthTable)
 {
    if (!logicElementsQuantity) return;
    updateLogicElementCommonDynamicMap2D(ID, logicElementsQuantity, logicElements, logicElementTypes);
@@ -872,35 +908,45 @@ CCE_PUBLIC_OPTIONS void cceUpdateLogicElementByTruthTableDynamicMap2D (const uin
    uint32_t operationsQuantityInBytes;
    uint8_t isLogicQuantityHigherThan3;
    isLogicQuantityHigherThan3 = logic->logicElementsQuantity > 3;
-   operationsQuantityInBytes = (0x01 << ((logic->logicElementsQuantity) - 3u) * isLogicQuantityHigherThan3) + !isLogicQuantityHigherThan3;
-   (logic->operations) = (uint_fast16_t*) malloc(operationsQuantityInBytes);
+   operationsQuantityInBytes = ((0x01 << ((logic->logicElementsQuantity) - 3u)) * isLogicQuantityHigherThan3) + !isLogicQuantityHigherThan3;
+   logic->operations = (uint_fast16_t*) realloc(logic->operations, operationsQuantityInBytes);
    memcpy(logic->operations, truthTable, operationsQuantityInBytes);
 }
 
 CCE_PUBLIC_OPTIONS uint8_t cceUpdateLogicElementsByBooleanExpressionDynamicMap2D (const uint16_t ID, const uint16_t *const logicElements, const cce_enum *const logicElementTypes, const char *const booleanExpression)
 {
    uint8_t logicElementsQuantity;
-   ((g_dynamicMap->logic + ID)->operations) = cceParseStringToLogicOperations(booleanExpression, &logicElementsQuantity);
+   free((g_dynamicMap->logic + ID)->operations);
+   (g_dynamicMap->logic + ID)->operations = cceParseStringToLogicOperations(booleanExpression, &logicElementsQuantity);
    if (!((g_dynamicMap->logic + ID)->operations))
       return 1u;
    updateLogicElementCommonDynamicMap2D(ID, logicElementsQuantity, logicElements, logicElementTypes);
    return 0u;
 }
 
-CCE_PUBLIC_OPTIONS void cceUpdateLogicActionsDynamicMap2D (const uint16_t ID, const uint8_t actionsQuantity, uint32_t *actionIDs, const void **actionArgs, const size_t *const actionArgSizes)
+CCE_PUBLIC_OPTIONS void cceUpdateLogicActionsDynamicMap2D (const uint16_t ID, const uint8_t actionsQuantity, uint32_t *actionIDs, const void **actionArgs, const uint32_t *const actionArgSizes)
 {
    struct ElementLogic *logic = (g_dynamicMap->logic + ID);
    logic->actionsQuantity = actionsQuantity;
-   logic->actionIDs = malloc(actionsQuantity * sizeof(uint32_t));
+   logic->actionIDs = realloc(logic->actionIDs, actionsQuantity * sizeof(uint32_t));
    memcpy(logic->actionIDs, actionIDs, actionsQuantity * sizeof(uint32_t));
-   logic->actionsArgOffsets = malloc((actionsQuantity + 1u) * sizeof(uint32_t));
+   logic->actionsArgOffsets = realloc(logic->actionsArgOffsets, (actionsQuantity + 1u) * sizeof(uint32_t));
    *(logic->actionsArgOffsets) = 0u;
-   const size_t *actionArgSize = actionArgSizes;
+   const uint32_t *actionArgSize = actionArgSizes;
    for (uint32_t *iterator = (logic->actionsArgOffsets + 1u), *end = (logic->actionsArgOffsets + actionsQuantity); iterator <= end; ++iterator, ++actionArgSize)
    {
       *iterator = *actionArgSize + *(iterator - 1u);
    }
-   logic->actionsArg = malloc(*(logic->actionsArgOffsets + actionsQuantity));
+   if (*(logic->actionsArgOffsets + actionsQuantity) > 0u)
+   {
+      logic->actionsArg = realloc(logic->actionsArg, *(logic->actionsArgOffsets + actionsQuantity));
+   }
+   else
+   {
+      free(logic->actionsArg);
+      logic->actionsArg = NULL;
+      return;
+   }
    actionArgSize = actionArgSizes;
    for (uint32_t *iterator = (logic->actionsArgOffsets), *end = (logic->actionsArgOffsets + actionsQuantity); iterator < end; ++iterator, ++actionArgSize, ++actionArgs)
    {
@@ -908,21 +954,25 @@ CCE_PUBLIC_OPTIONS void cceUpdateLogicActionsDynamicMap2D (const uint16_t ID, co
    }
 }
 
-CCE_PUBLIC_OPTIONS uint16_t cceFindFreeLogicDynamicMap2D (void)
+CCE_PUBLIC_OPTIONS uint16_t cceCreateLogicDynamicMap2D (void)
 {
    for (struct ElementLogic *iterator = g_dynamicMap->logic, *end = g_dynamicMap->logic + g_dynamicMap->logicQuantity; iterator < end; ++iterator)
    {
-      if (!(iterator->logicElementsQuantity))
+      if (iterator->actionsArgOffsets == NULL) // The only member that is guaranteed to be initialized when logic is used
       {
+         iterator->actionsArgOffsets = malloc(1 * sizeof(uint32_t));
+         *(iterator->actionsArgOffsets) = 0;
          return iterator - g_dynamicMap->logic;
       }
    }
    if (g_dynamicMap->logicQuantity >= g_dynamicMap->logicAllocatedQuantity)
    {
       g_dynamicMap->logicAllocatedQuantity += CCE_ALLOCATION_STEP;
-      g_dynamicMap->logic = realloc(g_dynamicMap->logic, g_dynamicMap->logicAllocatedQuantity);
-      memset(g_dynamicMap->logic + g_dynamicMap->logicAllocatedQuantity - CCE_ALLOCATION_STEP, 0u, CCE_ALLOCATION_STEP);
+      g_dynamicMap->logic = realloc(g_dynamicMap->logic, g_dynamicMap->logicAllocatedQuantity * sizeof(struct ElementLogic));
+      memset(g_dynamicMap->logic + g_dynamicMap->logicAllocatedQuantity - CCE_ALLOCATION_STEP, 0, CCE_ALLOCATION_STEP * sizeof(struct ElementLogic));
    }
+   (g_dynamicMap->logic + g_dynamicMap->logicQuantity)->actionsArgOffsets = malloc(1 * sizeof(uint32_t));
+   *((g_dynamicMap->logic + g_dynamicMap->logicQuantity)->actionsArgOffsets) = 0;
    return (g_dynamicMap->logicQuantity)++;
 }
 
@@ -933,12 +983,12 @@ void cce__terminateDynamicMap2D (void)
    
    cce__releaseUBO(g_dynamicMap->UBO_ID);
    cce__releaseTemporaryBools(g_dynamicMap->temporaryBools);
-   glDeleteBuffers(1u, &(g_dynamicMap->VBO));
-   glDeleteVertexArrays(1u, &(g_dynamicMap->VAO));
+   glDeleteBuffers(1, &(g_dynamicMap->VBO));
+   glDeleteVertexArrays(1, &(g_dynamicMap->VAO));
 
    for (struct DynamicMap2DElement *iterator = g_dynamicMap->elements, *end = g_dynamicMap->elements + g_dynamicMap->elementsQuantity; iterator < end; ++iterator)
    {
-      for (uint8_t i = 1u; i <= 3u; ++i)
+      for (uint8_t i = CCE_MOVE_GROUP; i <= CCE_COLLISION_GROUP; ++i)
       {
          uint16_t **elementGroup = getElementGroupPointersDynamicMap2D(i, iterator, NULL);
          free(*elementGroup);
@@ -947,7 +997,7 @@ void cce__terminateDynamicMap2D (void)
    free(g_dynamicMap->elements);
    
    
-   for (uint8_t i = 1u; i <= 3u; ++i)
+   for (uint8_t i = CCE_MOVE_GROUP; i <= CCE_COLLISION_GROUP; ++i)
    {
       struct DynamicElementGroup **groups;
       uint16_t *groupsQuantity;

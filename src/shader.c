@@ -139,12 +139,14 @@ char* fileRead (const char *const path)
 char* addStringsInShader (uint16_t shaderVersion, const char *const shaderAdditionalString, const char *const shaderSrc)
 {
    /*strlen("#version xxxxx core\n") == 20*/
-   size_t modifiedStringLength = strlen(shaderSrc) + strlen(shaderAdditionalString) + 20;
-   char *shaderModifiedSrc = (char*) malloc((modifiedStringLength + 1/*\0*/) * sizeof(char));
-   strcpy(shaderModifiedSrc, "#version ");
+   size_t shaderSrcLength = strlen(shaderSrc);
+   size_t additionalStringLength = strlen(shaderAdditionalString);
+   char *shaderModifiedSrc = (char*) malloc((shaderSrcLength + additionalStringLength + 20 + 1/*\0*/) * sizeof(char));
+   memcpy(shaderModifiedSrc, "#version ", 10);
    shortToString(shaderModifiedSrc, shaderVersion, " core\n");
-   strcat(shaderModifiedSrc, shaderAdditionalString);
-   strcat(shaderModifiedSrc, shaderSrc);
+   size_t versionStringLength = strlen(shaderModifiedSrc);
+   memcpy(shaderModifiedSrc + versionStringLength, shaderAdditionalString, additionalStringLength);
+   memcpy(shaderModifiedSrc + versionStringLength + additionalStringLength, shaderSrc, shaderSrcLength + 1); // +\0
    return shaderModifiedSrc;
 }
 

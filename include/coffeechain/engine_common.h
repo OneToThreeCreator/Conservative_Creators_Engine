@@ -51,17 +51,17 @@ typedef uint_fast32_t cce_uint;
 typedef uint8_t cce_void;
 typedef uint_fast8_t cce_enum;
 
-#define CCE_ENABLE_BOOL 1u
-#define CCE_DISABLE_BOOL 2u
-#define CCE_SWITCH_BOOL 3u
+#define CCE_ENABLE_BOOL 0x1
+#define CCE_DISABLE_BOOL 0x0
+#define CCE_SWITCH_BOOL 0x2
 
-#define CCE_FIXED_RESOLUTION 0x1
-#define CCE_FIXED_ASPECT_RATIO 0x2
-#define CCE_MINIMAL_ASPECT_RATIO 0x3
-#define CCE_MAXIMUM_ASPECT_RATIO 0x4
-#define CCE_GLOBAL_BOOL_LOGIC_ELEMENT 0x0u
-#define CCE_PLOT_NUMBER_LOGIC_ELEMENT 0x1u
-#define CCE_TIMER_LOGIC_ELEMENT       0x2u
+#define CCE_FIXED_RESOLUTION 0x4
+#define CCE_FIXED_ASPECT_RATIO 0x5
+#define CCE_MINIMAL_ASPECT_RATIO 0x6
+#define CCE_MAXIMUM_ASPECT_RATIO 0x7
+#define CCE_GLOBAL_BOOL_LOGIC_ELEMENT 0x8
+#define CCE_PLOT_NUMBER_LOGIC_ELEMENT 0x9
+#define CCE_TIMER_LOGIC_ELEMENT       0xA
 
 struct cce_uvec2
 {
@@ -111,7 +111,7 @@ struct CollisionGroup
 struct Timer
 {
    double initTime;
-   double delay;
+   float delay;
 };
 
 CCE_PUBLIC_OPTIONS extern const double *const cceDeltaTime;

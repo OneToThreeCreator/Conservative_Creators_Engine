@@ -1,0 +1,4 @@
+1. Add proper support for more than 255 groups in base_actions
+2. Implement support for shift in more actions
+3. Add support for some kind of delayed action execution
+4. Rewrite openGL drawing facility (remove geometry shader completely, make arrays of arrays of uniforms)

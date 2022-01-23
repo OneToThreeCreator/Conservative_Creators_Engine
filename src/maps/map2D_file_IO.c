@@ -219,8 +219,6 @@ static GLuint makeVAOmap2D (struct Map2DElement *elements, uint32_t elementsQuan
    glBufferData(GL_ARRAY_BUFFER, ((sizeof(struct Map2DElement) +  3 * sizeof(uint8_t)) * elementsQuantity), elements, GL_STATIC_DRAW);
    GL_CHECK_ERRORS;
    
-   /* Warning! Members of struct Map2DElement must follow one by one, otherwise the code below will not work propertly. Probably compiler-dependant. */
-   
    /* Pointers */
    glVertexAttribIPointer(0, 2, GL_INT, sizeof(struct Map2DElement), (void*)(offsetof(struct Map2DElement, x)));
    GL_CHECK_ERRORS;
@@ -232,7 +230,6 @@ static GLuint makeVAOmap2D (struct Map2DElement *elements, uint32_t elementsQuan
    GL_CHECK_ERRORS;
    glVertexAttribIPointer(4, 1, GL_UNSIGNED_INT, sizeof(struct Map2DElement), (void*)(offsetof(struct Map2DElement, textureInfo) + offsetof(struct Texture, ID)));
    GL_CHECK_ERRORS;
-   float *ptr = (float*) (((char*) (elements)) + offsetof(struct Map2DElement, textureInfo) + offsetof(struct Texture, startX));
    
    glVertexAttribIPointer(5, 1, GL_UNSIGNED_BYTE, 2u * sizeof(uint8_t), (void*)(elementsQuantity * sizeof(struct Map2DElement)));
    GL_CHECK_ERRORS;
@@ -463,7 +460,7 @@ struct Map2D* cceLoadMap2D (uint16_t number)
       struct Timer *end = (map->timers + map->timersQuantity - 1u);
       for (struct Timer *iterator = (map->timers); iterator <= end; ++iterator)
       {
-         fread((&(iterator->delay)), 8u/*double*/, 1u, map_f);
+         fread((&(iterator->delay)), 4u/*float*/, 1u, map_f);
          iterator->initTime = 0.0;
       }
    }
@@ -552,7 +549,7 @@ struct Map2D* cceMap2DdevToMap2D (struct Map2Ddev *mapdev)
    }
    if (mapdev->extensionGroupsQuantity)
    {
-      map->extensionGroups = (struct ElementGroup*) malloc(map->extensionGroupsQuantity * sizeof(struct ElementGroup));
+      map->extensionGroups = (struct ElementGroup*) malloc(mapdev->extensionGroupsQuantity * sizeof(struct ElementGroup));
       for (struct ElementGroup *i = map->extensionGroups, *j = mapdev->extensionGroups, *jend = mapdev->extensionGroups + mapdev->extensionGroupsQuantity - 1u;
            j < jend; ++i, ++j)
       {
@@ -618,7 +615,7 @@ struct Map2D* cceMap2DdevToMap2D (struct Map2Ddev *mapdev)
    if (mapdev->timersQuantity)
    {
       map->timers = (struct Timer*) malloc(mapdev->timersQuantity * sizeof(struct Timer));
-      double *srcDelays = mapdev->delaysOfTimers;
+      float *srcDelays = mapdev->delaysOfTimers;
       for(struct Timer *iterator = map->timers, *end = (map->timers + mapdev->timersQuantity - 1u); iterator <= end; ++iterator, ++srcDelays)
       {
          iterator->delay = *srcDelays;
@@ -720,8 +717,8 @@ struct Map2Ddev* cceLoadMap2Ddev (uint16_t number)
    fread(&(map->timersQuantity), 2u/*uint16_t*/, 1u, map_f);
    if ((map->timersQuantity))
    {
-      (map->delaysOfTimers) = (double*) malloc((map->timersQuantity) * sizeof(double));
-      fread((map->delaysOfTimers), 8u/*double*/, (map->timersQuantity), map_f);
+      (map->delaysOfTimers) = (float*) malloc((map->timersQuantity) * sizeof(float));
+      fread((map->delaysOfTimers), 4u/*float*/, (map->timersQuantity), map_f);
    }
    fread(&(map->logicQuantity), 4u/*uint32_t*/, 1u, map_f);
    if (map->logicQuantity)
@@ -801,7 +798,7 @@ int cceWriteMap2Ddev (struct Map2Ddev *map, void (*writeFunc)(FILE*))
    fwrite(&(map->timersQuantity), 2u/*uint16_t*/, 1u, map_f);
    if ((map->timersQuantity))
    {
-      fwrite((map->delaysOfTimers), 8u/*double*/, (map->timersQuantity), map_f);
+      fwrite((map->delaysOfTimers), 4u/*float*/, (map->timersQuantity), map_f);
    }
    fwrite(&(map->logicQuantity), 4u/*uint32_t*/, 1u, map_f);
    if (map->logicQuantity)

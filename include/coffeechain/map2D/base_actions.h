@@ -36,11 +36,23 @@ extern C:
 #define CCE_PUBLIC_OPTIONS
 #endif // Windows
 
+#define CCE_CURRENT_MAP2D 0x1
+#define CCE_DYNAMIC_MAP2D 0x2
+
+#define CCE_SET   CCE_ENABLE_BOOL
+#define CCE_SHIFT CCE_SWITCH_BOOL
+
+/*
+   Every structure here has 32-bit alignment. Using 64-bit aligned structure is not recommended, due to possibility of misaligned reading
+*/
+
 struct moveActionStruct
 {
    int32_t x;
    int32_t y;
    uint16_t groupID;
+   cce_enum action;
+   cce_enum mapType;
 };
 
 struct extendActionStruct
@@ -48,6 +60,8 @@ struct extendActionStruct
    int32_t x;
    int32_t y;
    uint16_t groupID;
+   cce_enum action;
+   cce_enum mapType;
 };
 
 struct rotateActionStruct
@@ -56,6 +70,8 @@ struct rotateActionStruct
    int32_t xOffset;
    int32_t yOffset;
    uint8_t groupID;
+   cce_enum mapType;
+   uint16_t __pad;
 };
 
 struct offsetTextureActionStruct
@@ -63,6 +79,8 @@ struct offsetTextureActionStruct
    int32_t offsetX;
    int32_t offsetY;
    uint8_t groupID;
+   cce_enum mapType;
+   uint16_t __pad;
 };
 
 struct changeColorActionStruct
@@ -72,29 +90,46 @@ struct changeColorActionStruct
    float blue;
    float alpha;
    uint8_t groupID;
+   cce_enum mapType;
+   uint16_t __pad;
 };
 
 struct setBoolActionStruct
 {
    uint16_t boolID;
    cce_enum action;
+   uint8_t __pad;
 };
-
-#define CCE_INCREASE_PLOT_NUMBER 0x1
-#define CCE_SET_PLOT_NUMBER 0x2
 
 struct setPlotNumberActionStruct
 {
    uint16_t value;
    cce_enum action;
+   uint8_t __pad;
 };
 
-CCE_PUBLIC_OPTIONS void  cceMoveGroupMap2D (uint16_t groupID, int32_t x, int32_t y);
-CCE_PUBLIC_OPTIONS void  cceExtendGroupMap2D (uint16_t groupID, int32_t x, int32_t y);
+struct startTimerActionStruct
+{
+   uint16_t ID;
+   cce_enum mapType;
+   uint8_t __pad;
+};
+
+struct setDynamicTimerDelayActionStruct
+{
+   float delay;
+   uint16_t ID;
+   cce_enum action;
+   uint8_t __pad;
+};
+
+CCE_PUBLIC_OPTIONS void  cceMoveGlobalOffsetGroupMap2D (int32_t x, int32_t y, cce_enum actionType);
+CCE_PUBLIC_OPTIONS void  cceMoveGroupMap2D (uint16_t groupID, int32_t x, int32_t y, cce_enum actionType, cce_enum mapType);
+CCE_PUBLIC_OPTIONS void  cceExtendGroupMap2D (uint16_t groupID, int32_t x, int32_t y, cce_enum actionType, cce_enum mapType);
 CCE_PUBLIC_OPTIONS float cceNormalizeAngle (float angleInDegrees);
-CCE_PUBLIC_OPTIONS void  cceRotateGroupMap2D (uint8_t groupID, float normalizedAngle, int32_t xOffset, int32_t yOffset);
-CCE_PUBLIC_OPTIONS void  cceOffsetTextureGroupMap2D (uint8_t groupID, int32_t offsetX, int32_t offsetY);
-CCE_PUBLIC_OPTIONS void  cceChangeColorGroupMap2D (uint8_t groupID, float r, float g, float b, float a);
+CCE_PUBLIC_OPTIONS void  cceRotateGroupMap2D (uint8_t groupID, float normalizedAngle, int32_t xOffset, int32_t yOffset, cce_enum mapType);
+CCE_PUBLIC_OPTIONS void  cceOffsetTextureGroupMap2D (uint8_t groupID, int32_t offsetX, int32_t offsetY, cce_enum mapType);
+CCE_PUBLIC_OPTIONS void  cceChangeColorGroupMap2D (uint8_t groupID, float r, float g, float b, float a, cce_enum mapType);
 
 #ifdef __cplusplus
 }

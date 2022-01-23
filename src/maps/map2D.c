@@ -221,9 +221,10 @@ CCE_PUBLIC_OPTIONS int cceInitEngine2D (uint16_t globalBoolsQuantity, uint32_t t
    map2Dflags = CCE_INIT;
    if (cce__initEngine(windowLabel, globalBoolsQuantity) != 0)
    {
+      free(pathBuffer);
       return -1;
    }
-      
+   
    {
       char string[] = "#define GLOBAL_OFFSET_CONTROL_MASK " MACRO_TO_STR(CCE_GLOBAL_OFFSET_MASK) "\n";
       #ifdef SYSTEM_SHADER_PATH
@@ -246,20 +247,21 @@ CCE_PUBLIC_OPTIONS int cceInitEngine2D (uint16_t globalBoolsQuantity, uint32_t t
    {
       fputs("ENGINE::INIT::SHADERS_CANNOT_BE_LOADED", stderr);
       cce__terminateEngine();
+      free(pathBuffer);
       return -1;
    }
    
-   uniformLocations = malloc(2u * sizeof(GLint));
+   uniformLocations = malloc(2 * sizeof(GLint));
    *uniformLocations = glGetUniformLocation(shaderProgram, "Step");
    GL_CHECK_ERRORS;
-   *(uniformLocations + 1u) = glGetUniformLocation(shaderProgram, "GlobalMoveCoords");
+   *(uniformLocations + 1) = glGetUniformLocation(shaderProgram, "GlobalMoveCoords");
    GL_CHECK_ERRORS;
    {
       const GLchar *uniformNames[] = {"Colors", "MoveCoords", "Extention", "TextureOffset", "RotationOffset", "RotateAngleSin", "RotateAngleCos"};
       GLuint indices[7];
-      glGetUniformIndices(shaderProgram, 7u, uniformNames, indices);
+      glGetUniformIndices(shaderProgram, 7, uniformNames, indices);
       GL_CHECK_ERRORS;
-      bufferUniformsOffsets = (GLint*) malloc(7u * sizeof(GLint));
+      bufferUniformsOffsets = (GLint*) malloc(7 * sizeof(GLint));
       glGetActiveUniformsiv(shaderProgram, 7, indices, GL_UNIFORM_OFFSET, bufferUniformsOffsets);
       GL_CHECK_ERRORS;
       glUniformBlockBinding(shaderProgram, glGetUniformBlockIndex(shaderProgram, "Variables"), 1u);
@@ -308,8 +310,8 @@ CCE_PUBLIC_OPTIONS int cceInitEngine2D (uint16_t globalBoolsQuantity, uint32_t t
    else
    {
       cce_setUniformBufferToDefault = setUniformBufferToDefault_withoutCBOext;
-      float *ones = malloc(255u * sizeof(float));
-      for (float *iterator = ones, *end = ones + 255u; iterator < end; ++iterator)
+      float *ones = malloc(255 * sizeof(float));
+      for (float *iterator = ones, *end = ones + 255; iterator < end; ++iterator)
       {
          *iterator = 1.0f;
       }
@@ -330,7 +332,7 @@ CCE_PUBLIC_OPTIONS int cceInitEngine2D (uint16_t globalBoolsQuantity, uint32_t t
    glEnable(GL_BLEND);
    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
    cce__initMap2DLoaders(&cce_actions);
-   cceAppendPath(pathBuffer, pathLength + 11u, "maps");
+   cceAppendPath(pathBuffer, pathLength + 11, "maps");
    cceSetMap2Dpath(pathBuffer);
    *(pathBuffer + pathLength) = '\0';
    
@@ -344,11 +346,11 @@ CCE_PUBLIC_OPTIONS int cceInitEngine2D (uint16_t globalBoolsQuantity, uint32_t t
    glTexturesArray = createTextureArray(CCE_ALLOCATION_STEP);
    glTexturesArraySize = CCE_ALLOCATION_STEP;
    stbi_set_flip_vertically_on_load(1);
-   cceAppendPath(pathBuffer, pathLength + 11u, "textures");
+   cceAppendPath(pathBuffer, pathLength + 11, "textures");
    cceSetTexturesPath(resourcePath);
    *(pathBuffer + pathLength) = '\0';
-   cce__baseActionsInit(g_dynamicMap, g_UBOs, bufferUniformsOffsets, uniformLocations, shaderProgram, cce_setUniformBufferToDefault);
    g_dynamicMap = cce__initDynamicMap2D();
+   cce__baseActionsInit(g_dynamicMap, g_UBOs, bufferUniformsOffsets, uniformLocations, shaderProgram, cce_setUniformBufferToDefault);
    cceSetFlags2D(CCE_DEFAULT);
    map2Dflags &= ~CCE_INIT;
    free(pathBuffer);
@@ -912,7 +914,18 @@ CCE_PUBLIC_OPTIONS int cceEngine2D (void)
       cce__engineUpdate();
       processLogicMap2Dcommon(maps);
       processLogicDynamicMap2D(g_dynamicMap, maps->main);
-      
+
+      static uint16_t frames = 0;
+      static float timePassed = 0.0f;
+      timePassed += *cceDeltaTime;
+      ++frames;
+      if (timePassed > 2.0f)
+      {
+         printf("%f FPS\n", frames / timePassed);
+         frames = 0;
+         timePassed = 0.0f;
+      }
+
       if (closestMapDistance < 0)
       {
          maps = loadMap2DwithDependies(maps, (maps->main->exitMaps + closestMapPosition)->ID);

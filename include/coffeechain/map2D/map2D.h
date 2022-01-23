@@ -29,18 +29,11 @@ extern C:
 {
 #endif // __cplusplus
 
-#if defined(_WIN32) || defined(__WIN32__) || defined(_WIN64) || defined(__TOS_WIN__) || defined(__WINDOWS__) || \
-    defined(__MINGW32__) || defined(__MINGW64__) || defined(__CYGWIN__)
-#include "cce_exports.h"
-#define CCE_PUBLIC_OPTIONS CCE_EXPORTS
-#else
-#define CCE_PUBLIC_OPTIONS
-#endif // Windows
 
-#define CCE_INCORRECT_ENUM 1u
-#define CCE_ATTEMPT_TO_OVERRIDE_DEFAULT_ELEMENT 2u
-#define CCE_ELEMENT_DOES_NOT_EXIST 3u
-#define CCE_OUT_OF_BOUNDS 4u
+#define CCE_INCORRECT_ENUM 1
+#define CCE_ATTEMPT_TO_OVERRIDE_DEFAULT_ELEMENT 2
+#define CCE_ELEMENT_DOES_NOT_EXIST 3
+#define CCE_OUT_OF_BOUNDS 4
 
 
 #define CCE_DEFAULT                            0x000
@@ -51,23 +44,13 @@ extern C:
 #define CCE_PROCESS_LOGIC_FOR_CLOSEST_MAP      0x004
 #define CCE_PROCESS_LOGIC_FOR_ALL_MAPS         0x008
 
-#define CCE_PROCESS_TEXTURES 0x010
-#define CCE_PROCESS_UBO_ARRAY 0x020
-
-#define CCE_BASIC_ACTIONS_NOT_SET 0x100
-#define CCE_INIT CCE_BASIC_ACTIONS_NOT_SET
-
-#define CCE_BASIC_ACTIONS_QUANTITY 16u
-
 typedef uint_fast32_t cce_flag;
 
+#define CCE_MOVE_GROUP 0x10
+#define CCE_EXTENSION_GROUP 0x11
+#define CCE_COLLISION_GROUP 0x12
 
-
-#define CCE_MOVE_GROUP 1u
-#define CCE_EXTENSION_GROUP 2u
-#define CCE_COLLISION_GROUP 3u
-
-#define CCE_COLLISION_LOGIC_ELEMENT   0x3u
+#define CCE_COLLISION_LOGIC_ELEMENT   0xB
 
 struct ExitMap2D
 {
@@ -97,13 +80,12 @@ struct Map2DElement
    struct Texture textureInfo;
    int8_t layer;
    // Vertex shader
-// uint8_t moveGroup;          // 0 is unmovable            (deprecated)
-// uint8_t moveGroup2;         // 0 is unmovable, max is 16 (deprecated!)
-// uint8_t extensionGroup;     // 0 is unscalable           (deprecated)
+// uint8_t moveGroup;          // 0 is unmovable
+// uint8_t extensionGroup;     // 0 is unscalable
    // Geometry shader
    uint8_t rotateGroup;        // 0 is unrotatable
    // Fragment shader
-   uint8_t textureOffsetGroup; // 0 is texture (more precisely - texture piece) unchangeable 
+   uint8_t textureOffsetGroup; // 0 is texture (more precisely - texture piece) unchangeable
    uint8_t colorGroup;         // 0 is color unchangable
 };
 
@@ -176,7 +158,7 @@ struct Map2Ddev
    uint16_t               collisionQuantity;
    struct CollisionGroup *collision;
    uint16_t               timersQuantity;
-   double                *delaysOfTimers;
+   float                 *delaysOfTimers;
    uint32_t               logicQuantity;
    struct ElementLogic   *logic;
    uint8_t                actionsQuantity;
@@ -221,14 +203,14 @@ CCE_PUBLIC_OPTIONS void cceUpdateCollisionDynamicMap2D (uint16_t ID, uint16_t gr
 CCE_PUBLIC_OPTIONS uint16_t cceCreateCollisionDynamicMap2D (uint16_t group1ID, cce_ubyte isGroup1BelongsToCurrentMap2D, 
                                       uint16_t group2ID, cce_ubyte isGroup2BelongsToCurrentMap2D);
 CCE_PUBLIC_OPTIONS void cceDeleteCollisionDynamicMap2D (uint16_t ID);
-CCE_PUBLIC_OPTIONS void cceSetTimerDynamicMap2D (uint16_t ID, float delay);
+CCE_PUBLIC_OPTIONS void cceStartTimerDynamicMap2D (uint16_t ID);
+CCE_PUBLIC_OPTIONS void cceSetTimerDelayDynamicMap2D (uint16_t ID, float delay);
 CCE_PUBLIC_OPTIONS uint16_t cceCreateTimerDynamicMap2D (float delay);
-CCE_PUBLIC_OPTIONS void cceResetTimerDynamicMap2D (uint16_t ID);
-CCE_PUBLIC_OPTIONS int8_t cceGetTimerDynamicMap2D (uint16_t ID);
-CCE_PUBLIC_OPTIONS void cceUpdateLogicElementByTruthTableDynamicMap2D (const uint16_t ID, const uint8_t logicElementsQuantity, const uint16_t *const logicElements, const cce_enum *const logicElementTypes, const uint_fast16_t *const truthTable);
+CCE_PUBLIC_OPTIONS struct Timer cceGetTimerDynamicMap2D (uint16_t ID);
+CCE_PUBLIC_OPTIONS void cceUpdateLogicElementsByTruthTableDynamicMap2D (const uint16_t ID, const uint8_t logicElementsQuantity, const uint16_t *const logicElements, const cce_enum *const logicElementTypes, const uint_fast16_t *const truthTable);
 CCE_PUBLIC_OPTIONS uint8_t cceUpdateLogicElementsByBooleanExpressionDynamicMap2D (const uint16_t ID, const uint16_t *const logicElements, const cce_enum *const logicElementTypes, const char *const booleanExpression);
-CCE_PUBLIC_OPTIONS void cceUpdateLogicActionsDynamicMap2D (const uint16_t ID, const uint8_t actionsQuantity, uint32_t *actionIDs, const void **actionArgs, const size_t *const actionArgSizes);
-CCE_PUBLIC_OPTIONS uint16_t cceFindFreeLogicDynamicMap2D (void);
+CCE_PUBLIC_OPTIONS void cceUpdateLogicActionsDynamicMap2D (const uint16_t ID, const uint8_t actionsQuantity, uint32_t *actionIDs, const void **actionArgs, const uint32_t *const actionArgSizes);
+CCE_PUBLIC_OPTIONS uint16_t cceCreateLogicDynamicMap2D (void);
 
 #define cceCheckCollisionMap2D(element1, element2) cceCheckCollision((element1)->x, (element1)->y, (element1)->width, (element1)->height, (element2)->x, (element2)->y, (element2)->width, (element2)->height)
 #ifdef __cplusplus

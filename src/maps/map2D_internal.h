@@ -33,6 +33,14 @@
 #define GL_CHECK_ERRORS cce__openGLErrorPrint(glGetError(), __LINE__, __FILE__)
 #endif
 
+#define CCE_PROCESS_TEXTURES 0x010
+#define CCE_PROCESS_UBO_ARRAY 0x020
+
+#define CCE_BASIC_ACTIONS_NOT_SET 0x100
+#define CCE_INIT CCE_BASIC_ACTIONS_NOT_SET
+
+#define CCE_BASIC_ACTIONS_QUANTITY 16
+
 struct LoadedTextures
 {
    uint32_t ID; /* 0 is invalid */
@@ -56,30 +64,18 @@ struct UsedUBO
 
 struct DynamicMap2DElement
 {
+   uint16_t *moveGroups;
+   uint16_t *extensionGroups;
+   uint16_t *collisionGroups;
    int32_t  x;
    int32_t  y;
    uint16_t width;
    uint16_t height;
    struct Texture textureInfo;
-   uint16_t  moveGroupsQuantity;
-   uint16_t *moveGroups;
-   uint16_t  extensionGroupsQuantity;
-   uint16_t *extensionGroups;
-   uint16_t  collisionGroupsQuantity;
-   uint16_t *collisionGroups;
-   union
-   {
-      struct
-      {
-         // Fragment shader
-         uint8_t textureOffsetGroup; /* 0 is texture (more precisely - texture piece) unchangeable */
-         uint8_t colorGroup;         /* 0 is color unchangable */
-      };
-      struct
-      {
-         uint16_t textureElementReliesOn;
-      };
-   };
+   uint16_t moveGroupsQuantity;
+   uint16_t extensionGroupsQuantity;
+   uint16_t collisionGroupsQuantity;
+   uint16_t textureElementReliesOn;
    uint8_t flags;              /* 0x1 - isUsed, 0x2 - hasCollider, 0x4 - toBeProcessed, 0x8 - has2DElement, 0x10 - isGlobalOffset */
    int8_t layer;
    // Vertex shader
@@ -87,6 +83,9 @@ struct DynamicMap2DElement
    uint8_t extensionGroup;     /* 0 is unscalable */
    // Geometry shader
    uint8_t rotateGroup;        /* 0 is unrotatable */
+   // Fragment shader
+   uint8_t textureOffsetGroup; /* 0 is texture (more precisely - texture piece) unchangeable */
+   uint8_t colorGroup;         /* 0 is color unchangable */
 };
 
 struct DynamicElementGroup
@@ -146,6 +145,7 @@ void cce__initMap2DLoaders (void (***doAction)(void*));
 void cce__setCurrentArrayOfMaps (const struct Map2Darray *maps);
 void cce__beginBaseActions (const struct Map2D *map);
 void cce__endBaseActions (void);
+void cce__endBaseActionsDynamicMap2D (void);
 
 cce_ubyte cce__fourthLogicTypeFuncMap2D(uint16_t ID, va_list argp);
 cce_ubyte cce__fourthLogicTypeFuncDynamicMap2D(uint16_t ID, va_list argp);
@@ -168,7 +168,8 @@ cce__processLogic(map->logicQuantity, map->logic, map->timers, cce_actions, cce_
 cce__endBaseActions()
 #define processLogicDynamicMap2D(dynamicMap, currentMap) cce__setCurrentTemporaryBools(dynamicMap->temporaryBools); cce__beginBaseActions(currentMap); \
 cce__processLogic(dynamicMap->logicQuantity, dynamicMap->logic, dynamicMap->timers, cce_actions, cce__fourthLogicTypeFuncDynamicMap2D, currentMap); \
-cce__endBaseActions()
+cce__endBaseActions(); \
+cce__endBaseActionsDynamicMap2D()
 
 #define CCE_COLORGROUP_OFFSET 0u
 #define CCE_MOVEGROUP_OFFSET 1u

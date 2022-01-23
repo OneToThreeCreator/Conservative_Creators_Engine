@@ -27,6 +27,98 @@
 #include <coffeechain/map2D/map2D.h>
 #include <coffeechain/path_getters.h>
 
+void initPlayer (uint32_t globalBoolsQuantity)
+{
+   struct Map2DElementDev player = {-1, -1, 1, 2, {0.5625f, 0.0f, 1.0f, 1.0f, 1}, 0, 0, 0, 0, 0, 0, 0};
+   cceCreateMap2DElementDynamicMap2D(&player, 1);
+
+   uint_fast16_t *aandb = cceParseStringToLogicOperations("a & b", NULL);
+   uint16_t logicIDs[5];
+   uint16_t timerID = cceCreateTimerDynamicMap2D(0.03f);
+   uint16_t moveElements[2] = {globalBoolsQuantity - 12, timerID};
+   cce_enum types[2] = {CCE_GLOBAL_BOOL_LOGIC_ELEMENT, CCE_TIMER_LOGIC_ELEMENT};
+   for (uint16_t *iterator = logicIDs, *end = logicIDs + 4; iterator < end; ++iterator)
+   {
+      *iterator = cceCreateLogicDynamicMap2D();
+      cceUpdateLogicElementsByTruthTableDynamicMap2D(*iterator, 2, moveElements, types, aandb);
+      ++(moveElements[0]);
+   }
+   {
+      uint16_t updateTimerElements[2] = {globalBoolsQuantity, timerID};
+      logicIDs[4] = cceCreateLogicDynamicMap2D();
+      cceUpdateLogicElementsByTruthTableDynamicMap2D(logicIDs[4], 2, updateTimerElements, types, aandb);
+   }
+   free(aandb);
+   uint32_t moveAndSetBoolAction[2] = {0, 5};
+   struct setBoolActionStruct setBoolSt = {globalBoolsQuantity, CCE_ENABLE_BOOL};
+   struct moveActionStruct moveSt = {0, -1, 0, CCE_SHIFT, CCE_DYNAMIC_MAP2D};
+   const void *moveVerticallyActionArgs[2] = {&moveSt, &setBoolSt};
+   uint32_t moveVerticallyActionArgSizes[2] = {sizeof(struct moveActionStruct), sizeof(struct setBoolActionStruct)};
+   cceUpdateLogicActionsDynamicMap2D(logicIDs[0], 2, moveAndSetBoolAction, moveVerticallyActionArgs, moveVerticallyActionArgSizes);
+   moveSt.y = 1;
+   cceUpdateLogicActionsDynamicMap2D(logicIDs[1], 2, moveAndSetBoolAction, moveVerticallyActionArgs, moveVerticallyActionArgSizes);
+   moveSt.x = 1;
+   moveSt.y = 0;
+   setBoolSt.action = CCE_DISABLE_BOOL;
+   struct startTimerActionStruct startTimerSt = {timerID, CCE_DYNAMIC_MAP2D};
+   const void *moveHorizontallyActionArgs[3] = {&moveSt, &setBoolSt, &startTimerSt};
+   uint32_t moveHorizontallyActionArgSizes[3] = {sizeof(struct moveActionStruct), sizeof(struct setBoolActionStruct), sizeof(struct startTimerActionStruct)};
+
+   uint32_t moveAndSetBoolAndTimerAction[3] = {0, 5, 7};
+   cceUpdateLogicActionsDynamicMap2D(logicIDs[2], 3, moveAndSetBoolAndTimerAction, moveHorizontallyActionArgs, moveHorizontallyActionArgSizes);
+   moveSt.x = -1;
+   cceUpdateLogicActionsDynamicMap2D(logicIDs[3], 3, moveAndSetBoolAndTimerAction, moveHorizontallyActionArgs, moveHorizontallyActionArgSizes);
+   uint32_t setBoolAndTimerAction[2] = {5, 7};
+   const void *timerAndBool[2] = {&setBoolSt, &startTimerSt};
+   uint32_t timerAndBoolSizes[2] = {sizeof(struct setBoolActionStruct), sizeof(struct startTimerActionStruct)};
+   cceUpdateLogicActionsDynamicMap2D(logicIDs[4], 2, setBoolAndTimerAction, timerAndBool, timerAndBoolSizes);
+   return;
+}
+
+void createAdditionalDynamicElement (struct cce_ivec2 coords, uint32_t globalBoolsQuantity)
+{
+   struct Map2DElementDev element = {coords.x, coords.y, 2, 2, {0.0f, 0.0f, 1.0f, 1.0f, 0}, 0, 1, 1, 0, 0, 0, 1};
+   cceCreateMap2DElementDynamicMap2D(&element, 1);
+
+   uint_fast16_t *aandb = cceParseStringToLogicOperations("a & b", NULL);
+   uint16_t logicIDs[5];
+   uint16_t timerID = cceCreateTimerDynamicMap2D(0.03f);
+   uint16_t bools[5] = {globalBoolsQuantity - 5, globalBoolsQuantity - 7, globalBoolsQuantity - 8, globalBoolsQuantity - 6, globalBoolsQuantity + 1};
+   uint16_t moveElements[2] = {0, timerID};
+   cce_enum types[2] = {CCE_GLOBAL_BOOL_LOGIC_ELEMENT, CCE_TIMER_LOGIC_ELEMENT};
+   for (uint16_t *biterator = bools, *iterator = logicIDs, *end = logicIDs + 5; iterator < end; ++iterator, ++biterator)
+   {
+      moveElements[0] = *biterator;
+      *iterator = cceCreateLogicDynamicMap2D();
+      cceUpdateLogicElementsByTruthTableDynamicMap2D(*iterator, 2, moveElements, types, aandb);
+   }
+   free(aandb);
+   uint32_t moveAndSetBoolAction[2] = {0, 5};
+   struct setBoolActionStruct setBoolSt = {globalBoolsQuantity + 1, CCE_ENABLE_BOOL};
+   struct moveActionStruct moveSt = {0, 1, 1, CCE_SHIFT, CCE_DYNAMIC_MAP2D};
+   const void *moveVerticallyActionArgs[2] = {&moveSt, &setBoolSt};
+   uint32_t moveVerticallyActionArgSizes[2] = {sizeof(struct moveActionStruct), sizeof(struct setBoolActionStruct)};
+   cceUpdateLogicActionsDynamicMap2D(logicIDs[0], 2, moveAndSetBoolAction, moveVerticallyActionArgs, moveVerticallyActionArgSizes);
+   moveSt.y = -1;
+   cceUpdateLogicActionsDynamicMap2D(logicIDs[1], 2, moveAndSetBoolAction, moveVerticallyActionArgs, moveVerticallyActionArgSizes);
+   moveSt.x = -1;
+   moveSt.y = 0;
+   setBoolSt.action = CCE_DISABLE_BOOL;
+   struct startTimerActionStruct startTimerSt = {timerID, CCE_DYNAMIC_MAP2D};
+   const void *moveHorizontallyActionArgs[3] = {&moveSt, &setBoolSt, &startTimerSt};
+   uint32_t moveHorizontallyActionArgSizes[3] = {sizeof(struct moveActionStruct), sizeof(struct setBoolActionStruct), sizeof(struct startTimerActionStruct)};
+
+   uint32_t moveAndSetBoolAndTimerAction[3] = {0, 5, 7};
+   cceUpdateLogicActionsDynamicMap2D(logicIDs[2], 3, moveAndSetBoolAndTimerAction, moveHorizontallyActionArgs, moveHorizontallyActionArgSizes);
+   moveSt.x = 1;
+   cceUpdateLogicActionsDynamicMap2D(logicIDs[3], 3, moveAndSetBoolAndTimerAction, moveHorizontallyActionArgs, moveHorizontallyActionArgSizes);
+   uint32_t setBoolAndTimerAction[2] = {5, 7};
+   const void *timerAndBool[2] = {&setBoolSt, &startTimerSt};
+   uint32_t timerAndBoolSizes[2] = {sizeof(struct setBoolActionStruct), sizeof(struct startTimerActionStruct)};
+   cceUpdateLogicActionsDynamicMap2D(logicIDs[4], 2, setBoolAndTimerAction, timerAndBool, timerAndBoolSizes);
+   return;
+}
+
 int main (int argc, char **argv)
 {
    char path[256];
@@ -53,8 +145,8 @@ int main (int argc, char **argv)
          strncat(path, appendString, 256 - strnlen(path, 256));
       }
    }
-   const uint32_t globalBoolsQuantity = 32768u;
-   if (cceInitEngine2D(globalBoolsQuantity, 16u, 16u, "CoffeeChain TEST", path) != 0)
+   const uint32_t globalBoolsQuantity = 32768;
+   if (cceInitEngine2D(globalBoolsQuantity, 16, 16, "CoffeeChain TEST", path) != 0)
    {
       return -1;
    }
@@ -62,85 +154,33 @@ int main (int argc, char **argv)
    cceSetTexturesPath(path);
    cceSetFlags2D(CCE_RENDER_ONLY_CURRENT_MAP | CCE_PROCESS_LOGIC_ONLY_FOR_CURRENT_MAP);
    {
-      char *path = cceGetTemporaryDirectory(0u);
+      char *path = cceGetTemporaryDirectory(0);
       cceSetMap2Dpath(path);
       free(path);
       
       struct Map2DElement elements[] = {
-         {3, 3, 10u, 10u, {0.0f, 0.0f, 5.0f, 5.0f, 2u}, 0, 0u, 0u, 0u},
-         {-11, -11, 10u, 24u, {0.0f, 0.0f, 1.0f, 1.0f, 0u}, 0, 0u, 0u, 1u},
-         {3, -11, 10u, 10u, {0.0f, 0.0f, 1.0f, 1.0f, 0u}, 0, 0u, 0u, 2u},
-         {0, -11, 2u, 24u,  {0.0f, 0.0f, 1.0f, 1.0f, 0u}, 0, 0u, 0u, 3u},
-         {2, 0, 11u, 2u,  {0.0f, 0.0f, 1.0f, 1.0f, 0u}, 0, 0u, 0u, 3u},
+         {  3,   3, 10, 10, {0.0f, 0.0f, 5.0f, 5.0f, 2}, 0, 0, 0, 0},
+         {-11, -11, 10, 24, {0.0f, 0.0f, 1.0f, 1.0f, 0}, 0, 0, 0, 1},
+         {  3, -11, 10, 10, {0.0f, 0.0f, 1.0f, 1.0f, 0}, 0, 0, 0, 2},
+         {  0, -11,  2, 24, {0.0f, 0.0f, 1.0f, 1.0f, 0}, 0, 0, 0, 3},
+         {  2,   0, 11,  2, {0.0f, 0.0f, 1.0f, 1.0f, 0}, 0, 0, 0, 3},
       };
-      struct ElementGroup moveGroups[1u] = {
-         {NULL, 0u},
+      struct ElementGroup moveGroups[1] = {
+         {NULL, 0},
       };
-      uint16_t timerID = 0u;
-      uint32_t timerAndColorsActions[4] = {7u, 4u, 4u, 4u};
-      uint32_t timerAndColorsOffsets[5] = {0u, sizeof(uint16_t), 4 * sizeof(float) + 2 * sizeof(uint16_t),
-                                           8 * sizeof(float) + 3 * sizeof(uint16_t), 12 * sizeof(float) + 4 * sizeof(uint16_t)};
-      cce_void timerAndColors[timerAndColorsOffsets[4]];
-      *((uint16_t*) (timerAndColors + timerAndColorsOffsets[0]))      = timerID;
-      
-      *((float*)    (timerAndColors + timerAndColorsOffsets[1]) + 0u) = 0.711f;
-      *((float*)    (timerAndColors + timerAndColorsOffsets[1]) + 1u) = 0.64f;
-      *((float*)    (timerAndColors + timerAndColorsOffsets[1]) + 2u) = 0.453f;
-      *((float*)    (timerAndColors + timerAndColorsOffsets[1]) + 3u) = 1.0f;
-      *((uint16_t*) (timerAndColors + timerAndColorsOffsets[1]) + 8u) = 1u;
-      
-      *((float*)    (timerAndColors + timerAndColorsOffsets[2]) + 0u) = 0.001f;
-      *((float*)    (timerAndColors + timerAndColorsOffsets[2]) + 1u) = 0.487f;
-      *((float*)    (timerAndColors + timerAndColorsOffsets[2]) + 2u) = 0.0f;
-      *((float*)    (timerAndColors + timerAndColorsOffsets[2]) + 3u) = 1.0f;
-      *((uint16_t*) (timerAndColors + timerAndColorsOffsets[2]) + 8u) = 2u;
-      
-      *((float*)    (timerAndColors + timerAndColorsOffsets[3]) + 0u) = 0.69f;
-      *((float*)    (timerAndColors + timerAndColorsOffsets[3]) + 1u) = 0.645f;
-      *((float*)    (timerAndColors + timerAndColorsOffsets[3]) + 2u) = 0.042f;
-      *((float*)    (timerAndColors + timerAndColorsOffsets[3]) + 3u) = 1.0f;
-      *((uint16_t*) (timerAndColors + timerAndColorsOffsets[3]) + 8u) = 3u;
-      
-      uint16_t moveUpElements[2]   = {globalBoolsQuantity - 12u, timerID};
-      uint16_t moveDownElements[2] = {globalBoolsQuantity - 11u, timerID};
-      uint16_t moveLeftElements[2] = {globalBoolsQuantity - 10u, timerID};
-      uint16_t moveRightElements[2] = {globalBoolsQuantity - 9u, timerID};
-      uint32_t moveAndTimerActions[2] = {0u, 7u};
-      uint32_t startTimerAction = 7u;
-      uint32_t moveAndTimerOffsets[3] = {0u, 2 * sizeof(uint32_t) + sizeof(uint16_t), 2 * sizeof(uint32_t) + 2 * sizeof(uint16_t)};
-      uint32_t timerOffsets[2] = {0u, sizeof(uint16_t)};
-      
-      int32_t moveUp[3] = {0, -1};
-      *(uint16_t*) (moveUp + 2u) = 0u;
-      *((uint16_t*) (moveUp + 2u) + 1u) = timerID;
-      int32_t moveDown[3] = {0, 1};
-      *(uint16_t*) (moveDown + 2u) = 0u;
-      *((uint16_t*) (moveDown + 2u) + 1u) = timerID;
-      int32_t moveLeft[3] = {1, 0};
-      *(uint16_t*) (moveLeft + 2u) = 0u;
-      *((uint16_t*) (moveLeft + 2u) + 1u) = timerID;
-      int32_t moveRight[3] = {-1, 0};
-      *(uint16_t*) (moveRight + 2u) = 0u;
-      *((uint16_t*) (moveRight + 2u) + 1u) = timerID;
-      
-      uint_fast16_t *aandb = cceParseStringToLogicOperations("a & b", NULL);
-      
-      struct ElementLogic logic[] = {
-         {2u, 2u, moveUpElements,    aandb, 0x8  /*00001000 in hex*/, moveAndTimerActions, moveAndTimerOffsets, (void*) moveUp},
-         {2u, 2u, moveDownElements,  aandb, 0x8  /*00001000 in hex*/, moveAndTimerActions, moveAndTimerOffsets, (void*) moveDown},
-         {2u, 2u, moveLeftElements,  aandb, 0x8  /*00001000 in hex*/, moveAndTimerActions, moveAndTimerOffsets, (void*) moveLeft},
-         {2u, 2u, moveRightElements, aandb, 0x8  /*00001000 in hex*/, moveAndTimerActions, moveAndTimerOffsets, (void*) moveRight},         
-      };
-      double globalTimer = 0.02;
-      struct Map2Ddev map = {0u, 5u, 0u, elements, 1u, moveGroups, 0u, NULL, 0u, NULL, 0u, NULL, 0u, NULL, 1u, &globalTimer, 4u, logic,
-                             4u, timerAndColorsActions, timerAndColorsOffsets, (void*) timerAndColors, 0u, NULL};
+      struct changeColorActionStruct colors[4] = {{0.711f, 0.64f,  0.453f, 1.0f, 1, CCE_CURRENT_MAP2D},
+                                                  {0.001f, 0.487f, 0.0f,   1.0f, 2, CCE_CURRENT_MAP2D},
+                                                  {0.69f,  0.645f, 0.042f, 1.0f, 3, CCE_CURRENT_MAP2D},
+                                                  {0.70f,  0.40f,  0.0f,   1.0f, 1, CCE_DYNAMIC_MAP2D}};
+      uint32_t colorActions[4] = {4, 4, 4, 4};
+      uint32_t colorsOffsets[5] = {0,  sizeof(struct changeColorActionStruct), 2 * sizeof(struct changeColorActionStruct),
+                                   3 * sizeof(struct changeColorActionStruct), 4 * sizeof(struct changeColorActionStruct)};
+      struct Map2Ddev map = {0, 5, 0, elements, 1, moveGroups, 0, NULL, 0, NULL, 0, NULL, 0, NULL, 0, NULL, 0, NULL,
+                             4, colorActions, colorsOffsets, (cce_void*) colors, 0, NULL};
       cceWriteMap2Ddev(&map, NULL);
-      free(aandb);
    }
-   {
-      struct Map2DElementDev player = {-1, -1, 2u, 2u, {0.0f, 0.0f, 1.0f, 1.0f, 1u}, 0u, 0u, 0u, 0u, 0u, 0u, 0u};
-      cceCreateMap2DElementDynamicMap2D(&player, 1u);
-   }
+   initPlayer(globalBoolsQuantity);
+   createAdditionalDynamicElement((struct cce_ivec2) {2, 2}, globalBoolsQuantity);
    printf("Initialization complete\n");
    return cceEngine2D();
 }

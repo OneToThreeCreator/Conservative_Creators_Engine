@@ -86,9 +86,9 @@ void printMap2Ddev (struct Map2Ddev *map)
       printf("  %lu: has collision groups %u and %u colliding\n", iterator - map->collision, iterator->group1, iterator->group2);
    }
    printf(" %u timers", map->timersQuantity);
-   for (double *iterator = map->delaysOfTimers, *end = map->delaysOfTimers + map->timersQuantity; iterator < end; ++iterator)
+   for (float *iterator = map->delaysOfTimers, *end = map->delaysOfTimers + map->timersQuantity; iterator < end; ++iterator)
    {
-      printf("  %lu: has delay %lf\n", iterator - map->delaysOfTimers, *iterator);
+      printf("  %lu: has delay %f\n", iterator - map->delaysOfTimers, *iterator);
    }
    printf(" %u logic\n", map->logicQuantity);
    for (struct ElementLogic *iterator = map->logic, *end = map->logic + map->logicQuantity; iterator < end; ++iterator)
@@ -170,6 +170,11 @@ void printMap2Ddev (struct Map2Ddev *map)
             arrow = '^';
             break;
          }
+         default:
+         {
+            arrow = ' ';
+            break;
+         }
       }
       printf("that loads map %u at point {x: %d y: %d}, and has %c pass direction\n",
       iterator->ID, iterator->xOffset, iterator->yOffset, arrow);
@@ -223,7 +228,7 @@ void printMap2D (struct Map2D *map)
    printf(" %u timers", map->timersQuantity);
    for (struct Timer *iterator = map->timers, *end = map->timers + map->timersQuantity; iterator < end; ++iterator)
    {
-      printf("  %lu: has delay %lf\n", iterator - map->timers, iterator->delay);
+      printf("  %lu: has delay %f\n", iterator - map->timers, iterator->delay);
    }
    printf(" %u logic\n", map->logicQuantity);
    for (struct ElementLogic *iterator = map->logic, *end = map->logic + map->logicQuantity; iterator < end; ++iterator)
