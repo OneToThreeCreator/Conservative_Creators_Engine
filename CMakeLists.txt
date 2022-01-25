@@ -20,7 +20,7 @@
 
 cmake_minimum_required(VERSION 3.13)
 
-project(coffeechain VERSION 0.1 DESCRIPTION "open 2D engine for creating games - shared library" LANGUAGES C)
+project(coffeechain VERSION 0.2 DESCRIPTION "open 2D engine for creating games - shared library" LANGUAGES C)
 
 option(BUILD_SHARED_LIBS     "Build CoffeeChain as shared library" ON)
 option(BUILD_TESTING         "Build CoffeeChain test program" ON)
