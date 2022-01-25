@@ -234,12 +234,15 @@ CCE_PUBLIC_OPTIONS void cceMoveGlobalOffsetGroupMap2D (int32_t x, int32_t y, cce
    }
    GL_CHECK_ERRORS;
    struct Map2D *map = allMaps->main;
-   moveElements(&(map->colliders->x), &(map->colliders->y), sizeof(struct Map2DCollider), map->moveGroups, -x, -y);
+   if (map->moveGroupsQuantity > 0)
+      moveElements(&(map->colliders->x), &(map->colliders->y), sizeof(struct Map2DCollider), map->moveGroups, -x, -y);
    for (struct Map2D **iterator = allMaps->dependies, **end = allMaps->dependies + allMaps->main->exitMapsQuantity; iterator < end; ++iterator)
    {
-      moveElements(&((*iterator)->colliders->x), &((*iterator)->colliders->y), sizeof(struct Map2DCollider), (*iterator)->moveGroups, -x, -y);
+      if ((*iterator)->moveGroupsQuantity > 0)
+         moveElements(&((*iterator)->colliders->x), &((*iterator)->colliders->y), sizeof(struct Map2DCollider), (*iterator)->moveGroups, -x, -y);
    }
-   moveElements(&(g_dynamicMap->elements->x), &(g_dynamicMap->elements->y), sizeof(struct DynamicMap2DElement), (struct ElementGroup*) g_dynamicMap->moveGroups, -x, -y);
+   if (g_dynamicMap->moveGroupsQuantity > 0)
+      moveElements(&(g_dynamicMap->elements->x), &(g_dynamicMap->elements->y), sizeof(struct DynamicMap2DElement), (struct ElementGroup*) g_dynamicMap->moveGroups, -x, -y);
 }
 
 CCE_PUBLIC_OPTIONS void cceMoveGroupMap2D (uint16_t groupID, int32_t x, int32_t y, cce_enum actionType, cce_enum mapType)
@@ -257,17 +260,23 @@ CCE_PUBLIC_OPTIONS void cceMoveGroupMap2D (uint16_t groupID, int32_t x, int32_t 
    {
       case CCE_CURRENT_MAP2D:
          glBuffer = g_currentMapBuffer;
-         firstElementX = &(currentMap->colliders->x);
-         firstElementY = &(currentMap->colliders->y);
-         elementSize = sizeof(struct Map2DCollider);
-         group = currentMap->moveGroups + groupID;
+         if (currentMap->moveGroupsQuantity > groupID)
+         {
+            firstElementX = &(currentMap->colliders->x);
+            firstElementY = &(currentMap->colliders->y);
+            elementSize = sizeof(struct Map2DCollider);
+            group = currentMap->moveGroups + groupID;
+         }
          break;
       case CCE_DYNAMIC_MAP2D:
          glBuffer = g_dynamicMapBuffer;
-         firstElementX = &(g_dynamicMap->elements->x);
-         firstElementY = &(g_dynamicMap->elements->y);
-         elementSize = sizeof(struct DynamicMap2DElement);
-         group = (struct ElementGroup*) (g_dynamicMap->moveGroups + groupID);
+         if (g_dynamicMap->moveGroupsQuantity > groupID)
+         {
+            firstElementX = &(g_dynamicMap->elements->x);
+            firstElementY = &(g_dynamicMap->elements->y);
+            elementSize = sizeof(struct DynamicMap2DElement);
+            group = (struct ElementGroup*) (g_dynamicMap->moveGroups + groupID);
+         }
          break;
       default: return;
    }
@@ -293,7 +302,8 @@ CCE_PUBLIC_OPTIONS void cceMoveGroupMap2D (uint16_t groupID, int32_t x, int32_t 
       }
       default: return;
    }
-   moveElements(firstElementX, firstElementY, elementSize, group, x, y);
+   if (group != NULL)
+      moveElements(firstElementX, firstElementY, elementSize, group, x, y);
 }
 
 /* Group iteration is from 1, not 0 */
@@ -310,17 +320,23 @@ CCE_PUBLIC_OPTIONS void cceExtendGroupMap2D (uint16_t groupID, int32_t x, int32_
    {
       case CCE_CURRENT_MAP2D:
          glBuffer = g_currentMapBuffer;
-         firstElementWidth = &(currentMap->colliders->width);
-         firstElementHeight = &(currentMap->colliders->height);
-         elementSize = sizeof(struct Map2DCollider) / 4;
-         group = currentMap->moveGroups + groupID;
+         if (currentMap->extensionGroupsQuantity > groupID)
+         {
+            firstElementWidth = &(currentMap->colliders->width);
+            firstElementHeight = &(currentMap->colliders->height);
+            elementSize = sizeof(struct Map2DCollider) / sizeof(int32_t);
+            group = currentMap->extensionGroups + groupID;
+         }
          break;
       case CCE_DYNAMIC_MAP2D:
          glBuffer = g_dynamicMapBuffer;
-         firstElementWidth = &(g_dynamicMap->elements->width);
-         firstElementHeight = &(g_dynamicMap->elements->height);
-         elementSize = sizeof(struct DynamicMap2DElement) / 4;
-         group = (struct ElementGroup*) g_dynamicMap->moveGroups + groupID;
+         if (g_dynamicMap->extensionGroupsQuantity > groupID)
+         {
+            firstElementWidth = &(g_dynamicMap->elements->width);
+            firstElementHeight = &(g_dynamicMap->elements->height);
+            elementSize = sizeof(struct DynamicMap2DElement) / sizeof(int32_t);
+            group = (struct ElementGroup*) g_dynamicMap->extensionGroups + groupID;
+         }
          break;
       default: return;
    }
@@ -343,7 +359,8 @@ CCE_PUBLIC_OPTIONS void cceExtendGroupMap2D (uint16_t groupID, int32_t x, int32_
          y -= resize[1];
       }
    }
-
+   if (group == NULL)
+      return;
    for (uint32_t *iterator = (group + groupID - 1u)->elementIDs, *end = (group + groupID - 1u)->elementIDs + (group + groupID - 1u)->elementsQuantity; iterator < end; ++iterator)
    {
       *(firstElementWidth + *iterator * elementSize)  += x;

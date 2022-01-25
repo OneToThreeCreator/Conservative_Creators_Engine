@@ -346,9 +346,9 @@ static struct Map2DCollider* elementsToColliders (uint32_t  elementsQuantity, ui
    elements = (struct Map2DElement*) realloc(elements, (sizeof(struct Map2DElement) + 3u * sizeof(uint8_t)) * elementsQuantity);
    uint8_t *glGroups = (uint8_t*) ((void*) (elements + elementsQuantity));
    memset(glGroups, 0, elementsQuantity * (3u * sizeof(uint8_t)));
+   uint32_t currentElement = 0u;
    if (moveGroups)
    {
-      uint32_t currentElement = 0u;
       if (moveGroups->elementsQuantity) for (uint32_t *exclude = moveGroups->elementIDs, *excludeEnd = moveGroups->elementIDs + moveGroups->elementsQuantity;
                                              currentElement < elementsQuantity; ++currentElement)
       {
@@ -361,12 +361,12 @@ static struct Map2DCollider* elementsToColliders (uint32_t  elementsQuantity, ui
          }
          (*(glGroups + currentElement * 2u + 1u)) = CCE_GLOBAL_OFFSET_MASK;
       }
-      while (currentElement < elementsQuantity)
-      {
-         (*(glGroups + currentElement * 2u + 1u)) = CCE_GLOBAL_OFFSET_MASK;
-         ++currentElement;
-      }
       convertCCEgroupsToGLgroups(moveGroupsQuantity - 1u, moveGroups + 1u, glGroups, 2u, elementsWithoutColliderQuantity, elementsQuantity);
+   }
+   while (currentElement < elementsQuantity)
+   {
+      (*(glGroups + currentElement * 2u + 1u)) = CCE_GLOBAL_OFFSET_MASK;
+      ++currentElement;
    }
    if (extensionGroups)
       convertCCEgroupsToGLgroups(extensionGroupsQuantity, extensionGroups, glGroups + (elementsQuantity * (2u * sizeof(uint8_t))), 1u, elementsWithoutColliderQuantity, elementsQuantity);
@@ -521,7 +521,7 @@ struct Map2D* cceLoadMap2D (uint16_t number)
    if (cce_fileParseFunc) cce_fileParseFunc(map_f, number);
    if (fclose(map_f) == -1)
    {
-      cce__criticalErrorPrint("ENGINE::MAP2D_LOADER::FILE_UNEXPECTED_CLOSE:\nmap %u file was unexpectedly closed by external file handler", number);
+      cce__errorPrint("ENGINE::MAP2D_LOADER::FILE_UNEXPECTED_CLOSE:\nmap %u file was unexpectedly closed by external file handler", number);
    }
    return map;
 }
