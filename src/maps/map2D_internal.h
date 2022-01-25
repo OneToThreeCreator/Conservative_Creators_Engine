@@ -39,8 +39,6 @@
 #define CCE_BASIC_ACTIONS_NOT_SET 0x100
 #define CCE_INIT CCE_BASIC_ACTIONS_NOT_SET
 
-#define CCE_BASIC_ACTIONS_QUANTITY 16
-
 struct LoadedTextures
 {
    uint32_t ID; /* 0 is invalid */
@@ -162,12 +160,12 @@ void cce__terminateDynamicMap2D (void);
 void cce__terminateEngine2D (void);
 
 /* Action is a function: void action (void *ptr) */
-#define processLogicMap2D(map) if (map->logicQuantity) cce__setCurrentTemporaryBools(map->temporaryBools); \
+#define processLogicMap2D(map) if ((map)->logicQuantity) cce__setCurrentTemporaryBools((map)->temporaryBools); \
 cce__beginBaseActions(map); \
-cce__processLogic(map->logicQuantity, map->logic, map->timers, cce_actions, cce__fourthLogicTypeFuncMap2D, map); \
+cce__processLogic((map)->logicQuantity, (map)->logic, (map)->timers, cce_actions, cce__fourthLogicTypeFuncMap2D, map); \
 cce__endBaseActions()
-#define processLogicDynamicMap2D(dynamicMap, currentMap) cce__setCurrentTemporaryBools(dynamicMap->temporaryBools); cce__beginBaseActions(currentMap); \
-cce__processLogic(dynamicMap->logicQuantity, dynamicMap->logic, dynamicMap->timers, cce_actions, cce__fourthLogicTypeFuncDynamicMap2D, currentMap); \
+#define processLogicDynamicMap2D(dynamicMap, currentMap) cce__setCurrentTemporaryBools((dynamicMap)->temporaryBools); cce__beginBaseActions(currentMap); \
+cce__processLogic((dynamicMap)->logicQuantity, (dynamicMap)->logic, (dynamicMap)->timers, cce_actions, cce__fourthLogicTypeFuncDynamicMap2D, currentMap); \
 cce__endBaseActions(); \
 cce__endBaseActionsDynamicMap2D()
 

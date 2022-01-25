@@ -736,6 +736,12 @@ struct Map2Ddev* cceLoadMap2Ddev (uint16_t number)
       map->actionsArg = (cce_void *) malloc((*(map->actionsArgOffsets + map->actionsQuantity) - 1u)/* sizeof(cce_void)*/);
       fread( (map->actionsArg),            1u/*cce_void*/,         *(map->actionsArgOffsets + map->actionsQuantity),          map_f);
    }
+   fread(&(map->exitMapsQuantity), 1u, 1u, map_f);
+   if (map->exitMapsQuantity)
+   {
+      map->exitMaps = (struct ExitMap2D*) malloc(map->exitMapsQuantity * sizeof(struct ExitMap2D));
+      fread(map->exitMaps, sizeof(struct ExitMap2D), map->exitMapsQuantity, map_f);
+   }
    
    // I'm lazy, again
    for (uint8_t smth = 0u, i = 0u; i < 10; ++i)
@@ -811,6 +817,11 @@ int cceWriteMap2Ddev (struct Map2Ddev *map, void (*writeFunc)(FILE*))
       fwrite( (map->actionIDs),             4u/*uint32_t*/,  (map->actionsQuantity),                          map_f);
       fwrite( (map->actionsArgOffsets + 1), 4u/*uint32_t*/,  (map->actionsQuantity),                          map_f);
       fwrite( (map->actionsArg),            1u/*cce_void*/, *(map->actionsArgOffsets + map->actionsQuantity), map_f);
+   }
+   fwrite(&(map->exitMapsQuantity), 1u/*uint8_t*/, 1u, map_f);
+   if (map->exitMapsQuantity)
+   {
+      fwrite(map->exitMaps, sizeof(struct ExitMap2D), map->exitMapsQuantity, map_f);
    }
    
    // I'm lazy, again

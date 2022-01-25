@@ -29,6 +29,7 @@ extern C:
 {
 #endif // __cplusplus
 
+#define CCE_BASIC_ACTIONS_QUANTITY 16u
 
 #define CCE_INCORRECT_ENUM 1
 #define CCE_ATTEMPT_TO_OVERRIDE_DEFAULT_ELEMENT 2
@@ -36,13 +37,13 @@ extern C:
 #define CCE_OUT_OF_BOUNDS 4
 
 
-#define CCE_DEFAULT                            0x000
-#define CCE_RENDER_CLOSEST_MAP                 CCE_DEFAULT
 #define CCE_RENDER_ONLY_CURRENT_MAP            0x001
-#define CCE_RENDER_ALL_LOADED_MAPS             0x002
-#define CCE_PROCESS_LOGIC_ONLY_FOR_CURRENT_MAP CCE_DEFAULT
-#define CCE_PROCESS_LOGIC_FOR_CLOSEST_MAP      0x004
-#define CCE_PROCESS_LOGIC_FOR_ALL_MAPS         0x008
+#define CCE_RENDER_CLOSEST_MAP                 0x002
+#define CCE_RENDER_ALL_LOADED_MAPS             0x003
+#define CCE_PROCESS_LOGIC_ONLY_FOR_CURRENT_MAP 0x004
+#define CCE_PROCESS_LOGIC_FOR_CLOSEST_MAP      0x008
+#define CCE_PROCESS_LOGIC_FOR_ALL_MAPS         0x00C
+#define CCE_DEFAULT CCE_RENDER_CLOSEST_MAP | CCE_PROCESS_LOGIC_ONLY_FOR_CURRENT_MAP
 
 typedef uint_fast32_t cce_flag;
 
@@ -54,12 +55,12 @@ typedef uint_fast32_t cce_flag;
 
 struct ExitMap2D
 {
+   uint32_t ID;
    int32_t xOffset;
    int32_t yOffset;
    int32_t aBorder;
    int32_t b1Border;
    int32_t b2Border;
-   uint32_t ID;
    uint8_t flags; // 0x1 - a is x (otherwise a is y), 0x2 - b is to the south/west from globalOffset
 };
 
@@ -212,6 +213,7 @@ CCE_PUBLIC_OPTIONS void cceUpdateLogicElementsByTruthTableDynamicMap2D (const ui
 CCE_PUBLIC_OPTIONS uint8_t cceUpdateLogicElementsByBooleanExpressionDynamicMap2D (const uint16_t ID, const uint16_t *const logicElements, const cce_enum *const logicElementTypes, const char *const booleanExpression);
 CCE_PUBLIC_OPTIONS void cceUpdateLogicActionsDynamicMap2D (const uint16_t ID, const uint8_t actionsQuantity, uint32_t *actionIDs, const void **actionArgs, const uint32_t *const actionArgSizes);
 CCE_PUBLIC_OPTIONS uint16_t cceCreateLogicDynamicMap2D (void);
+CCE_PUBLIC_OPTIONS extern uint16_t cceLoadedMap2Dnumber;
 
 #define cceCheckCollisionMap2D(element1, element2) cceCheckCollision((element1)->x, (element1)->y, (element1)->width, (element1)->height, (element2)->x, (element2)->y, (element2)->width, (element2)->height)
 #ifdef __cplusplus

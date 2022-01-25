@@ -321,7 +321,7 @@ CCE_PUBLIC_OPTIONS uint8_t cceCreateGroupDynamicMap2D (cce_enum group_type, uint
    struct DynamicElementGroup **groups;
    {
       uint16_t *groupsQuantity;
-      if (getGroupPointersDynamicMap2D(group_type, &groups, &groupsQuantity, NULL, NULL))
+      if (getGroupPointersDynamicMap2D(group_type, &groups, &groupsQuantity, NULL, NULL) == CCE_INCORRECT_ENUM)
       {
          ptrdiff_t error = group_type;  
          cce__errorPrint("ENGINE::GET_EMPTY_GROUP_FROM_DYNAMIC_MAP2D::INCORRECT_ENUM:\ngroup_type: %i passed to the function is not valid", (void*) error);
@@ -464,7 +464,7 @@ CCE_PUBLIC_OPTIONS uint8_t cceDeleteElementFromGroupDynamicMap2D (cce_enum group
       struct DynamicElementGroup **groups;
       uint16_t *groupsQuantity;
       uint16_t *groupsAllocatedQuantity;
-      if (!(getGroupPointersDynamicMap2D(group_type, &groups, &groupsQuantity, &groupsAllocatedQuantity, NULL)))
+      if ((getGroupPointersDynamicMap2D(group_type, &groups, &groupsQuantity, &groupsAllocatedQuantity, NULL)) == CCE_INCORRECT_ENUM)
       {
          ptrdiff_t error = group_type;
          cce__errorPrint("ENGINE::DELETE_ELEMENT_FROM_GROUP_IN_DYNAMIC_MAP2D::INCORRECT_ENUM:\ngroup_type: %i passed to the function is not valid", (void*) error);
@@ -506,7 +506,7 @@ CCE_PUBLIC_OPTIONS uint8_t cceDeleteElementFromGroupDynamicMap2D (cce_enum group
             *(iterator - 1u) = *iterator;
             ++iterator;
          }
-         *elementGroup = realloc(*elementGroup, *elementGroupLength * sizeof(uint16_t));
+         *elementGroup = realloc(*elementGroup, (*elementGroupLength) * sizeof(uint16_t));
          break;
       }
    }
@@ -515,6 +515,8 @@ CCE_PUBLIC_OPTIONS uint8_t cceDeleteElementFromGroupDynamicMap2D (cce_enum group
 
 static void deleteGroupsFromElementDynamicMap2D (struct DynamicMap2DElement *element)
 {
+   if (element >= g_dynamicMap->elements + g_dynamicMap->elementsQuantity)
+      return;
    if ((element->flags) & 0x2u)
    {
       if (element->moveGroupsQuantity)
@@ -621,23 +623,6 @@ void cce__processDynamicMap2DElements (void)
       {
          iterator->textureElementReliesOn = cce__loadTexture(iterator->textureInfo.ID);
          memcpy(bufferPtr + ((iterator - g_dynamicMap->elements) * sizeof(struct DynamicMap2DElement)), iterator, sizeof(struct DynamicMap2DElement));
-         uint8_t isMoveGroup = iterator->moveGroup > 0u, isGlobalOffset = iterator->flags & CCE_GLOBAL_OFFSET_MASK;
-         iterator->moveGroupsQuantity += isMoveGroup + isGlobalOffset;
-         if (isMoveGroup || isGlobalOffset)
-         {
-            iterator->moveGroups = realloc(iterator->moveGroups, iterator->moveGroupsQuantity * sizeof(uint16_t));
-            uint8_t i = 0u;
-            *(iterator->moveGroups) = iterator->moveGroup;
-            i += isMoveGroup;
-            if (isGlobalOffset)
-               *(iterator->moveGroups + i) = 0u;
-         }
-         iterator->extensionGroupsQuantity += iterator->extensionGroup > 0u;
-         if (iterator->extensionGroup)
-         {
-            iterator->extensionGroups = realloc(iterator->extensionGroups, sizeof(uint16_t));
-            *(iterator->extensionGroups) = iterator->extensionGroup - 1u;
-         }
          iterator->flags ^= 0x4u;
          struct cce_ivec2 globalGroupOffset = {0, 0}, tmp;
          if (iterator->flags & 0x2)

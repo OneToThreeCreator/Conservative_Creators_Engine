@@ -132,6 +132,18 @@ static void setGridSizeAction (void *data)
    cceSetGridMultiplier(*((float*) data));
 }
 
+static void loadMap2Daction (void *data)
+{
+   struct loadMap2DactionStruct *params = ((struct loadMap2DactionStruct*) data);
+   switch (params->action)
+   {
+      case CCE_SHIFT:
+         cceLoadedMap2Dnumber += params->ID;
+      case CCE_SET:
+         cceLoadedMap2Dnumber =  params->ID;
+   }
+}
+
 void cce__beginBaseActions (const struct Map2D *map)
 {
    currentMap = map;
@@ -184,16 +196,17 @@ void cce__baseActionsInit (const struct DynamicMap2D *dynamic_map, struct UsedUB
    g_uniformLocations = uniformLocations;
    g_shaderProgram = shaderProgram;
    g_setUniformBufferToDefault = setUniformBufferToDefault;
-   cceRegisterAction(0, moveAction);
-   cceRegisterAction(1, extendAction);
-   cceRegisterAction(2, rotateAction);
-   cceRegisterAction(3, offsetTextureAction);
-   cceRegisterAction(4, changeColorAction);
-   cceRegisterAction(5, setBoolAction);
-   cceRegisterAction(6, setPlotNumberAction);
-   cceRegisterAction(7, startTimerAction);
-   cceRegisterAction(8, setDynamicTimerDelayAction);
-   cceRegisterAction(9, setGridSizeAction);
+   cceRegisterAction(0,  moveAction);
+   cceRegisterAction(1,  extendAction);
+   cceRegisterAction(2,  rotateAction);
+   cceRegisterAction(3,  offsetTextureAction);
+   cceRegisterAction(4,  changeColorAction);
+   cceRegisterAction(5,  setBoolAction);
+   cceRegisterAction(6,  setPlotNumberAction);
+   cceRegisterAction(7,  startTimerAction);
+   cceRegisterAction(8,  setDynamicTimerDelayAction);
+   cceRegisterAction(9,  setGridSizeAction);
+   cceRegisterAction(10, loadMap2Daction);
 }
 
 static inline void moveElements (int32_t *firstElementX, int32_t *firstElementY, ptrdiff_t step, struct ElementGroup *group, int32_t x, int32_t y)

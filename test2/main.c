@@ -27,7 +27,7 @@
 #include <coffeechain/map2D/map2D.h>
 #include <coffeechain/path_getters.h>
 
-void initPlayer (uint32_t globalBoolsQuantity)
+static void initPlayer (uint32_t globalBoolsQuantity)
 {
    struct Map2DElementDev player = {-1, -1, 1, 2, {0.5625f, 0.0f, 1.0f, 1.0f, 1}, 0, 0, 0, 0, 0, 0, 0};
    cceCreateMap2DElementDynamicMap2D(&player, 1);
@@ -76,7 +76,7 @@ void initPlayer (uint32_t globalBoolsQuantity)
    return;
 }
 
-void createAdditionalDynamicElement (struct cce_ivec2 coords, uint32_t globalBoolsQuantity)
+static void createAdditionalDynamicElement (struct cce_ivec2 coords, uint32_t globalBoolsQuantity)
 {
    struct Map2DElementDev element = {coords.x, coords.y, 2, 2, {0.0f, 0.0f, 1.0f, 1.0f, 0}, 0, 1, 1, 0, 0, 0, 1};
    cceCreateMap2DElementDynamicMap2D(&element, 1);
@@ -120,6 +120,27 @@ void createAdditionalDynamicElement (struct cce_ivec2 coords, uint32_t globalBoo
    return;
 }
 
+static void createMap2D (uint16_t ID, uint16_t exitMapsQuantity, struct ExitMap2D *exitMaps)
+{
+   struct Map2DElement elements[] = {
+      {  3,   3, 10, 10, {0.0f, 0.0f, 5.0f, 5.0f, 2}, 0, 0, 0, 0},
+      {-11, -11, 10, 24, {0.0f, 0.0f, 1.0f, 1.0f, 0}, 0, 0, 0, 1},
+      {  3, -11, 10, 10, {0.0f, 0.0f, 1.0f, 1.0f, 0}, 0, 0, 0, 2},
+      {  0, -11,  2, 24, {0.0f, 0.0f, 1.0f, 1.0f, 0}, 0, 0, 0, 3},
+      {  2,   0, 11,  2, {0.0f, 0.0f, 1.0f, 1.0f, 0}, 0, 0, 0, 3},
+   };
+   struct changeColorActionStruct colors[4] = {{0.711f, 0.64f,  0.453f, 1.0f, 1, CCE_CURRENT_MAP2D},
+                                               {0.001f, 0.487f, 0.0f,   1.0f, 2, CCE_CURRENT_MAP2D},
+                                               {0.69f,  0.645f, 0.042f, 1.0f, 3, CCE_CURRENT_MAP2D},
+                                               {0.70f,  0.40f,  0.0f,   1.0f, 1, CCE_DYNAMIC_MAP2D}};
+   uint32_t colorActions[4] = {4, 4, 4, 4};
+   uint32_t colorsOffsets[5] = {0,  sizeof(struct changeColorActionStruct), 2 * sizeof(struct changeColorActionStruct),
+                                3 * sizeof(struct changeColorActionStruct), 4 * sizeof(struct changeColorActionStruct)};
+   struct Map2Ddev map = {ID, 5, 0, elements, 0, NULL, 0, NULL, 0, NULL, 0, NULL, 0, NULL, 0, NULL, 0, NULL,
+                          4, colorActions, colorsOffsets, (cce_void*) colors, exitMapsQuantity, exitMaps};
+   cceWriteMap2Ddev(&map, NULL);
+}
+
 int main (int argc, char **argv)
 {
    char path[256];
@@ -153,36 +174,22 @@ int main (int argc, char **argv)
    }
    cceAppendPath(path, 256, "test2/textures");
    cceSetTexturesPath(path);
-   cceSetFlags2D(CCE_RENDER_ONLY_CURRENT_MAP | CCE_PROCESS_LOGIC_ONLY_FOR_CURRENT_MAP);
+   cceSetFlags2D(CCE_RENDER_CLOSEST_MAP | CCE_PROCESS_LOGIC_ONLY_FOR_CURRENT_MAP);
    {
       char *path = cceGetTemporaryDirectory(0);
       cceSetMap2Dpath(path);
       free(path);
-      
-      struct Map2DElement elements[] = {
-         {  3,   3, 10, 10, {0.0f, 0.0f, 5.0f, 5.0f, 2}, 0, 0, 0, 0},
-         {-11, -11, 10, 24, {0.0f, 0.0f, 1.0f, 1.0f, 0}, 0, 0, 0, 1},
-         {  3, -11, 10, 10, {0.0f, 0.0f, 1.0f, 1.0f, 0}, 0, 0, 0, 2},
-         {  0, -11,  2, 24, {0.0f, 0.0f, 1.0f, 1.0f, 0}, 0, 0, 0, 3},
-         {  2,   0, 11,  2, {0.0f, 0.0f, 1.0f, 1.0f, 0}, 0, 0, 0, 3},
+      struct ExitMap2D exitMaps[2] = {
+         {1, 0,  24,  13, -11, 13, 0x0},
+         {2, 0, -24, -11, -11, 13, 0x2},
       };
-      struct ElementGroup moveGroups[1] = {
-         {NULL, 0},
-      };
-      struct changeColorActionStruct colors[4] = {{0.711f, 0.64f,  0.453f, 1.0f, 1, CCE_CURRENT_MAP2D},
-                                                  {0.001f, 0.487f, 0.0f,   1.0f, 2, CCE_CURRENT_MAP2D},
-                                                  {0.69f,  0.645f, 0.042f, 1.0f, 3, CCE_CURRENT_MAP2D},
-                                                  {0.70f,  0.40f,  0.0f,   1.0f, 1, CCE_DYNAMIC_MAP2D}};
-      uint32_t colorActions[4] = {4, 4, 4, 4};
-      uint32_t colorsOffsets[5] = {0,  sizeof(struct changeColorActionStruct), 2 * sizeof(struct changeColorActionStruct),
-                                   3 * sizeof(struct changeColorActionStruct), 4 * sizeof(struct changeColorActionStruct)};
-      struct Map2Ddev map = {0, 5, 0, elements, 1, moveGroups, 0, NULL, 0, NULL, 0, NULL, 0, NULL, 0, NULL, 0, NULL,
-                             4, colorActions, colorsOffsets, (cce_void*) colors, 0, NULL};
-      cceWriteMap2Ddev(&map, NULL);
+      createMap2D(0, 2, exitMaps);
+      createMap2D(1, 0, NULL);
+      createMap2D(2, 0, NULL);
    }
    initPlayer(globalBoolsQuantity);
    createAdditionalDynamicElement((struct cce_ivec2) {2, 2}, globalBoolsQuantity);
-   cceSetGridMultiplier(10.0f);
+   cceSetGridMultiplier(1.0f);
    printf("Initialization complete\n");
    return cceEngine2D();
 }

@@ -28,7 +28,7 @@ extern C:
 {
 #endif // __cplusplus
 
-#if defined(_WIN32) || defined(__WIN32__) || defined(_WIN64) || defined(__TOS_WIN__) || defined(__WINDOWS__) || \
+#if defined(_WIN32) || defined(__WIN32__) || defined(WIN32) || defined(_WIN64) || defined(__TOS_WIN__) || defined(__WINDOWS__) ||  \
     defined(__MINGW32__) || defined(__MINGW64__) || defined(__CYGWIN__)
 #include "cce_exports.h"
 #define CCE_PUBLIC_OPTIONS CCE_EXPORTS
@@ -122,6 +122,29 @@ struct setDynamicTimerDelayActionStruct
    cce_enum action;
    uint8_t __pad;
 };
+
+struct loadMap2DactionStruct
+{
+   uint16_t ID;
+   cce_enum action;
+   uint8_t __pad;
+};
+
+/*
+// action data should be located right after this struct
+struct delayedActionStruct
+{
+   uint32_t action;
+   uint32_t actionStructSize;
+   uint32_t repeatsQuantity;
+   float delay;
+};
+
+struct eachFrameActionStruct
+{
+   uint32_t action;
+   uint32_t actionStructSize;
+}; */
 
 CCE_PUBLIC_OPTIONS void  cceMoveGlobalOffsetGroupMap2D (int32_t x, int32_t y, cce_enum actionType);
 CCE_PUBLIC_OPTIONS void  cceMoveGroupMap2D (uint16_t groupID, int32_t x, int32_t y, cce_enum actionType, cce_enum mapType);

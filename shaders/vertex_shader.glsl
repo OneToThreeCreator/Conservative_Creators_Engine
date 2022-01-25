@@ -56,13 +56,14 @@ layout (packed) uniform Variables
 
 uniform vec2  Step = vec2(16, 16);
 uniform ivec2 GlobalMoveCoords = ivec2(0, 0);
+uniform ivec2 MapOffset = ivec2(0, 0);
 
 void main()
 {
    vs_to_gs.TextureID = aTextureID;
    int isMoveGroup1 = min(1, aMoveGroupsID);
    int isGlobalMoveGroup = (aIsGlobalOffset & GLOBAL_OFFSET_CONTROL_MASK) / GLOBAL_OFFSET_CONTROL_MASK;
-   vec2 offset = MoveCoords[aMoveGroupsID - isMoveGroup1] * isMoveGroup1 + GlobalMoveCoords * isGlobalMoveGroup;
+   vec2 offset = MoveCoords[aMoveGroupsID - isMoveGroup1] * isMoveGroup1 + GlobalMoveCoords * isGlobalMoveGroup + MapOffset;
    gl_Position = vec4((aCoords.xy + offset.xy) / Step.xy, aLayer, 1.0f);
    int isExtentionGroup = min(1, aExtentionGroupID);
    vs_to_gs.HalfSize.xy = ((aSize.xy + (Extention[aExtentionGroupID - isExtentionGroup].xy * isExtentionGroup)) / Step.xy) * 0.5f;
