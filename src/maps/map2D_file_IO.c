@@ -21,8 +21,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stddef.h>
+
 #include <string.h>
+#if defined(_WIN32) || defined(__WIN32__) || defined(_WIN64) || defined(__TOS_WIN__) || defined(__WINDOWS__) || \
+      defined(__MINGW32__) || defined(__MINGW64__) || defined(__CYGWIN__)
+#include <malloc.h>
+#else
 #include <alloca.h>
+#endif
 
 #include "../engine_common.h"
 #include "../engine_common_internal.h"

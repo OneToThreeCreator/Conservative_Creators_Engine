@@ -263,8 +263,8 @@ void cce__processLogic (uint32_t logicQuantity, struct ElementLogic *logic, stru
             #endif // UINT_FAST16_MAX < UINT32_MAX
             {
                cce_byte state = 0;
-               for (uint_fast16_t *iterator = (logic->operations + (boolSum >> SHIFT_OF_FAST_SIZE),
-               *end = (logic->operations + (boolSum >> SHIFT_OF_FAST_SIZE) + (1 << (logic->logicElementsQuantity - j - 1u - 3u))/sizeof(uint_fast16_t); iterator < end; ++iterator)
+               for (uint_fast16_t *iterator = (logic->operations + (boolSum >> SHIFT_OF_FAST_SIZE)),
+               *end = logic->operations + (boolSum >> SHIFT_OF_FAST_SIZE) + (1 << (logic->logicElementsQuantity - j - 1u - 3u))/sizeof(uint_fast16_t); iterator < end; ++iterator)
                {
                   if (!(*iterator))
                   {

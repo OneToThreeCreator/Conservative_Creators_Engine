@@ -84,8 +84,9 @@ target_compile_definitions(${PROJECT_NAME} PRIVATE SYSTEM_SHADER_PATH=\"${CMAKE_
 target_link_libraries(${PROJECT_NAME} PRIVATE glfw m)
 
 if(WIN32)
+   include(GenerateExportHeader)
    target_link_libraries(${PROJECT_NAME} PRIVATE shell32 kernel32)
-   generate_exports_header(${PROJECT_NAME}
+   generate_export_header(${PROJECT_NAME}
       EXPORT_MACRO_NAME CCE_EXPORTS
       EXPORT_FILE_NAME ${PROJECT_BINARY_DIR}/include/coffeechain/cce_exports.h
       INCLUDE_GUARD_NAME CCE_EXPORTS_H

@@ -374,7 +374,6 @@ CCE_PUBLIC_OPTIONS void cceTerminateTemporaryDirectory (void)
 
 #include <windows.h>
 #include <shlobj.h>
-#include <shlobj_core.h>
 #include <shellapi.h>
 #include <time.h>
 
@@ -405,7 +404,8 @@ static char* getErrorMessage (DWORD error)
 
 CCE_PUBLIC_OPTIONS char* cceGetCurrentPath (char *pathBuffer, size_t pathBufferLength)
 {
-   return GetCurrentDirectoryA(pathBufferLength, pathBuffer);
+   GetCurrentDirectoryA(pathBufferLength, pathBuffer);
+   return pathBuffer;
 }
 
 CCE_PUBLIC_OPTIONS char* cceGetDirectory (char *path, size_t bufferSize)
@@ -522,16 +522,16 @@ CCE_PUBLIC_OPTIONS char* cceGetAppDataPath (const char *restrict folderName, siz
    return realloc(appDataPath, strnlen(appDataPath, pathLength + folderNameLength + spaceToLeave + 1u + 1u) + spaceToLeave + 1u);
 }
 
-CCE_PUBLIC_OPTIONS char* cceGetTemporaryDirectory (size_t spaceToLeave);
+CCE_PUBLIC_OPTIONS char* cceGetTemporaryDirectory (size_t spaceToLeave)
 {
    if (!tmpPath)
    {
       tmpPath = malloc(MAX_PATH * sizeof(char));
-      tmpPathLength = GetTempPathA(tmpPath, tmpPath, MAX_PATH);
+      tmpPathLength = GetTempPathA(tmpPath, MAX_PATH);
       if (!tmpPathLength)
       {
          free(tmpPath);
-         printError("DIRECTORY::TEMPORARY::FAILED_TO_GET_TEMPORARY_PATH");
+         fprintf(stderr, "DIRECTORY::TEMPORARY::FAILED_TO_GET_TEMPORARY_PATH");
          return NULL;
       }
       char *path = malloc(MAX_PATH * sizeof(char));
@@ -539,7 +539,7 @@ CCE_PUBLIC_OPTIONS char* cceGetTemporaryDirectory (size_t spaceToLeave);
       if (!tmpPathLength)
       {
          free(tmpPath);
-         printError("DIRECTORY::TEMPORARY::FAILED_TO_GET_LONG_PATH");
+         fprintf(stderr, "DIRECTORY::TEMPORARY::FAILED_TO_GET_LONG_PATH");
          return NULL;
       }
       
@@ -559,7 +559,7 @@ CCE_PUBLIC_OPTIONS char* cceGetTemporaryDirectory (size_t spaceToLeave);
       
       *(tmpPath + tmpPathLength) = '\\';
       *(tmpPath + tmpPathLength + 1u) = '\0';
-      convertIntToBase64String(time(0), tmpPath + (tmpPathLength - 6u - 1u), 6u);
+      cceConvertIntToBase64String(time(0), tmpPath + (tmpPathLength - 6u - 1u), 6u);
    }
    char *buffer = malloc((tmpPathLength + spaceToLeave + 1u) * sizeof(char));
    return memcpy(buffer, tmpPath, tmpPathLength + 1u);
@@ -572,7 +572,7 @@ CCE_PUBLIC_OPTIONS void cceDeleteDirectory (const char *aPath)
    size_t pathLength = strlen(aPath);
    size_t fileNameLength;
    HANDLE file;
-   char *path
+   char *path;
    if (pathLength > MAX_PATH)
    {
       bufferSize = pathLength + 23u; // +Null-terminator
@@ -583,9 +583,9 @@ CCE_PUBLIC_OPTIONS void cceDeleteDirectory (const char *aPath)
    }
    path = malloc(bufferSize * sizeof(char));
    memcpy(path, aPath, pathLength);
-   if ((path + pathLength - 1u) != '\\' && (path + pathLength - 1u) != '/')
+   if (*(path + pathLength - 1u) != '\\' && *(path + pathLength - 1u) != '/')
    {
-      (path + pathLength) = '\\'
+      *(path + pathLength) = '\\';
       ++pathLength;
    }
    *(path + pathLength) = '*';

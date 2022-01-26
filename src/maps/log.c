@@ -23,14 +23,14 @@
 #include <stdarg.h>
 #include "map2D_internal.h"
 //#include "log.h"
-#ifdef __APPLE__
+/*#ifdef __APPLE__
 #include <OpenAL/al.h>
 #include <OpenAL/alc.h>
 #else
 #include <AL/al.h>
 #include <AL/alc.h>
 #endif // __APPLE__
-
+*/
 void cce__openGLErrorPrint (GLenum error, size_t line, const char *file)
 {
    switch (error)
@@ -78,6 +78,7 @@ void cce__openGLErrorPrint (GLenum error, size_t line, const char *file)
    }
 }
 
+/*
 void cce__openALErrorPrint (ALenum error)
 {
    switch (error)
@@ -114,7 +115,7 @@ void cce__openALErrorPrint (ALenum error)
       }
    }
 }
-
+*/
 void cce__errorPrint (const char *const msgAndFormat, ...)
 {
    va_list args;
