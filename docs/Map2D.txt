@@ -8,8 +8,8 @@ struct MapElement elements  [elementsQuantity]      // To get collider of elemen
 /* Game logic elements */
 uint16_t moveGroupsQuantity
 struct ElementGroups  moveGroups                    // Groups 1 - 255 can be used to move drawed MapElement as array "moveGroup1" , group 0 as "globalMove" (inverted!). Groups > 255 can only be used to move Colliders
-uint16_t moveGroupsQuantity
-struct ElementGroups  moveGroups                    // Groups 0 - 254 can be used to extend drawed MapElement as array "extensionGroup". Groups > 254 can only be used to extend Colliders
+uint16_t extensionGroupsQuantity
+struct ElementGroups  extensionGroups                    // Groups 0 - 254 can be used to extend drawed MapElement as array "extensionGroup". Groups > 254 can only be used to extend Colliders
 uint32_t              collidersQuantity
 struct Collider       colliders [collidersQuantity] // To get collider x (first collider is 0), use this formula: elementsQuantity - elementsWithoutColliderQuantity + x
 uint16_t              collisionGroupsQuantity
