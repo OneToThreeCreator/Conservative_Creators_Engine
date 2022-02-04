@@ -428,7 +428,6 @@ CCE_PUBLIC_OPTIONS void cceChangeColorGroupMap2D (uint8_t groupID, float r, floa
          break;
       default: return;
    }
-   printf("changing color of group %u in %s\n", groupID, (mapType == CCE_DYNAMIC_MAP2D) ? "dynamic map" : (mapType == CCE_CURRENT_MAP2D) ? "current map" : "nowhere...");
 
    *(((float*) (glBuffer + *(g_uniformsOffsets + CCE_COLORGROUP_OFFSET))) + (groupID - 1u) * 4u)      = r;
    *(((float*) (glBuffer + *(g_uniformsOffsets + CCE_COLORGROUP_OFFSET))) + (groupID - 1u) * 4u + 1u) = g;

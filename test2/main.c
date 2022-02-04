@@ -29,11 +29,10 @@
 
 static void initPlayer (uint32_t globalBoolsQuantity)
 {
-   struct Map2DElementDev player = {-1, -1, 1, 2, {0.5625f, 0.0f, 1.0f, 1.0f, 1}, 0, 0, 0, 0, 0, 0, 0};
-   cceCreateMap2DElementDynamicMap2D(&player, 1);
+   struct Map2DElementDev player = {-1, -1, 1, 2, {0.5625f, 0.0f, 1.0f, 1.0f, 1}, 0, 0, 0, 0, 0, 0};
+   cceCreateMap2DElementDynamicMap2D(&player, 1, 1);
 
    uint_fast16_t *aandb = cceParseStringToLogicOperations("a & b", NULL);
-   printf("aandb == %lx\n", *aandb);
    uint16_t logicIDs[5];
    uint16_t timerID = cceCreateTimerDynamicMap2D(0.03f);
    uint16_t moveElements[2] = {globalBoolsQuantity - 12, timerID};
@@ -78,8 +77,8 @@ static void initPlayer (uint32_t globalBoolsQuantity)
 
 static void createAdditionalDynamicElement (struct cce_ivec2 coords, uint32_t globalBoolsQuantity)
 {
-   struct Map2DElementDev element = {coords.x, coords.y, 2, 2, {0.0f, 0.0f, 1.0f, 1.0f, 0}, 0, 1, 1, 0, 0, 0, 1};
-   cceCreateMap2DElementDynamicMap2D(&element, 1);
+   struct Map2DElementDev element = {coords.x, coords.y, 2, 2, {0.0f, 0.0f, 1.0f, 1.0f, 0}, 1, 1, 0, 0, 0, 1};
+   cceCreateMap2DElementDynamicMap2D(&element, 1, 1);
 
    uint_fast16_t *aandb = cceParseStringToLogicOperations("a & b", NULL);
    uint16_t logicIDs[5];
@@ -123,11 +122,11 @@ static void createAdditionalDynamicElement (struct cce_ivec2 coords, uint32_t gl
 static void createMap2D (uint16_t ID, uint16_t exitMapsQuantity, struct ExitMap2D *exitMaps)
 {
    struct Map2DElement elements[] = {
-      {  3,   3, 10, 10, {0.0f, 0.0f, 5.0f, 5.0f, 2}, 0, 0, 0, 0},
-      {-11, -11, 10, 24, {0.0f, 0.0f, 1.0f, 1.0f, 0}, 0, 0, 0, 1},
-      {  3, -11, 10, 10, {0.0f, 0.0f, 1.0f, 1.0f, 0}, 0, 0, 0, 2},
-      {  0, -11,  2, 24, {0.0f, 0.0f, 1.0f, 1.0f, 0}, 0, 0, 0, 3},
-      {  2,   0, 11,  2, {0.0f, 0.0f, 1.0f, 1.0f, 0}, 0, 0, 0, 3},
+      {  3,   3, 10, 10, {0.0f, 0.0f, 5.0f, 5.0f, 2}, 0, 0, 0},
+      {-11, -11, 10, 24, {0.0f, 0.0f, 1.0f, 1.0f, 0}, 0, 0, 1},
+      {  3, -11, 10, 10, {0.0f, 0.0f, 1.0f, 1.0f, 0}, 0, 0, 2},
+      {  0, -11,  2, 24, {0.0f, 0.0f, 1.0f, 1.0f, 0}, 0, 0, 3},
+      {  2,   0, 11,  2, {0.0f, 0.0f, 1.0f, 1.0f, 0}, 0, 0, 3},
    };
    struct changeColorActionStruct colors[4] = {{0.711f, 0.64f,  0.453f, 1.0f, 1, CCE_CURRENT_MAP2D},
                                                {0.001f, 0.487f, 0.0f,   1.0f, 2, CCE_CURRENT_MAP2D},

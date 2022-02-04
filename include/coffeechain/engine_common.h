@@ -75,6 +75,12 @@ struct cce_ivec2
    int32_t y;
 };
 
+struct cce_vec2
+{
+   float x;
+   float y;
+};
+
 struct Texture
 {
    float    startX;

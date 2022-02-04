@@ -25,6 +25,7 @@
 #include "shader.h"
 #include "path_getters.h"
 
+#undef NDEBUG
 /* There is EPIC workaround to set defines in GLSL at runtime */
 
 unsigned int makeVFshaderProgram  (const char *const vertexPath, const char *const fragmentPath, uint16_t shadersVersion,
@@ -162,6 +163,9 @@ unsigned int compileShader (const char *shaderSource, GLenum shaderType)
    {
       char infoLog[512];
       glGetShaderInfoLog(shader, 512, NULL, infoLog);
+      #ifndef NDEBUG
+      fprintf(stderr, "Broken shader:\n%s\n", shaderSource);
+      #endif
       fprintf(stderr, "OPENGL::SHADER::FAILED_TO_COMPILE:\n%s\n", infoLog);
       return 0u;
    }

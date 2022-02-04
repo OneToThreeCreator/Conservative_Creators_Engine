@@ -43,10 +43,12 @@ size_t mapPathLength;
 static void (*cce_fileParseFunc)(FILE*, uint16_t);
 static void (*cce_callbackOnFreeing)(uint16_t);
 static void (***cce_actions)(void*);
+static GLuint g_EBO;
 
-void cce__initMap2DLoaders (void (***doAction)(void*))
+void cce__initMap2DLoaders (void (***doAction)(void*), GLuint EBO)
 {
    cce_actions = doAction;
+   g_EBO = EBO;
 }
 
 CCE_PUBLIC_OPTIONS void cceSetMap2Dpath (const char *path)
@@ -210,7 +212,7 @@ CCE_PUBLIC_OPTIONS void cceFreeMap2Ddev (struct Map2Ddev *map)
    free(map);
 }
 
-static GLuint makeVAOmap2D (struct Map2DElement *elements, uint32_t elementsQuantity, GLuint *VBO)
+static GLuint makeVAOmap2D (struct Map2DElement *elements, uint32_t elementsQuantity, uint8_t *moveGroups, uint8_t *extensionGroups, uint8_t *globalOffsets, GLuint *VBO)
 {
    GLuint VAO;
    glGenVertexArrays(1, &VAO);
@@ -221,44 +223,27 @@ static GLuint makeVAOmap2D (struct Map2DElement *elements, uint32_t elementsQuan
    GL_CHECK_ERRORS;
    glBindBuffer(GL_ARRAY_BUFFER, *VBO);
    GL_CHECK_ERRORS;
+   glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, g_EBO);
    
-   glBufferData(GL_ARRAY_BUFFER, ((sizeof(struct Map2DElement) +  3 * sizeof(uint8_t)) * elementsQuantity), elements, GL_STATIC_DRAW);
+   glBufferData(GL_ARRAY_BUFFER, (sizeof(struct Map2DElementVertices) * 4 * elementsQuantity), NULL, GL_STATIC_DRAW);
    GL_CHECK_ERRORS;
-   
-   /* Pointers */
-   glVertexAttribIPointer(0, 2, GL_INT, sizeof(struct Map2DElement), (void*)(offsetof(struct Map2DElement, x)));
+   struct Map2DElementVertices *vertices = glMapBuffer(GL_ARRAY_BUFFER, GL_WRITE_ONLY);
    GL_CHECK_ERRORS;
-   glVertexAttribIPointer(1, 2, GL_UNSIGNED_SHORT, sizeof(struct Map2DElement), (void*)(offsetof(struct Map2DElement, width)));
-   GL_CHECK_ERRORS;
-   glVertexAttribPointer(2, 1, GL_BYTE, GL_TRUE, sizeof(struct Map2DElement), (void*)(offsetof(struct Map2DElement, layer)));
-   GL_CHECK_ERRORS;
-   glVertexAttribPointer(3, 4, GL_FLOAT, GL_FALSE, sizeof(struct Map2DElement), (void*)(offsetof(struct Map2DElement, textureInfo) + offsetof(struct Texture, startX)));
-   GL_CHECK_ERRORS;
-   glVertexAttribIPointer(4, 1, GL_UNSIGNED_INT, sizeof(struct Map2DElement), (void*)(offsetof(struct Map2DElement, textureInfo) + offsetof(struct Texture, ID)));
-   GL_CHECK_ERRORS;
-   
-   glVertexAttribIPointer(5, 1, GL_UNSIGNED_BYTE, 2u * sizeof(uint8_t), (void*)(elementsQuantity * sizeof(struct Map2DElement)));
-   GL_CHECK_ERRORS;
-   glVertexAttribIPointer(6, 1, GL_UNSIGNED_BYTE, 2u * sizeof(uint8_t), (void*)(elementsQuantity * sizeof(struct Map2DElement) + sizeof(uint8_t)));
-   GL_CHECK_ERRORS;
-   
-   glVertexAttribIPointer(7, 1, GL_UNSIGNED_BYTE, sizeof(uint8_t), (void*)(elementsQuantity * (sizeof(struct Map2DElement) + elementsQuantity * 2u * sizeof(uint8_t))));
-   GL_CHECK_ERRORS;
-   glVertexAttribIPointer(8, 1, GL_UNSIGNED_BYTE, sizeof(struct Map2DElement), (void*)(offsetof(struct Map2DElement, rotateGroup)));
-   GL_CHECK_ERRORS;
-   glVertexAttribIPointer(9, 1, GL_UNSIGNED_BYTE, sizeof(struct Map2DElement), (void*)(offsetof(struct Map2DElement, textureOffsetGroup)));
-   GL_CHECK_ERRORS;
-   glVertexAttribIPointer(10, 1, GL_UNSIGNED_BYTE, sizeof(struct Map2DElement), (void*)(offsetof(struct Map2DElement, colorGroup)));
-   GL_CHECK_ERRORS;
-   
-   /* I'm lazy */
-   for (uint8_t i = 0u; i < 11; ++i)
+   for (struct Map2DElement *iterator = elements, *end = elements + elementsQuantity; iterator < end;
+        ++iterator, ++moveGroups, ++extensionGroups, ++globalOffsets, vertices += 4)
    {
-      glEnableVertexAttribArray(i);
-      GL_CHECK_ERRORS;
+      cce__map2DElementToMap2DElementVertices(vertices, iterator, *moveGroups, *globalOffsets, *extensionGroups);
    }
+   glUnmapBuffer(GL_ARRAY_BUFFER);
+   GL_CHECK_ERRORS;
+   
+   cce__setAttribPointerVAO();
+   
    glBindBuffer(GL_ARRAY_BUFFER, 0);
+   GL_CHECK_ERRORS;
    glBindVertexArray(0);
+   GL_CHECK_ERRORS;
+   cce__extendElementBufferIfNecessary(elementsQuantity);
    return VAO;
 }
 
@@ -365,19 +350,19 @@ static struct Map2DCollider* elementsToColliders (uint32_t  elementsQuantity, ui
                break;
             continue;
          }
-         (*(glGroups + currentElement * 2u + 1u)) = CCE_GLOBAL_OFFSET_MASK;
+         (*(glGroups + currentElement)) = 1;
       }
-      convertCCEgroupsToGLgroups(moveGroupsQuantity - 1u, moveGroups + 1u, glGroups, 2u, elementsWithoutColliderQuantity, elementsQuantity);
+      convertCCEgroupsToGLgroups(moveGroupsQuantity - 1,  moveGroups + 1,  glGroups + (elementsQuantity * (1 * sizeof(uint8_t))), 1, elementsWithoutColliderQuantity, elementsQuantity);
    }
    while (currentElement < elementsQuantity)
    {
-      (*(glGroups + currentElement * 2u + 1u)) = CCE_GLOBAL_OFFSET_MASK;
+      (*(glGroups + currentElement)) = 1;
       ++currentElement;
    }
    if (extensionGroups)
-      convertCCEgroupsToGLgroups(extensionGroupsQuantity, extensionGroups, glGroups + (elementsQuantity * (2u * sizeof(uint8_t))), 1u, elementsWithoutColliderQuantity, elementsQuantity);
+      convertCCEgroupsToGLgroups(extensionGroupsQuantity, extensionGroups, glGroups + (elementsQuantity * (2 * sizeof(uint8_t))), 1, elementsWithoutColliderQuantity, elementsQuantity);
       
-   *VAO = makeVAOmap2D(elements, elementsQuantity, VBO);
+   *VAO = makeVAOmap2D(elements, elementsQuantity, glGroups + (elementsQuantity * sizeof(uint8_t)), glGroups + (elementsQuantity * (2u * sizeof(uint8_t))), glGroups, VBO);
    
    if (moveGroups && moveGroupsQuantity > 256u)
       offsetCCEgroupsFromElementsToColliders(moveGroupsQuantity - 256u, moveGroups + 256u, elementsWithoutColliderQuantity);

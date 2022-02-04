@@ -74,12 +74,10 @@ struct DynamicMap2DElement
    uint16_t extensionGroupsQuantity;
    uint16_t collisionGroupsQuantity;
    uint16_t textureElementReliesOn;
-   uint8_t flags;              /* 0x1 - isUsed, 0x2 - hasCollider, 0x4 - toBeProcessed, 0x8 - has2DElement, 0x10 - isGlobalOffset */
-   int8_t layer;
+   uint8_t flags;              /* 0x1 - isUsed, 0x2 - hasCollider, 0x4 - toBeProcessed, 0x8 - has2DElement, 0x10 - isGlobalOffset, 0x20 - isCurrentPosition */
    // Vertex shader
-   uint8_t moveGroup;          /* 0 is unmovable */
-   uint8_t extensionGroup;     /* 0 is unscalable */
-   // Geometry shader
+   //uint8_t moveGroup;          /* 0 is unmovable */
+   //uint8_t extensionGroup;     /* 0 is unscalable */
    uint8_t rotateGroup;        /* 0 is unrotatable */
    // Fragment shader
    uint8_t textureOffsetGroup; /* 0 is texture (more precisely - texture piece) unchangeable */
@@ -135,15 +133,52 @@ struct DynamicMap2D
    uint16_t temporaryBools;
 };
 
+struct Map2DElementVertices
+{
+   struct cce_ivec2 vertexCoords;
+   struct cce_ivec2 position;
+   struct cce_vec2  textureCoords;
+   struct
+   {
+      uint8_t rotateGroupID;
+      uint8_t isGlobalOffset;
+      uint8_t moveGroupID;
+      uint8_t extendGroupID;
+   } transformGroups;
+   struct cce_vec2 textureFragmentSize;
+   uint16_t textureID;
+   struct
+   {
+      uint8_t textureOffsetID;
+      uint8_t colorID;
+   } paintGroups;
+};
+
 char* cce__createNewPathFromOldPath (const char *const oldPath, const char *const appendPath, size_t freeSpaceToLeave);
 
 void cce__baseActionsInit (const struct DynamicMap2D *dynamic_map, struct UsedUBO *UBOs, const GLint *bufferUniformsOffsets, 
                       const GLint *uniformLocations, GLuint shaderProgram, void (*setUniformBufferToDefault)(GLuint, GLint));
-void cce__initMap2DLoaders (void (***doAction)(void*));
+void cce__initMap2DLoaders (void (***doAction)(void*), GLuint EBO);
 void cce__setCurrentArrayOfMaps (const struct Map2Darray *maps);
 void cce__beginBaseActions (const struct Map2D *map);
 void cce__endBaseActions (void);
 void cce__endBaseActionsDynamicMap2D (void);
+
+void cce__setAttribPointerVAO (void);
+void cce__elementToMap2DElementVertices (struct Map2DElementVertices *buffer, int32_t x, int32_t y, uint16_t width, uint16_t height,
+                                         uint8_t moveGroup, uint8_t globalOffset, uint8_t extensionGroup, uint8_t rotationGroup,
+                                         struct Texture *textureInfo, uint16_t textureID, uint8_t textureOffsetGroup, uint8_t colorGroup);
+void cce__extendElementBufferIfNecessary (uint32_t minimalSize);
+
+#define cce__map2DElementToMap2DElementVertices(buffer, element, moveGroup, globalOffset, extensionGroup) \
+cce__elementToMap2DElementVertices(buffer, (element)->x, (element)->y, (element)->width, (element)->height, moveGroup, globalOffset, extensionGroup, \
+(element)->rotateGroup, &((element)->textureInfo), (element)->textureInfo.ID, (element)->textureOffsetGroup, (element)->colorGroup)
+
+#define cce__dynamicMap2DElementToMap2DElementVertices(buffer, element) \
+cce__elementToMap2DElementVertices(buffer, (element)->x, (element)->y, (element)->width, (element)->height, \
+(element->moveGroupsQuantity) ? (*((element)->moveGroups)) : 0, ((element)->flags & CCE_GLOBAL_OFFSET_MASK) > 0, \
+(element->extensionGroupsQuantity) ? (*((element)->extensionGroups) + 1) : 0, (element)->rotateGroup, &((element)->textureInfo), \
+(element)->textureElementReliesOn, (element)->textureOffsetGroup, (element)->colorGroup)
 
 cce_ubyte cce__fourthLogicTypeFuncMap2D(uint16_t ID, va_list argp);
 cce_ubyte cce__fourthLogicTypeFuncDynamicMap2D(uint16_t ID, va_list argp);
@@ -155,16 +190,16 @@ void cce__releaseTexture (uint16_t textureID);
 uint16_t cce__getFreeUBO (void);
 void cce__releaseUBO (uint16_t ID);
 void cce__releaseUnusedUBO (uint16_t ID);
-const struct DynamicMap2D* cce__initDynamicMap2D (void);
+const struct DynamicMap2D* cce__initDynamicMap2D (GLuint EBO);
 void cce__terminateDynamicMap2D (void);
 void cce__terminateEngine2D (void);
 
 /* Action is a function: void action (void *ptr) */
-#define processLogicMap2D(map) if ((map)->logicQuantity) cce__setCurrentTemporaryBools((map)->temporaryBools); \
+#define cce__processLogicMap2D(map) if ((map)->logicQuantity) cce__setCurrentTemporaryBools((map)->temporaryBools); \
 cce__beginBaseActions(map); \
 cce__processLogic((map)->logicQuantity, (map)->logic, (map)->timers, cce_actions, cce__fourthLogicTypeFuncMap2D, map); \
 cce__endBaseActions()
-#define processLogicDynamicMap2D(dynamicMap, currentMap) cce__setCurrentTemporaryBools((dynamicMap)->temporaryBools); cce__beginBaseActions(currentMap); \
+#define cce__processLogicDynamicMap2D(dynamicMap, currentMap) cce__setCurrentTemporaryBools((dynamicMap)->temporaryBools); cce__beginBaseActions(currentMap); \
 cce__processLogic((dynamicMap)->logicQuantity, (dynamicMap)->logic, (dynamicMap)->timers, cce_actions, cce__fourthLogicTypeFuncDynamicMap2D, currentMap); \
 cce__endBaseActions(); \
 cce__endBaseActionsDynamicMap2D()
