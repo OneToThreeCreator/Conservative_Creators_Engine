@@ -29,7 +29,7 @@
 
 static void initPlayer (uint32_t globalBoolsQuantity)
 {
-   struct Map2DElementDev player = {-1, -1, 1, 2, {0.5625f, 0.0f, 1.0f, 1.0f, 1}, 0, 0, 0, 0, 0, 0};
+   struct Map2DElementDev player = {-1, -1, 1, 2, {0.5625f, 0.0f, 1.0f, 1.0f, 1}, {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, 0, 0};
    cceCreateMap2DElementDynamicMap2D(&player, 1, 1);
 
    uint_fast16_t *aandb = cceParseStringToLogicOperations("a & b", NULL);
@@ -77,7 +77,7 @@ static void initPlayer (uint32_t globalBoolsQuantity)
 
 static void createAdditionalDynamicElement (struct cce_ivec2 coords, uint32_t globalBoolsQuantity)
 {
-   struct Map2DElementDev element = {coords.x, coords.y, 2, 2, {0.0f, 0.0f, 1.0f, 1.0f, 0}, 1, 1, 0, 0, 0, 1};
+   struct Map2DElementDev element = {coords.x, coords.y, 2, 2, {0.0f, 0.0f, 1.0f, 1.0f, 0}, {1, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, 0, 1};
    cceCreateMap2DElementDynamicMap2D(&element, 1, 1);
 
    uint_fast16_t *aandb = cceParseStringToLogicOperations("a & b", NULL);
@@ -122,11 +122,11 @@ static void createAdditionalDynamicElement (struct cce_ivec2 coords, uint32_t gl
 static void createMap2D (uint16_t ID, uint16_t exitMapsQuantity, struct ExitMap2D *exitMaps)
 {
    struct Map2DElement elements[] = {
-      {  3,   3, 10, 10, {0.0f, 0.0f, 5.0f, 5.0f, 2}, 0, 0, 0},
-      {-11, -11, 10, 24, {0.0f, 0.0f, 1.0f, 1.0f, 0}, 0, 0, 1},
-      {  3, -11, 10, 10, {0.0f, 0.0f, 1.0f, 1.0f, 0}, 0, 0, 2},
-      {  0, -11,  2, 24, {0.0f, 0.0f, 1.0f, 1.0f, 0}, 0, 0, 3},
-      {  2,   0, 11,  2, {0.0f, 0.0f, 1.0f, 1.0f, 0}, 0, 0, 3},
+      {  3,   3, 10, 10, {0.0f, 0.0f, 5.0f, 5.0f, 2}, {0, 0, 0, 0}, {0, 0, 0, 0}, 0},
+      {-11, -11, 10, 24, {0.0f, 0.0f, 1.0f, 1.0f, 0}, {0, 0, 0, 0}, {1, 0, 0, 0}, 0},
+      {  3, -11, 10, 10, {0.0f, 0.0f, 1.0f, 1.0f, 0}, {0, 0, 0, 0}, {2, 0, 0, 0}, 0},
+      {  0, -11,  2, 24, {0.0f, 0.0f, 1.0f, 1.0f, 0}, {0, 0, 0, 0}, {3, 0, 0, 0}, 0},
+      {  2,   0, 11,  2, {0.0f, 0.0f, 1.0f, 1.0f, 0}, {0, 0, 0, 0}, {3, 0, 0, 0}, 0},
    };
    struct changeColorActionStruct colors[4] = {{0.711f, 0.64f,  0.453f, 1.0f, 1, CCE_CURRENT_MAP2D},
                                                {0.001f, 0.487f, 0.0f,   1.0f, 2, CCE_CURRENT_MAP2D},
@@ -142,10 +142,12 @@ static void createMap2D (uint16_t ID, uint16_t exitMapsQuantity, struct ExitMap2
 
 int main (int argc, char **argv)
 {
-   char path[256];
+   char *path;
+   size_t pathLength;
    if (argc < 2)
    {
-      cceGetCurrentPath(path, 256);
+      path = cceGetCurrentPath(15);
+      pathLength = strlen(path);
    }
    else
    {
@@ -156,14 +158,19 @@ int main (int argc, char **argv)
       }
       if (argv[1][0] == '/')
       {
-         strncpy(path, argv[1], 256);
+         pathLength = strlen(argv[1]);
+         path = malloc(pathLength + 16);
+         memcpy(path, argv[1], pathLength + 1);
       }
       else
       {
          char *appendString = argv[1];
          appendString += (appendString[0] == '.') * 2;
-         cceGetCurrentPath(path, 256);
-         strncat(path, appendString, 256 - strnlen(path, 256));
+         size_t appendLength = strlen(appendString);
+         path = cceGetCurrentPath(appendLength + 15);
+         pathLength = strlen(path);
+         memcpy(path + pathLength, appendString, appendLength + 1);
+         pathLength += appendLength;
       }
    }
    const uint32_t globalBoolsQuantity = 32768;
@@ -171,9 +178,11 @@ int main (int argc, char **argv)
    {
       return -1;
    }
-   cceAppendPath(path, 256, "test2/textures");
+   cceAppendPath(path, pathLength + 16, "test2/textures");
    cceSetTexturesPath(path);
-   cceSetFlags2D(CCE_RENDER_CLOSEST_MAP | CCE_PROCESS_LOGIC_ONLY_FOR_CURRENT_MAP);
+   free(path);
+
+   cceSetFlags2D(CCE_RENDER_CLOSEST_MAP | CCE_PROCESS_LOGIC_ONLY_FOR_CURRENT_MAP | CCE_FORCE_INITIALIZE_MAP_ONLOAD);
    {
       char *path = cceGetTemporaryDirectory(0);
       cceSetMap2Dpath(path);

@@ -36,7 +36,7 @@ void printMap2Ddev (struct Map2Ddev *map)
       printf("  %lu: x: %d, y: %d, width: %u, height: %u, textureCoords: {sx: %f, sy: %f, ex: %f, ey: %f, ID: %u}, rotateGroup: %u, textureOffsetGroup: %u, colorGroup: %u\n",
       iterator - map->elements, iterator->x, iterator->y, iterator->width, iterator->height,
       iterator->textureInfo.startX, iterator->textureInfo.startY, iterator->textureInfo.endX, iterator->textureInfo.endY, iterator->textureInfo.ID,
-      iterator->rotateGroup, iterator->textureOffsetGroup, iterator->colorGroup);
+      iterator->rotateGroup, iterator->textureOffsetGroups, iterator->colorGroups);
    }
    printf(" %u colliders:\n", map->elementsQuantity - map->elementsWithoutColliderQuantity + map->collidersQuantity);
    for (struct Map2DElement *iterator = map->elements + map->elementsWithoutColliderQuantity, *end = map->elements + map->elementsQuantity; iterator < end; ++iterator)

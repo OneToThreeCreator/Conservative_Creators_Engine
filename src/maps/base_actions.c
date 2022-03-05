@@ -1,4 +1,4 @@
-/*
+﻿/*
     CoffeeChain - open source engine for making games.
     Copyright (C) 2020-2021 Andrey Givoronsky
 
@@ -37,10 +37,12 @@ static const struct DynamicMap2D *g_dynamicMap;
 static struct UsedUBO *g_UBOs;
 static const GLint *g_uniformsOffsets;
 static const GLint *g_uniformLocations;
+static const GLint *g_uniformBufferSize;
 static GLuint g_shaderProgram;
 cce_void *g_currentMapBuffer = NULL;
 cce_void *g_dynamicMapBuffer = NULL;
 static void (*g_setUniformBufferToDefault)(GLuint, GLint);
+static GLint uniformOffset;
 
 #define PI 3.14159265f
 
@@ -59,7 +61,7 @@ static void extendAction (void *data)
 static void rotateAction (void *data)
 {
    struct rotateActionStruct *params = (struct rotateActionStruct*) data;
-   cceRotateGroupMap2D(params->groupID, params->angle, params->xOffset, params->yOffset, params->mapType);
+   cceRotateGroupMap2D(params->groupID, params->angle, params->xOffset, params->yOffset, params->action, params->mapType);
 }
 
 static void offsetTextureAction (void *data)
@@ -139,8 +141,10 @@ static void loadMap2Daction (void *data)
    {
       case CCE_SHIFT:
          cceLoadedMap2Dnumber += params->ID;
+         break;
       case CCE_SET:
          cceLoadedMap2Dnumber =  params->ID;
+         break;
    }
 }
 
@@ -154,31 +158,58 @@ void cce__beginBaseActions (const struct Map2D *map)
    }
    glBindBuffer(GL_UNIFORM_BUFFER, (g_UBOs + currentMap->UBO_ID)->UBO);
    GL_CHECK_ERRORS;
-   g_currentMapBuffer = glMapBuffer(GL_UNIFORM_BUFFER, GL_READ_WRITE);
+   g_currentMapBuffer = glMapBufferRange(GL_UNIFORM_BUFFER, uniformOffset, *g_uniformBufferSize - uniformOffset, GL_MAP_READ_BIT | GL_MAP_WRITE_BIT);
    GL_CHECK_ERRORS;
    if (g_dynamicMapBuffer == NULL)
    {
       glBindBuffer(GL_UNIFORM_BUFFER, (g_UBOs + g_dynamicMap->UBO_ID)->UBO);
-      g_dynamicMapBuffer = glMapBuffer(GL_UNIFORM_BUFFER, GL_READ_WRITE);
+      GL_CHECK_ERRORS;
+      g_dynamicMapBuffer = glMapBufferRange(GL_UNIFORM_BUFFER, uniformOffset, *g_uniformBufferSize - uniformOffset, GL_MAP_READ_BIT | GL_MAP_WRITE_BIT);
       GL_CHECK_ERRORS;
    }
    glBindBuffer(GL_UNIFORM_BUFFER, 0);
 }
 
-void cce__endBaseActions (void)
+static void endBaseActionsCommon (uint16_t uboID)
 {
-   glBindBuffer(GL_UNIFORM_BUFFER, (g_UBOs + currentMap->UBO_ID)->UBO);
+   struct UsedUBO *ubo = (g_UBOs + uboID);
+   glBindBuffer(GL_UNIFORM_BUFFER, ubo->UBO);
+   GL_CHECK_ERRORS;
    glUnmapBuffer(GL_UNIFORM_BUFFER);
    GL_CHECK_ERRORS;
+   if (ubo->moveGroupValuesQuantity == 0 && ubo->extensionGroupValuesQuantity == 0)
+      return;
+   printf("ubo->moveGroupValues {%i %i}\nmoveOffset == %u\n", ubo->moveGroupValues->x, ubo->moveGroupValues->y, *(g_uniformsOffsets + CCE_MOVEGROUP_OFFSET));
+   struct cce_ivec2 *buffer = glMapBufferRange(GL_UNIFORM_BUFFER, *(g_uniformsOffsets + CCE_MOVEGROUP_OFFSET), 2 * sizeof(struct cce_ivec2) * 255,
+                                               GL_MAP_WRITE_BIT | (GL_MAP_INVALIDATE_RANGE_BIT * (((ubo->moveGroupValuesQuantity)      >= 255) &&
+                                                                                                  ((ubo->extensionGroupValuesQuantity) >= 255))));
+   GL_CHECK_ERRORS;
+   //memset(buffer, ubo->moveGroupValues->x, MIN(ubo->moveGroupValuesQuantity, 255) * sizeof(struct cce_ivec2));
+   memcpy(buffer, ubo->moveGroupValues, MIN(ubo->moveGroupValuesQuantity, 255) * sizeof(struct cce_ivec2));
+   buffer += 255;
+   struct
+   {
+      int16_t x;
+      int16_t y;
+   } *extensionValues = (void*) (ubo->extensionGroupValues);
+   for (struct cce_ivec2 *end = buffer + MIN(ubo->extensionGroupValuesQuantity, 255); buffer < end; ++buffer, ++extensionValues)
+   {
+      *buffer = (struct cce_ivec2) {extensionValues->x, extensionValues->y};
+   }
+   glUnmapBuffer(GL_UNIFORM_BUFFER);
+   GL_CHECK_ERRORS;
+}
+
+void cce__endBaseActions (void)
+{
+   endBaseActionsCommon(currentMap->UBO_ID);
    currentMap = NULL;
    g_currentMapBuffer = NULL;
 }
 
 void cce__endBaseActionsDynamicMap2D (void)
 {
-   glBindBuffer(GL_UNIFORM_BUFFER, (g_UBOs + g_dynamicMap->UBO_ID)->UBO);
-   glUnmapBuffer(GL_UNIFORM_BUFFER);
-   GL_CHECK_ERRORS;
+   endBaseActionsCommon(g_dynamicMap->UBO_ID);
    g_dynamicMapBuffer = NULL;
 }
 
@@ -188,7 +219,8 @@ void cce__setCurrentArrayOfMaps (const struct Map2Darray *maps)
 }
 
 void cce__baseActionsInit (const struct DynamicMap2D *dynamic_map, struct UsedUBO *UBOs, const GLint *bufferUniformsOffsets, 
-                      const GLint *uniformLocations, GLuint shaderProgram, void (*setUniformBufferToDefault)(GLuint, GLint))
+                           const GLint *uniformLocations, GLuint shaderProgram, void (*setUniformBufferToDefault)(GLuint, GLint),
+                           const GLint *uniformBufferSize)
 {
    g_dynamicMap = dynamic_map;
    g_UBOs = UBOs;
@@ -196,6 +228,8 @@ void cce__baseActionsInit (const struct DynamicMap2D *dynamic_map, struct UsedUB
    g_uniformLocations = uniformLocations;
    g_shaderProgram = shaderProgram;
    g_setUniformBufferToDefault = setUniformBufferToDefault;
+   g_uniformBufferSize = uniformBufferSize;
+   uniformOffset = *(g_uniformsOffsets + CCE_COLORGROUP_OFFSET);
    cceRegisterAction(0,  moveAction);
    cceRegisterAction(1,  extendAction);
    cceRegisterAction(2,  rotateAction);
@@ -264,15 +298,15 @@ CCE_PUBLIC_OPTIONS void cceMoveGroupMap2D (uint16_t groupID, int32_t x, int32_t 
    {
       return cceMoveGlobalOffsetGroupMap2D(x, y, actionType);
    }
-   cce_void *glBuffer;
+   struct UsedUBO *ubo;
    int32_t *firstElementX, *firstElementY;
    ptrdiff_t elementSize;
-   struct ElementGroup *group;
+   struct ElementGroup *group = NULL;
 
    switch (mapType)
    {
       case CCE_CURRENT_MAP2D:
-         glBuffer = g_currentMapBuffer;
+         ubo = (g_UBOs + currentMap->UBO_ID);
          if (currentMap->moveGroupsQuantity > groupID)
          {
             firstElementX = &(currentMap->colliders->x);
@@ -282,7 +316,7 @@ CCE_PUBLIC_OPTIONS void cceMoveGroupMap2D (uint16_t groupID, int32_t x, int32_t 
          }
          break;
       case CCE_DYNAMIC_MAP2D:
-         glBuffer = g_dynamicMapBuffer;
+         ubo = (g_UBOs + g_dynamicMap->UBO_ID);
          if (g_dynamicMap->moveGroupsQuantity > groupID)
          {
             firstElementX = &(g_dynamicMap->elements->x);
@@ -298,17 +332,17 @@ CCE_PUBLIC_OPTIONS void cceMoveGroupMap2D (uint16_t groupID, int32_t x, int32_t 
    {
       case CCE_SHIFT:
       {
-         *(((int32_t*) (glBuffer + *(g_uniformsOffsets + CCE_MOVEGROUP_OFFSET))) + (groupID - 1u) * 2u)      += x;
-         *(((int32_t*) (glBuffer + *(g_uniformsOffsets + CCE_MOVEGROUP_OFFSET))) + (groupID - 1u) * 2u + 1u) += y;
+         (ubo->moveGroupValues + (groupID - 1u))->x += x;
+         (ubo->moveGroupValues + (groupID - 1u))->y += y;
          break;
       }
       case CCE_SET:
       {
          int32_t offset[2];
-         offset[0] = *(((int32_t*) (glBuffer + *(g_uniformsOffsets + CCE_MOVEGROUP_OFFSET))) + (groupID - 1u) * 2u);
-         offset[1] = *(((int32_t*) (glBuffer + *(g_uniformsOffsets + CCE_MOVEGROUP_OFFSET))) + (groupID - 1u) * 2u + 1u);
-         *(((int32_t*) (glBuffer + *(g_uniformsOffsets + CCE_MOVEGROUP_OFFSET))) + (groupID - 1u) * 2u)      = x;
-         *(((int32_t*) (glBuffer + *(g_uniformsOffsets + CCE_MOVEGROUP_OFFSET))) + (groupID - 1u) * 2u + 1u) = y;
+         offset[0] = (ubo->moveGroupValues + (groupID - 1u))->x;
+         offset[1] = (ubo->moveGroupValues + (groupID - 1u))->y;
+         (ubo->moveGroupValues + (groupID - 1u))->x = x;
+         (ubo->moveGroupValues + (groupID - 1u))->y = y;
          x -= offset[0];
          y -= offset[1];
          break;
@@ -324,15 +358,15 @@ CCE_PUBLIC_OPTIONS void cceExtendGroupMap2D (uint16_t groupID, int32_t x, int32_
 {
    if (groupID == 0u) return;
 
-   cce_void *glBuffer;
+   struct UsedUBO *ubo;
    uint16_t *firstElementWidth, *firstElementHeight;
    ptrdiff_t elementSize;
-   struct ElementGroup *group;
+   struct ElementGroup *group = NULL;
 
    switch (mapType)
    {
       case CCE_CURRENT_MAP2D:
-         glBuffer = g_currentMapBuffer;
+         ubo = (g_UBOs + currentMap->UBO_ID);
          if (currentMap->extensionGroupsQuantity > groupID)
          {
             firstElementWidth = &(currentMap->colliders->width);
@@ -342,7 +376,7 @@ CCE_PUBLIC_OPTIONS void cceExtendGroupMap2D (uint16_t groupID, int32_t x, int32_
          }
          break;
       case CCE_DYNAMIC_MAP2D:
-         glBuffer = g_dynamicMapBuffer;
+         ubo = (g_UBOs + g_dynamicMap->UBO_ID);
          if (g_dynamicMap->extensionGroupsQuantity > groupID)
          {
             firstElementWidth = &(g_dynamicMap->elements->width);
@@ -358,18 +392,20 @@ CCE_PUBLIC_OPTIONS void cceExtendGroupMap2D (uint16_t groupID, int32_t x, int32_
    {
       case CCE_SHIFT:
       {
-         *(((int32_t*) (glBuffer + *(g_uniformsOffsets + CCE_EXTENSIONGROUP_OFFSET))) + (groupID - 1u) * 2u)      += x;
-         *(((int32_t*) (glBuffer + *(g_uniformsOffsets + CCE_EXTENSIONGROUP_OFFSET))) + (groupID - 1u) * 2u + 1u) += y;
+         (ubo->extensionGroupValues + (groupID - 1u))->x += x;
+         (ubo->extensionGroupValues + (groupID - 1u))->y += y;
+         break;
       }
       case CCE_SET:
       {
          uint16_t resize[2];
-         resize[0] = *(((int32_t*) (glBuffer + *(g_uniformsOffsets + CCE_EXTENSIONGROUP_OFFSET))) + (groupID - 1u) * 2u);
-         resize[1] = *(((int32_t*) (glBuffer + *(g_uniformsOffsets + CCE_EXTENSIONGROUP_OFFSET))) + (groupID - 1u) * 2u + 1u);
-         *(((int32_t*) (glBuffer + *(g_uniformsOffsets + CCE_EXTENSIONGROUP_OFFSET))) + (groupID - 1u) * 2u)      = x;
-         *(((int32_t*) (glBuffer + *(g_uniformsOffsets + CCE_EXTENSIONGROUP_OFFSET))) + (groupID - 1u) * 2u + 1u) = y;
+         resize[0] = (ubo->extensionGroupValues + (groupID - 1u))->x;
+         resize[1] = (ubo->extensionGroupValues + (groupID - 1u))->y;
+         (ubo->extensionGroupValues + (groupID - 1u))->x = x;
+         (ubo->extensionGroupValues + (groupID - 1u))->y = y;
          x -= resize[0];
          y -= resize[1];
+         break;
       }
    }
    if (group == NULL)
@@ -387,29 +423,43 @@ CCE_PUBLIC_OPTIONS float cceNormalizeAngle (float angleInDegrees)
 }
 
 /* Group iteration is from 1, not 0 */
-CCE_PUBLIC_OPTIONS void cceRotateGroupMap2D (uint8_t groupID, float normalizedAngle, int32_t xOffset, int32_t yOffset, cce_enum mapType)
+CCE_PUBLIC_OPTIONS void cceRotateGroupMap2D (uint8_t groupID, float normalizedAngle, int32_t xOffset, int32_t yOffset, cce_enum actionType, cce_enum mapType)
 {
    if (groupID == 0u) return;
 
    cce_void *glBuffer;
+   struct UsedUBO *ubo;
    switch (mapType)
    {
       case CCE_CURRENT_MAP2D:
+         ubo = (g_UBOs + currentMap->UBO_ID);
          glBuffer = g_currentMapBuffer;
          break;
       case CCE_DYNAMIC_MAP2D:
+         ubo = (g_UBOs + g_dynamicMap->UBO_ID);
          glBuffer = g_dynamicMapBuffer;
          break;
       default: return;
    }
 
+   switch (actionType)
+   {
+      case CCE_SHIFT:
+         *(ubo->rotationAngles + (groupID - 1u)) += normalizedAngle;
+         normalizedAngle = *(ubo->rotationAngles + (groupID - 1u));
+         break;
+      case CCE_SET:
+         *(ubo->rotationAngles + (groupID - 1u)) = normalizedAngle;
+         break;
+   }
+
    float sin = sinf(normalizedAngle * PI);
    float cos = cosf(normalizedAngle * PI);
 
-   *(((float*)   (glBuffer + *(g_uniformsOffsets + CCE_ROTATEANGLESIN_OFFSET))) + (groupID - 1u) * 4u)      = sin;
-   *(((float*)   (glBuffer + *(g_uniformsOffsets + CCE_ROTATEANGLECOS_OFFSET))) + (groupID - 1u) * 4u)      = cos;
-   *(((int32_t*) (glBuffer + *(g_uniformsOffsets + CCE_ROTATIONOFFSET_OFFSET))) + (groupID - 1u) * 4u)      = xOffset;
-   *(((int32_t*) (glBuffer + *(g_uniformsOffsets + CCE_ROTATIONOFFSET_OFFSET))) + (groupID - 1u) * 4u + 1u) = yOffset;
+   (((struct cce_vec2*)  (glBuffer + *(g_uniformsOffsets + CCE_ROTATEANGLESINCOS_OFFSET) - uniformOffset)) + (groupID - 1u))->x = sin;
+   (((struct cce_vec2*)  (glBuffer + *(g_uniformsOffsets + CCE_ROTATEANGLESINCOS_OFFSET) - uniformOffset)) + (groupID - 1u))->y = cos;
+   (((struct cce_ivec2*) (glBuffer + *(g_uniformsOffsets + CCE_ROTATIONOFFSET_OFFSET)    - uniformOffset)) + (groupID - 1u))->x = xOffset;
+   (((struct cce_ivec2*) (glBuffer + *(g_uniformsOffsets + CCE_ROTATIONOFFSET_OFFSET)    - uniformOffset)) + (groupID - 1u))->y = yOffset;
 }
 
 /* Group iteration is from 1, not 0 */
@@ -429,10 +479,10 @@ CCE_PUBLIC_OPTIONS void cceChangeColorGroupMap2D (uint8_t groupID, float r, floa
       default: return;
    }
 
-   *(((float*) (glBuffer + *(g_uniformsOffsets + CCE_COLORGROUP_OFFSET))) + (groupID - 1u) * 4u)      = r;
-   *(((float*) (glBuffer + *(g_uniformsOffsets + CCE_COLORGROUP_OFFSET))) + (groupID - 1u) * 4u + 1u) = g;
-   *(((float*) (glBuffer + *(g_uniformsOffsets + CCE_COLORGROUP_OFFSET))) + (groupID - 1u) * 4u + 2u) = b;
-   *(((float*) (glBuffer + *(g_uniformsOffsets + CCE_COLORGROUP_OFFSET))) + (groupID - 1u) * 4u + 3u) = a;
+   *(((float*) (glBuffer + *(g_uniformsOffsets + CCE_COLORGROUP_OFFSET) - uniformOffset)) + (groupID - 1u) * 4u)      = r;
+   *(((float*) (glBuffer + *(g_uniformsOffsets + CCE_COLORGROUP_OFFSET) - uniformOffset)) + (groupID - 1u) * 4u + 1u) = g;
+   *(((float*) (glBuffer + *(g_uniformsOffsets + CCE_COLORGROUP_OFFSET) - uniformOffset)) + (groupID - 1u) * 4u + 2u) = b;
+   *(((float*) (glBuffer + *(g_uniformsOffsets + CCE_COLORGROUP_OFFSET) - uniformOffset)) + (groupID - 1u) * 4u + 3u) = a;
 }
 
 CCE_PUBLIC_OPTIONS void cceOffsetTextureGroupMap2D (uint8_t groupID, int32_t offsetX, int32_t offsetY, cce_enum mapType)
@@ -451,6 +501,6 @@ CCE_PUBLIC_OPTIONS void cceOffsetTextureGroupMap2D (uint8_t groupID, int32_t off
       default: return;
    }
 
-   *(((int32_t*) (glBuffer + *(g_uniformsOffsets + CCE_TEXTUREOFFSET_OFFSET))) + (groupID - 1u) * 2u)      = offsetX;
-   *(((int32_t*) (glBuffer + *(g_uniformsOffsets + CCE_TEXTUREOFFSET_OFFSET))) + (groupID - 1u) * 2u + 1u) = offsetY;
+   (((struct cce_ivec2*) (glBuffer + *(g_uniformsOffsets + CCE_TEXTUREOFFSET_OFFSET) - uniformOffset)) + (groupID - 1u))->x = offsetX;
+   (((struct cce_ivec2*) (glBuffer + *(g_uniformsOffsets + CCE_TEXTUREOFFSET_OFFSET) - uniformOffset)) + (groupID - 1u))->y = offsetY;
 }

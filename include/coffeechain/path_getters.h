@@ -36,7 +36,7 @@ extern C:
 #endif // Windows
 
 CCE_PUBLIC_OPTIONS char* cceGetDirectory (char *path, size_t bufferSize);
-CCE_PUBLIC_OPTIONS char* cceGetCurrentPath (char *pathBuffer, size_t pathBufferLength);
+CCE_PUBLIC_OPTIONS char* cceGetCurrentPath (size_t spaceToLeave);
 CCE_PUBLIC_OPTIONS void  cceDeleteDirectory (const char *path);
 CCE_PUBLIC_OPTIONS char* cceGetAppDataPath (const char *restrict folderName, size_t spaceToLeave);
 CCE_PUBLIC_OPTIONS char* cceAppendPath (char *const buffer, size_t bufferSize, const char *const append);

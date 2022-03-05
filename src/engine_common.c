@@ -159,7 +159,7 @@ static void updateTemporaryBoolsArray (void)
 {
    for (struct UsedTemporaryBools *iterator = g_temporaryBools, *end = g_temporaryBools + g_temporaryBoolsQuantity; iterator < end; ++iterator)
    {
-      if (iterator->flags & 0x4)
+      if (iterator->flags & 0x2)
       {
          iterator->flags &= 0x1;
          memset(iterator->temporaryBools, 0, (UINT16_MAX - g_globalBoolsQuantity + 1u) >> 3u);
@@ -194,7 +194,7 @@ uint16_t cce__getFreeTemporaryBools (void)
 
 void cce__releaseTemporaryBools (uint16_t ID)
 {
-   (g_temporaryBools + ID)->flags = 0x4;
+   (g_temporaryBools + ID)->flags = 0x2;
    return;
 }
 

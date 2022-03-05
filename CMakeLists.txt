@@ -20,17 +20,17 @@
 
 cmake_minimum_required(VERSION 3.13)
 
-project(coffeechain VERSION 0.2 DESCRIPTION "open 2D engine for creating games - shared library" LANGUAGES C)
+project(CoffeeChain VERSION 0.2 DESCRIPTION "open 2D engine for creating games - shared library" LANGUAGES C)
 
-option(BUILD_SHARED_LIBS     "Build CoffeeChain as shared library" ON)
-option(BUILD_TESTING         "Build CoffeeChain test program" ON)
+option(CoffeeChain_BUILD_SHARED_LIBS     "Build CoffeeChain as shared library" ON)
+option(CoffeeChain_BUILD_TESTING         "Build CoffeeChain test program" ON)
 
 set(CMAKE_C_STANDARD 99)
 set(CMAKE_C_STANDARD_REQUIRED True)
 find_package(glfw3 3.3 REQUIRED)
 #find_package(OpenAL    REQUIRED)
 
-add_library(${PROJECT_NAME}
+add_library(coffeechain
    #src/audio.c
    #src/audio.h
    src/engine_common.c
@@ -59,44 +59,46 @@ add_library(${PROJECT_NAME}
    #src/external/stb_vorbis.h
 )
 
-set_target_properties(${PROJECT_NAME} PROPERTIES 
-   VERSION ${PROJECT_VERSION}
-   SOVERSION 1
+set_target_properties(coffeechain PROPERTIES 
+	VERSION ${CoffeeChain_VERSION}
+   SOVERSION 2
 )
 
-if(CMAKE_BUILD_TYPE MATCHES "DEBUG")
+
+
+if(CMAKE_BUILD_TYPE MATCHES "Debug" OR CMAKE_BUILD_TYPE MATCHES "DEBUG" OR CMAKE_BUILD_TYPE MATCHES "debug")
    if(NOT MSVC)
-      add_compile_options(-Wall -Wextra)
+      target_compile_options(coffeechain PRIVATE -Wall;-Wextra)
       if(${CMAKE_C_COMPILER_ID} MATCHES "GNU" OR ${CMAKE_C_COMPILER_ID} MATCHES "Clang")
-         add_compile_options(-Wshadow)
+         target_compile_options(coffeechain PRIVATE -Wshadow)
       endif()
    else()
-      add_compile_options(/W4)
+      target_compile_options(coffeechain PRIVATE /W4)
    endif()
-else ()
-   add_compile_definitions(NDEBUG)
 endif()
 
 
 configure_file(src/config.h.in include/coffeechain/config.h)
-target_include_directories(${PROJECT_NAME} PUBLIC ${PROJECT_BINARY_DIR}/include/coffeechain)
-target_compile_definitions(${PROJECT_NAME} PRIVATE SYSTEM_SHADER_PATH=\"${CMAKE_INSTALL_PREFIX}/share/coffeechain/shaders\")
-target_link_libraries(${PROJECT_NAME} PRIVATE glfw m)
+target_include_directories(coffeechain PUBLIC ${CoffeeChain_BINARY_DIR}/include/coffeechain)
+target_link_libraries(coffeechain PRIVATE glfw m)
 
 if(WIN32)
    include(GenerateExportHeader)
-   target_link_libraries(${PROJECT_NAME} PRIVATE shell32 kernel32)
-   generate_export_header(${PROJECT_NAME}
+   target_link_libraries(coffeechain PRIVATE shell32 kernel32)
+   generate_export_header(coffeechain
       EXPORT_MACRO_NAME CCE_EXPORTS
-      EXPORT_FILE_NAME ${PROJECT_BINARY_DIR}/include/coffeechain/cce_exports.h
+      EXPORT_FILE_NAME ${CoffeeChain_BINARY_DIR}/include/coffeechain/cce_exports.h
       INCLUDE_GUARD_NAME CCE_EXPORTS_H
-      STATIC_DEFINE SHARED_EXPORTS_BUILT_AS_STATIC
    )
-   install(FILES ${PROJECT_BINARY_DIR}/include/coffeechain/cce_exports.h DESTINATION include/coffeechain)
+   install(FILES ${CoffeeChain_BINARY_DIR}/include/coffeechain/cce_exports.h DESTINATION include/coffeechain)
+else()
+   target_compile_definitions(coffeechain PRIVATE SYSTEM_SHADER_PATH=\"${CMAKE_INSTALL_PREFIX}/share/coffeechain/shaders\")
+   # Windows don't have standartized path for storing shared data (or libraries, or anything that isn't self-contained)
 endif()
 
-if(BUILD_TESTING)
+if(CoffeeChain_BUILD_TESTING)
    include(CTest)
+   enable_testing()
    add_executable(coffeechain-test1
       test1/main.c
    )
@@ -106,30 +108,31 @@ if(BUILD_TESTING)
    )
    target_include_directories(coffeechain-test1
       PRIVATE include
-      PRIVATE ${PROJECT_BINARY_DIR}/include
+      PRIVATE ${CoffeeChain_BINARY_DIR}/include
    )
    target_include_directories(coffeechain-test2
       PRIVATE include
-      PRIVATE ${PROJECT_BINARY_DIR}/include
+      PRIVATE ${CoffeeChain_BINARY_DIR}/include
    )
-   target_link_directories(coffeechain-test1 PRIVATE ${PROJECT_BINARY_DIR})
-   target_link_directories(coffeechain-test2 PRIVATE ${PROJECT_BINARY_DIR})
-   target_link_libraries(coffeechain-test1 ${PROJECT_NAME})
-   target_link_libraries(coffeechain-test2 ${PROJECT_NAME})
+   target_link_directories(coffeechain-test1 PRIVATE ${CoffeeChain_BINARY_DIR})
+   target_link_directories(coffeechain-test2 PRIVATE ${CoffeeChain_BINARY_DIR})
+   target_link_libraries(coffeechain-test1 coffeechain)
+   target_link_libraries(coffeechain-test2 coffeechain)
    add_test(NAME coffeechain-test1
             COMMAND coffeechain-test1)
    add_test(NAME coffeechain-test2
-            COMMAND coffeechain-test2 ${PROJECT_SOURCE_DIR})
+            COMMAND coffeechain-test2 ${CoffeeChain_SOURCE_DIR})
    
    if(NOT WIN32)
-      target_link_options(coffeechain-test1 PRIVATE -Wl,-rpath=${PROJECT_BINARY_DIR})
+      target_link_options(coffeechain-test1 PRIVATE -Wl,-rpath=${CoffeeChain_BINARY_DIR})
+      target_link_options(coffeechain-test2 PRIVATE -Wl,-rpath=${CoffeeChain_BINARY_DIR})
    endif()
 endif()
 
-install(TARGETS ${PROJECT_NAME}
+install(TARGETS coffeechain
    LIBRARY DESTINATION lib
 )
 install(DIRECTORY shaders DESTINATION share/coffeechain)
 install(DIRECTORY include/coffeechain DESTINATION include)
-install(FILES ${PROJECT_BINARY_DIR}/include/coffeechain/config.h DESTINATION include/coffeechain)
+install(FILES ${CoffeeChain_BINARY_DIR}/include/coffeechain/config.h DESTINATION include/coffeechain)
 

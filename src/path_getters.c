@@ -128,9 +128,30 @@ CCE_PUBLIC_OPTIONS char* cceConvertIntToBase64String (size_t number, char *restr
 #include <unistd.h>
 #include <ftw.h>
 
-CCE_PUBLIC_OPTIONS char* cceGetCurrentPath (char *pathBuffer, size_t pathBufferLength)
+#define DEFAULT_PATH_LENGTH 256
+
+CCE_PUBLIC_OPTIONS char* cceGetCurrentPath (size_t spaceToLeave)
 {
-   return getcwd(pathBuffer, pathBufferLength);
+   char *path;
+   size_t pathLength;
+   for (size_t i = 1;; ++i)
+   {
+      pathLength = DEFAULT_PATH_LENGTH * i;
+      path = malloc(pathLength);
+      if (getcwd(path, pathLength) != NULL)
+         break;
+
+      free(path);
+      switch (errno)
+      {
+         case ERANGE:
+            errno = 0;
+            continue;
+         default:
+            return NULL;
+      }
+   }
+   return realloc(path, strnlen(path, pathLength) + 1 + spaceToLeave);
 }
 
 CCE_PUBLIC_OPTIONS char* cceGetDirectory (char *path, size_t bufferSize)
@@ -179,7 +200,7 @@ CCE_PUBLIC_OPTIONS char* cceGetDirectory (char *path, size_t bufferSize)
    size_t symbolsRemaining = bufferSize - (length + 1u);
    for (size_t symbolsQuantity = 1u; symbolsQuantity <= symbolsRemaining; ++symbolsQuantity)
    {
-      for (size_t number = 0u; number < (1 << (symbolsQuantity * 6u)); ++number)
+      for (size_t number = 0u; number < (((size_t) 1) << (symbolsQuantity * 6u)); ++number)
       {
          cceConvertIntToBase64String(number, path + length, symbolsQuantity);
          *(path + length + symbolsQuantity) = '\0';
@@ -237,7 +258,6 @@ CCE_PUBLIC_OPTIONS char* cceGetDirectory (char *path, size_t bufferSize)
 CCE_PUBLIC_OPTIONS char* cceGetAppDataPath (const char *restrict folderName, size_t spaceToLeave)
 {
    struct stat st;
-   int statState;
    char *restrict appDataPath;
    const char *restrict path = getenv("XDG_DATA_HOME");
    size_t pathLength, folderNameLength = strlen(folderName);
@@ -402,10 +422,12 @@ static char* getErrorMessage (DWORD error)
    return errorString;
 }
 
-CCE_PUBLIC_OPTIONS char* cceGetCurrentPath (char *pathBuffer, size_t pathBufferLength)
+CCE_PUBLIC_OPTIONS char* cceGetCurrentPath (size_t spaceToLeave)
 {
-   GetCurrentDirectoryA(pathBufferLength, pathBuffer);
-   return pathBuffer;
+   size_t size = (spaceToLeave + MAX_PATH) * sizeof(char);
+   char *path = malloc(size);
+   GetCurrentDirectoryA(size, path);
+   return realloc(path, strnlen(path, size) + 1 + spaceToLeave);
 }
 
 CCE_PUBLIC_OPTIONS char* cceGetDirectory (char *path, size_t bufferSize)

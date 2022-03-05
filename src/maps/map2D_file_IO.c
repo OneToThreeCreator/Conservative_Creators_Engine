@@ -23,12 +23,6 @@
 #include <stddef.h>
 
 #include <string.h>
-#if defined(_WIN32) || defined(__WIN32__) || defined(_WIN64) || defined(__TOS_WIN__) || defined(__WINDOWS__) || \
-      defined(__MINGW32__) || defined(__MINGW64__) || defined(__CYGWIN__)
-#include <malloc.h>
-#else
-#include <alloca.h>
-#endif
 
 #include "../engine_common.h"
 #include "../engine_common_internal.h"
@@ -39,16 +33,16 @@
 
 static char *mapPath = NULL;
 size_t mapPathLength;
+const cce_flag *map2Dflags;
 
 static void (*cce_fileParseFunc)(FILE*, uint16_t);
 static void (*cce_callbackOnFreeing)(uint16_t);
-static void (***cce_actions)(void*);
 static GLuint g_EBO;
 
-void cce__initMap2DLoaders (void (***doAction)(void*), GLuint EBO)
+void cce__initMap2DLoaders (GLuint EBO, const cce_flag *flagsPointer)
 {
-   cce_actions = doAction;
    g_EBO = EBO;
+   map2Dflags = flagsPointer;
 }
 
 CCE_PUBLIC_OPTIONS void cceSetMap2Dpath (const char *path)
@@ -230,9 +224,9 @@ static GLuint makeVAOmap2D (struct Map2DElement *elements, uint32_t elementsQuan
    struct Map2DElementVertices *vertices = glMapBuffer(GL_ARRAY_BUFFER, GL_WRITE_ONLY);
    GL_CHECK_ERRORS;
    for (struct Map2DElement *iterator = elements, *end = elements + elementsQuantity; iterator < end;
-        ++iterator, ++moveGroups, ++extensionGroups, ++globalOffsets, vertices += 4)
+        ++iterator, moveGroups += 4, extensionGroups += 4, ++globalOffsets, vertices += 4)
    {
-      cce__map2DElementToMap2DElementVertices(vertices, iterator, *moveGroups, *globalOffsets, *extensionGroups);
+      cce__map2DElementToMap2DElementVertices(vertices, iterator, moveGroups, extensionGroups, *globalOffsets);
    }
    glUnmapBuffer(GL_ARRAY_BUFFER);
    GL_CHECK_ERRORS;
@@ -247,6 +241,8 @@ static GLuint makeVAOmap2D (struct Map2DElement *elements, uint32_t elementsQuan
    return VAO;
 }
 
+//#define ADD_TO_2BIT_ARRAY(array, i, number) ((array)[(i) >> (SHIFT_OF_FAST_SIZE - 1)] += ((number) << ((i) & ((1 << (SHIFT_OF_FAST_SIZE - 1)) - 1))))
+//#define GET_VALUE_FROM_2BIT_ARRAY(array, i)(((array)[(i) >> (SHIFT_OF_FAST_SIZE - 1)] >> ((i) & ((1 << (SHIFT_OF_FAST_SIZE - 1)) - 1))) & 3)
 static void convertCCEgroupsToGLgroups (uint16_t groupsQuantity, struct ElementGroup *groups, uint8_t *glGroups, uint8_t glGroupsStep, uint32_t elementsWithoutColliderQuantity, uint32_t elementsQuantity)
 {
    uint8_t i = 1u;
@@ -258,7 +254,14 @@ static void convertCCEgroupsToGLgroups (uint16_t groupsQuantity, struct ElementG
       {
          if ((*j) < elementsQuantity)
          {
-            (*(glGroups + (*j) * glGroupsStep)) = i;
+            for (uint8_t *iterator = glGroups + (*j) * glGroupsStep * 4, *iend = glGroups + (*j) * glGroupsStep * 4 + 4; iterator < iend; ++iterator)
+            {
+               if (*iterator == 0)
+               {
+                  *iterator = i;
+                  break;
+               }
+            }
          }
          if (*j < elementsWithoutColliderQuantity)
          {
@@ -293,7 +296,7 @@ static void offsetCCEgroupsFromElementsToColliders (uint16_t groupsQuantity, str
    uint32_t offset = 0u;
    while (groups < end)
    {
-      if (groups->elementsQuantity) for (uint32_t *iterator = groups->elementIDs, *end = (groups->elementIDs + groups->elementsQuantity); iterator < end; ++iterator)
+      if (groups->elementsQuantity) for (uint32_t *iterator = groups->elementIDs, *iend = (groups->elementIDs + groups->elementsQuantity); iterator < iend; ++iterator)
       {
          if (*iterator < elementsWithoutColliderQuantity)
          {
@@ -334,10 +337,10 @@ static struct Map2DCollider* elementsToColliders (uint32_t  elementsQuantity, ui
                                                   GLuint *VAO, GLuint *VBO)
 {
    *texturesMapReliesOn = cce__loadTexturesMap2D(elements, elementsQuantity, texturesMapReliesOnQuantity);
-   elements = (struct Map2DElement*) realloc(elements, (sizeof(struct Map2DElement) + 3u * sizeof(uint8_t)) * elementsQuantity);
+   elements = (struct Map2DElement*) realloc(elements, (sizeof(struct Map2DElement) + (2 * 4 + 1) * sizeof(uint8_t)) * elementsQuantity);
    uint8_t *glGroups = (uint8_t*) ((void*) (elements + elementsQuantity));
-   memset(glGroups, 0, elementsQuantity * (3u * sizeof(uint8_t)));
-   uint32_t currentElement = 0u;
+   memset(glGroups, 0, elementsQuantity * ((2 * 4 + 1) * sizeof(uint8_t)));
+   uint32_t currentElement = 0;
    if (moveGroups)
    {
       if (moveGroups->elementsQuantity) for (uint32_t *exclude = moveGroups->elementIDs, *excludeEnd = moveGroups->elementIDs + moveGroups->elementsQuantity;
@@ -360,9 +363,9 @@ static struct Map2DCollider* elementsToColliders (uint32_t  elementsQuantity, ui
       ++currentElement;
    }
    if (extensionGroups)
-      convertCCEgroupsToGLgroups(extensionGroupsQuantity, extensionGroups, glGroups + (elementsQuantity * (2 * sizeof(uint8_t))), 1, elementsWithoutColliderQuantity, elementsQuantity);
+      convertCCEgroupsToGLgroups(extensionGroupsQuantity, extensionGroups, glGroups + (elementsQuantity * (5 * sizeof(uint8_t))), 1, elementsWithoutColliderQuantity, elementsQuantity);
       
-   *VAO = makeVAOmap2D(elements, elementsQuantity, glGroups + (elementsQuantity * sizeof(uint8_t)), glGroups + (elementsQuantity * (2u * sizeof(uint8_t))), glGroups, VBO);
+   *VAO = makeVAOmap2D(elements, elementsQuantity, glGroups + (elementsQuantity * sizeof(uint8_t)), glGroups + (elementsQuantity * 5 * sizeof(uint8_t)), glGroups, VBO);
    
    if (moveGroups && moveGroupsQuantity > 256u)
       offsetCCEgroupsFromElementsToColliders(moveGroupsQuantity - 256u, moveGroups + 256u, elementsWithoutColliderQuantity);
@@ -413,8 +416,6 @@ struct Map2D* cceLoadMap2D (uint16_t number)
          map->extensionGroups = cce__loadGroups(map->extensionGroupsQuantity, map_f);
          colliders = elementsToColliders(map->elementsQuantity, elementsWithoutColliderQuantity, elements, &(map->texturesMapReliesOn), &(map->texturesMapReliesOnQuantity),
                                          map->moveGroupsQuantity, map->moveGroups, map->extensionGroupsQuantity, map->extensionGroups,  &(map->VAO), &(map->VBO));
-         
-         map->UBO_ID = cce__getFreeUBO();
       }
       else
       {
@@ -470,28 +471,21 @@ struct Map2D* cceLoadMap2D (uint16_t number)
       map->logic = NULL;
    }
    
-   uint8_t staticActionsQuantity;
-   fread(&(staticActionsQuantity), 1u, 1u, map_f);
-   if (staticActionsQuantity)
+   fread(&(map->staticActionsQuantity), 1u, 1u, map_f);
+   if (map->staticActionsQuantity)
    {
-      cce__beginBaseActions(map);
-      uint32_t *staticActionsIDs = (uint32_t *) malloc(staticActionsQuantity * sizeof(uint32_t));
-      fread(staticActionsIDs, 4u, staticActionsQuantity, map_f);
-      uint32_t *staticActionsArgOffsets = (uint32_t *) malloc((staticActionsQuantity + 1u) * sizeof(uint32_t));
-      fread(staticActionsArgOffsets + 1, 4u, staticActionsQuantity, map_f);
-      *staticActionsArgOffsets = 0u;
-      cce_void *staticActionsArgs = (cce_void *) malloc((*(staticActionsArgOffsets + staticActionsQuantity)) * sizeof(uint8_t));
-      fread( (staticActionsArgs), 1u, *(staticActionsArgOffsets + staticActionsQuantity), map_f);
-      if (map->logicQuantity)
+      map->staticActionIDs = (uint32_t *) malloc(map->staticActionsQuantity * sizeof(uint32_t));
+      fread(map->staticActionIDs, 4u, map->staticActionsQuantity, map_f);
+      map->staticActionArgOffsets = (uint32_t *) malloc((map->staticActionsQuantity + 1u) * sizeof(uint32_t));
+      fread(map->staticActionArgOffsets + 1, 4u, map->staticActionsQuantity, map_f);
+      *(map->staticActionArgOffsets) = 0u;
+      map->staticActionArgs = (cce_void *) malloc((*(map->staticActionArgOffsets + map->staticActionsQuantity)) * sizeof(uint8_t));
+      fread( (map->staticActionArgs), 1u, *(map->staticActionArgOffsets + map->staticActionsQuantity), map_f);
+
+      if (*map2Dflags & (CCE_PROCESS_LOGIC_FOR_CLOSEST_MAP | CCE_PROCESS_LOGIC_FOR_ALL_MAPS | CCE_FORCE_INITIALIZE_MAP_ONLOAD))
       {
-         cce__setCurrentTemporaryBools(map->temporaryBools);
+         cce__initLogicMap2D(map);
       }
-      cce__callActions(*cce_actions, staticActionsQuantity, staticActionsIDs, staticActionsArgOffsets, staticActionsArgs);
-      
-      free(staticActionsIDs);
-      free(staticActionsArgOffsets);
-      free(staticActionsArgs);
-      cce__endBaseActions();
    }
    fread(&(map->exitMapsQuantity), 1u, 1u, map_f);
    if (map->exitMapsQuantity)
@@ -564,14 +558,16 @@ struct Map2D* cceMap2DdevToMap2D (struct Map2Ddev *mapdev)
       {
          colliders = elementsToColliders(mapdev->elementsQuantity, mapdev->elementsWithoutColliderQuantity, elements, &(map->texturesMapReliesOn), &(map->texturesMapReliesOnQuantity),
                                          mapdev->moveGroupsQuantity, map->moveGroups, mapdev->extensionGroupsQuantity, map->extensionGroups, &(map->VAO), &(map->VBO));
-         
-         map->UBO_ID = cce__getFreeUBO();
       }
       map->collidersQuantity = elementsCollidersQuantity + mapdev->collidersQuantity;
-      map->colliders = (struct Map2DCollider*) realloc(colliders, (map->collidersQuantity) * sizeof(struct Map2DCollider));
       if (mapdev->collidersQuantity)
       {
+         map->colliders = (struct Map2DCollider*) realloc(colliders, (map->collidersQuantity) * sizeof(struct Map2DCollider));
          memcpy(map->colliders + elementsCollidersQuantity, mapdev->colliders, mapdev->collidersQuantity * sizeof(struct Map2DCollider));
+      }
+      else
+      {
+         free(colliders);
       }
    }
    map->collisionGroupsQuantity = mapdev->collisionGroupsQuantity;
@@ -644,7 +640,6 @@ struct Map2D* cceMap2DdevToMap2D (struct Map2Ddev *mapdev)
          dest->actionsArg = (cce_void *) malloc((*(src->actionsArgOffsets + src->actionsQuantity) - 1u)/* sizeof(cce_void)*/);
          memcpy(dest->actionsArg, src->actionsArg, (*(src->actionsArgOffsets + src->actionsQuantity) - 1u)/* sizeof(cce_void)*/);
       }
-      map->temporaryBools = cce__getFreeTemporaryBools();
    }
    else
    {
@@ -652,13 +647,17 @@ struct Map2D* cceMap2DdevToMap2D (struct Map2Ddev *mapdev)
    }
    if (mapdev->actionsQuantity)
    {
-      if (mapdev->logicQuantity)
+      map->staticActionIDs = malloc(mapdev->actionsQuantity * sizeof(uint32_t));
+      memcpy(map->staticActionIDs, mapdev->actionIDs, mapdev->actionsQuantity * sizeof(uint32_t));
+      map->staticActionArgOffsets = malloc((mapdev->actionsQuantity + 1) * sizeof(uint32_t));
+      memcpy(map->staticActionArgOffsets, mapdev->actionsArgOffsets, (mapdev->actionsQuantity + 1) * sizeof(uint32_t));
+      map->staticActionArgs = malloc(*(mapdev->actionsArgOffsets + mapdev->actionsQuantity) * sizeof(cce_void));
+      memcpy(map->staticActionArgs, mapdev->actionsArg, *(mapdev->actionsArgOffsets + mapdev->actionsQuantity) * sizeof(cce_void));
+
+      if (*map2Dflags & (CCE_PROCESS_LOGIC_FOR_CLOSEST_MAP | CCE_PROCESS_LOGIC_FOR_ALL_MAPS | CCE_FORCE_INITIALIZE_MAP_ONLOAD))
       {
-         cce__setCurrentTemporaryBools(map->temporaryBools);
+         cce__initLogicMap2D(map);
       }
-      cce__beginBaseActions(map);
-      cce__callActions(*cce_actions, mapdev->actionsQuantity, mapdev->actionIDs, mapdev->actionsArgOffsets, mapdev->actionsArg);
-      cce__endBaseActions();
    }
    map->exitMapsQuantity = mapdev->exitMapsQuantity;
    if (mapdev->exitMapsQuantity)

@@ -40,10 +40,12 @@ extern C:
 #define CCE_RENDER_ONLY_CURRENT_MAP            0x001
 #define CCE_RENDER_CLOSEST_MAP                 0x002
 #define CCE_RENDER_ALL_LOADED_MAPS             0x003
-#define CCE_PROCESS_LOGIC_ONLY_FOR_CURRENT_MAP 0x004
+#define CCE_PROCESS_LOGIC_ONLY_FOR_CURRENT_MAP 0x000 // default
+#define CCE_DONT_PROCESS_LOGIC                 0x004
 #define CCE_PROCESS_LOGIC_FOR_CLOSEST_MAP      0x008
 #define CCE_PROCESS_LOGIC_FOR_ALL_MAPS         0x00C
-#define CCE_DEFAULT CCE_RENDER_CLOSEST_MAP | CCE_PROCESS_LOGIC_ONLY_FOR_CURRENT_MAP
+#define CCE_FORCE_INITIALIZE_MAP_ONLOAD        0x010
+#define CCE_DEFAULT (CCE_RENDER_CLOSEST_MAP | CCE_PROCESS_LOGIC_ONLY_FOR_CURRENT_MAP)
 
 typedef uint_fast32_t cce_flag;
 
@@ -79,14 +81,9 @@ struct Map2DElement
    uint16_t width;
    uint16_t height;
    struct Texture textureInfo;
-   // Vertex shader
-// uint8_t moveGroup;          // 0 is unmovable
-// uint8_t extensionGroup;     // 0 is unscalable
-   // Geometry shader
-   uint8_t rotateGroup;        // 0 is unrotatable
-   // Fragment shader
-   uint8_t textureOffsetGroup; // 0 is texture (more precisely - texture piece) unchangeable
-   uint8_t colorGroup;         // 0 is color unchangable
+   uint8_t textureOffsetGroups[4]; // 0 is texture (more precisely - texture piece) unchangeable
+   uint8_t colorGroups[4];         // 0 is color unchangable
+   uint8_t rotateGroup;           // 0 is unrotatable
 };
 
 struct Map2DElementDev
@@ -96,15 +93,12 @@ struct Map2DElementDev
    uint16_t width;
    uint16_t height;
    struct Texture textureInfo;
-   // Vertex shader
-   uint8_t moveGroup;          // 0 is unmovable
+   uint8_t moveGroups[4];          // 0 is unmovable
+   uint8_t extensionGroups[4];     // 0 is unscalable
+   uint8_t textureOffsetGroups[4]; // 0 is texture (more precisely - texture piece) unchangeable
+   uint8_t colorGroups[4];         // 0 is color unchangable
+   uint8_t rotateGroup;            // 0 is unrotatable
    uint8_t isGlobalOffset;
-   uint8_t extensionGroup;     // 0 is unscalable
-   // Geometry shader
-   uint8_t rotateGroup;        // 0 is unrotatable
-   // Fragment shader
-   uint8_t textureOffsetGroup; // 0 is texture (more precisely - texture piece) unchangeable
-   uint8_t colorGroup;         // 0 is color unchangable
 };
 
 struct Map2D
@@ -119,6 +113,9 @@ struct Map2D
    struct ElementLogic   *logic;
    struct ExitMap2D      *exitMaps;
    uint16_t              *texturesMapReliesOn;
+   uint32_t              *staticActionIDs;
+   uint32_t              *staticActionArgOffsets;
+   cce_void              *staticActionArgs;
    
    uint32_t VAO;
    uint32_t VBO;
@@ -138,6 +135,7 @@ struct Map2D
    uint16_t texturesMapReliesOnQuantity;
    
    uint8_t  exitMapsQuantity;
+   uint8_t  staticActionsQuantity;
 };
 
 struct Map2Ddev
@@ -191,8 +189,10 @@ CCE_PUBLIC_OPTIONS struct Map2DCollider cceGetColliderDataDynamicMap2D (uint32_t
 CCE_PUBLIC_OPTIONS struct CollisionGroup cceGetCollisionDataDynamicMap2D (uint16_t ID);
 CCE_PUBLIC_OPTIONS uint8_t cceCreateGroupDynamicMap2D (cce_enum group_type, uint16_t elementsQuantity, uint32_t *elementIDs, uint16_t *emptyGroupID);
 CCE_PUBLIC_OPTIONS uint8_t cceAddElementInGroupDynamicMap2D (cce_enum group_type, uint16_t ID, uint32_t elementID);
+CCE_PUBLIC_OPTIONS uint8_t cceAddElementInGroupVisibleDynamicMap2D (cce_enum group_type, uint16_t ID, uint32_t elementID);
 CCE_PUBLIC_OPTIONS void cceReplaceMap2DElementDynamicMap2D (struct Map2DElementDev *element, uint32_t ID, uint8_t hasCollider, uint8_t isCurrentPosition);
 CCE_PUBLIC_OPTIONS uint32_t cceCreateMap2DElementDynamicMap2D (struct Map2DElementDev *element, uint8_t hasCollider, uint8_t isCurrentPosition);
+CCE_PUBLIC_OPTIONS uint8_t cceDeleteGroupVisibilityFromElementDynamicMap2D (cce_enum group_type, uint16_t ID, uint32_t elementID);
 CCE_PUBLIC_OPTIONS uint8_t cceDeleteElementFromGroupDynamicMap2D (cce_enum group_type, uint16_t ID, uint32_t elementID);
 CCE_PUBLIC_OPTIONS void cceDeleteMap2DElementDynamicMap2D (uint32_t ID);
 CCE_PUBLIC_OPTIONS uint8_t cceDeleteGroupDynamicMap2D (cce_enum group_type, uint16_t ID);

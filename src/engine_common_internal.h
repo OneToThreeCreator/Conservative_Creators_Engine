@@ -25,8 +25,11 @@
 //#include "audio.h"
 #include "external/glad.h"
 
-// Can only be a power of 2
+#if !defined(CCE_ALLOCATION_STEP)
 #define CCE_ALLOCATION_STEP 8u
+#elif ((CCE_ALLOCATION_STEP) & ((CCE_ALLOCATION_STEP) - 1)) != 0
+#error "CCE_ALLOCATION_STEP must be a power of 2"
+#endif
 
 // Some default resolutions for different aspect ratios
 #define CCE_DEFAULT_WINDOW_WIDTH        800u
@@ -66,9 +69,11 @@
 #define MACRO_TO_STR_IMPL(x) #x 
 #define MACRO_TO_STR(x) MACRO_TO_STR_IMPL(x)
 
+#define CCE_CEIL_SIZE_TO_ALLOCATION_STEP(s) ((s & ~(CCE_ALLOCATION_STEP - 1u)) + CCE_ALLOCATION_STEP * ((s & (CCE_ALLOCATION_STEP - 1u)) > 0))
+
 struct UsedTemporaryBools
 {
-   uint8_t flags; /* 0x1 - used, 0x4 - to be cleared */
+   uint8_t flags; /* 0x1 - used, 0x2 - to be cleared */
    uint_fast16_t *temporaryBools;
 };
 

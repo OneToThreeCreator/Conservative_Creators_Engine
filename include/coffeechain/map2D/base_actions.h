@@ -70,8 +70,9 @@ struct rotateActionStruct
    int32_t xOffset;
    int32_t yOffset;
    uint8_t groupID;
+   cce_enum action;
    cce_enum mapType;
-   uint16_t __pad;
+   uint8_t __pad;
 };
 
 struct offsetTextureActionStruct
@@ -150,7 +151,7 @@ CCE_PUBLIC_OPTIONS void  cceMoveGlobalOffsetGroupMap2D (int32_t x, int32_t y, cc
 CCE_PUBLIC_OPTIONS void  cceMoveGroupMap2D (uint16_t groupID, int32_t x, int32_t y, cce_enum actionType, cce_enum mapType);
 CCE_PUBLIC_OPTIONS void  cceExtendGroupMap2D (uint16_t groupID, int32_t x, int32_t y, cce_enum actionType, cce_enum mapType);
 CCE_PUBLIC_OPTIONS float cceNormalizeAngle (float angleInDegrees);
-CCE_PUBLIC_OPTIONS void  cceRotateGroupMap2D (uint8_t groupID, float normalizedAngle, int32_t xOffset, int32_t yOffset, cce_enum mapType);
+CCE_PUBLIC_OPTIONS void  cceRotateGroupMap2D (uint8_t groupID, float normalizedAngle, int32_t xOffset, int32_t yOffset, cce_enum actionType, cce_enum mapType);
 CCE_PUBLIC_OPTIONS void  cceOffsetTextureGroupMap2D (uint8_t groupID, int32_t offsetX, int32_t offsetY, cce_enum mapType);
 CCE_PUBLIC_OPTIONS void  cceChangeColorGroupMap2D (uint8_t groupID, float r, float g, float b, float a, cce_enum mapType);
 
