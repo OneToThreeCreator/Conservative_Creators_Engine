@@ -72,8 +72,6 @@ CCE_PUBLIC_OPTIONS void cceFreeMap2D (struct Map2D *map)
       glDeleteVertexArrays(1u, &(map->VAO));
    if (map->VBO)
       glDeleteBuffers(1u, &(map->VBO));
-   if (map->elementsQuantity)
-      cce__releaseUBO(map->UBO_ID);
    if (map->collidersQuantity)
       free(map->colliders);
    if (map->moveGroupsQuantity)
@@ -136,9 +134,10 @@ CCE_PUBLIC_OPTIONS void cceFreeMap2D (struct Map2D *map)
       }
       cce_callbackOnFreeing(map->ID);
    }
-   if (map->logicQuantity)
+   if (*map2Dflags & (CCE_PROCESS_LOGIC_FOR_CLOSEST_MAP | CCE_PROCESS_LOGIC_FOR_ALL_MAPS | CCE_FORCE_INITIALIZE_MAP_ONLOAD))
    {
       cce__releaseTemporaryBools(map->temporaryBools);
+      cce__releaseUBO(map->UBO_ID);
    }
    free(map);
 }

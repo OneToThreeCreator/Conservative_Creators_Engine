@@ -174,15 +174,15 @@ int main (int argc, char **argv)
       }
    }
    const uint32_t globalBoolsQuantity = 32768;
-   if (cceInitEngine2D(globalBoolsQuantity, 16, 16, "CoffeeChain TEST", path) != 0)
+   if (cceInitEngine2D(globalBoolsQuantity, 16, 16, "CoffeeChain TEST", path, CCE_RENDER_CLOSEST_MAP | CCE_PROCESS_LOGIC_ONLY_FOR_CURRENT_MAP |
+                       CCE_FORCE_INITIALIZE_MAP_ONLOAD) != 0)
    {
+      free(path);
       return -1;
    }
    cceAppendPath(path, pathLength + 16, "test2/textures");
    cceSetTexturesPath(path);
    free(path);
-
-   cceSetFlags2D(CCE_RENDER_CLOSEST_MAP | CCE_PROCESS_LOGIC_ONLY_FOR_CURRENT_MAP | CCE_FORCE_INITIALIZE_MAP_ONLOAD);
    {
       char *path = cceGetTemporaryDirectory(0);
       cceSetMap2Dpath(path);
@@ -191,9 +191,13 @@ int main (int argc, char **argv)
          {1, 0,  24,  13, -11, 13, 0x0},
          {2, 0, -24, -11, -11, 13, 0x2},
       };
+      struct ExitMap2D exitMap0[2] = {
+      {0, 0,  24,  13, -11, 13, 0x0},
+      {0, 0, -24, -11, -11, 13, 0x2},
+   };
       createMap2D(0, 2, exitMaps);
-      createMap2D(1, 0, NULL);
-      createMap2D(2, 0, NULL);
+      createMap2D(1, 1, exitMap0 + 1);
+      createMap2D(2, 1, exitMap0);
    }
    initPlayer(globalBoolsQuantity);
    createAdditionalDynamicElement((struct cce_ivec2) {2, 2}, globalBoolsQuantity);

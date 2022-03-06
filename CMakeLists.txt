@@ -61,7 +61,7 @@ add_library(coffeechain
 
 set_target_properties(coffeechain PROPERTIES 
 	VERSION ${CoffeeChain_VERSION}
-   SOVERSION 2
+   SOVERSION 3
 )
 
 

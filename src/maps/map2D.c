@@ -55,9 +55,10 @@ static uint32_t                   g_elementBufferSize = 0;
 static const struct DynamicMap2D *g_dynamicMap;
 
 static void (*cce_setUniformBufferToDefault)(GLuint, GLint);
-static GLuint shaderProgram;
+static void (*drawMap2Ddependant)(struct Map2D*);
 static GLint *bufferUniformsOffsets;
 static GLint *uniformLocations;
+static GLuint shaderProgram;
 
 static uint32_t actionsQuantity;
 
@@ -94,11 +95,21 @@ static void setUniformBufferToDefault_withoutCBOext (GLuint UBO, GLint RotateAng
    GL_CHECK_ERRORS;
 }
 
-static inline void drawMap2D (struct Map2D *map)
+static void drawMap2D (struct Map2D *map)
 {
    glBindVertexArray(map->VAO);
    GL_CHECK_ERRORS;
    glBindBufferRange(GL_UNIFORM_BUFFER, 1u, (g_UBOs + map->UBO_ID)->UBO, 0u, g_uniformBufferSize);
+   GL_CHECK_ERRORS;
+   glDrawElements(GL_TRIANGLES, map->elementsQuantity * 6, GL_UNSIGNED_INT, (void*) 0);
+   GL_CHECK_ERRORS;
+}
+
+static void drawMap2DcleanUBO (struct Map2D *map)
+{
+   glBindVertexArray(map->VAO);
+   GL_CHECK_ERRORS;
+   glBindBufferRange(GL_UNIFORM_BUFFER, 1u, g_cleanUBO, 0u, g_uniformBufferSize);
    GL_CHECK_ERRORS;
    glDrawElements(GL_TRIANGLES, map->elementsQuantity * 6, GL_UNSIGNED_INT, (void*) 0);
    GL_CHECK_ERRORS;
@@ -116,7 +127,7 @@ static void drawMap2Dnearest (struct Map2Darray *maps)
    drawMap2D(maps->main);
    struct ExitMap2D *exitMap = maps->main->exitMaps + lastNearestMap2D;
    glUniform2i(*(uniformLocations + 2), exitMap->xOffset, exitMap->yOffset);
-   drawMap2D(*(maps->dependies + lastNearestMap2D));
+   drawMap2Ddependant(*(maps->dependies + lastNearestMap2D));
    glUniform2i(*(uniformLocations + 2), 0, 0);
 }
 
@@ -127,7 +138,7 @@ static void drawMap2Dall (struct Map2Darray *maps)
    for (struct Map2D **iterator = maps->dependies, **end = maps->dependies + maps->main->exitMapsQuantity; iterator < end; ++iterator, ++exitMap)
    {
       glUniform2i(*(uniformLocations + 2), exitMap->xOffset, exitMap->yOffset);
-      drawMap2D(*iterator);
+      drawMap2Ddependant(*iterator);
    }
    glUniform2i(*(uniformLocations + 2), 0, 0);
 }
@@ -163,8 +174,9 @@ static void (*processLogicMap2Dcommon) (struct Map2Darray*);
 #define CCE_RENDER_MAP_FLAGS (CCE_RENDER_ONLY_CURRENT_MAP | CCE_RENDER_CLOSEST_MAP | CCE_RENDER_ALL_LOADED_MAPS)
 #define CCE_PROCESS_LOGIC_FLAGS (CCE_PROCESS_LOGIC_ONLY_FOR_CURRENT_MAP | CCE_DONT_PROCESS_LOGIC | \
 CCE_PROCESS_LOGIC_FOR_CLOSEST_MAP | CCE_PROCESS_LOGIC_FOR_ALL_MAPS)
-#define CCE_AVAILABLE_FLAGS (CCE_RENDER_MAP_FLAGS | CCE_PROCESS_LOGIC_FLAGS)
-CCE_PUBLIC_OPTIONS void cceSetFlags2D (cce_flag flags)
+#define CCE_AVAILABLE_FLAGS (CCE_RENDER_MAP_FLAGS | CCE_PROCESS_LOGIC_FLAGS | CCE_FORCE_INITIALIZE_MAP_ONLOAD)
+
+static void cceSetFlags2D (cce_flag flags)
 {
    map2Dflags &= ~CCE_AVAILABLE_FLAGS;
    flags &= CCE_AVAILABLE_FLAGS;
@@ -220,7 +232,22 @@ CCE_PUBLIC_OPTIONS void cceSetFlags2D (cce_flag flags)
          flags |= (CCE_DEFAULT & CCE_PROCESS_LOGIC_FLAGS);
       }
    }
-
+   if ((((flags & CCE_PROCESS_LOGIC_FLAGS) == CCE_PROCESS_LOGIC_ONLY_FOR_CURRENT_MAP) ||
+        ((flags & CCE_PROCESS_LOGIC_FLAGS) == CCE_DONT_PROCESS_LOGIC)) &&
+        ((flags & CCE_FORCE_INITIALIZE_MAP_ONLOAD) == 0))
+   {
+      glGenBuffers(1, &g_cleanUBO);
+      glBindBuffer(GL_UNIFORM_BUFFER, g_cleanUBO);
+      GL_CHECK_ERRORS;
+      glBufferData(GL_UNIFORM_BUFFER, g_uniformBufferSize, NULL, GL_DYNAMIC_DRAW);
+      GL_CHECK_ERRORS;
+      cce_setUniformBufferToDefault(g_cleanUBO, *(bufferUniformsOffsets + CCE_ROTATEANGLESINCOS_OFFSET));
+      drawMap2Ddependant = drawMap2DcleanUBO;
+   }
+   else
+   {
+      drawMap2Ddependant = drawMap2D;
+   }
    map2Dflags |= flags;
 }
 
@@ -247,7 +274,7 @@ CCE_PUBLIC_OPTIONS void cceSetGridMultiplier (float multiplier)
 }
 
 CCE_PUBLIC_OPTIONS int cceInitEngine2D (uint16_t globalBoolsQuantity, uint32_t textureMaxWidth, uint32_t textureMaxHeight,
-                                        const char *windowLabel, const char *resourcePath)
+                                        const char *windowLabel, const char *resourcePath, cce_flag flags)
 {
    if (!resourcePath)
    {
@@ -388,7 +415,7 @@ CCE_PUBLIC_OPTIONS int cceInitEngine2D (uint16_t globalBoolsQuantity, uint32_t t
    *(pathBuffer + pathLength) = '\0';
    g_dynamicMap = cce__initDynamicMap2D(g_EBO);
    cce__baseActionsInit(g_dynamicMap, g_UBOs, bufferUniformsOffsets, uniformLocations, shaderProgram, cce_setUniformBufferToDefault, &g_uniformBufferSize);
-   cceSetFlags2D(CCE_DEFAULT);
+   cceSetFlags2D(flags);
    map2Dflags &= ~CCE_INIT;
    free(pathBuffer);
    glUseProgram(shaderProgram);
@@ -693,12 +720,19 @@ void cce__allocateUBObuffers (uint16_t uboID, uint16_t moveGroupsQuantity, uint1
       ubo->extensionGroupValues = NULL;
    }
    ubo->extensionGroupValuesQuantity = extensionGroupsQuantity;
+
+   if (ubo->flags & 0x2)
+   {
+      cce_setUniformBufferToDefault(ubo->UBO, *(bufferUniformsOffsets + CCE_ROTATEANGLESINCOS_OFFSET));
+      ubo->flags &= 0x1;
+   }
 }
 
 // Gets called before processing of map logic begins
 void cce__initLogicMap2D (struct Map2D *map)
 {
    map->UBO_ID = cce__getFreeUBO();
+   map->temporaryBools = cce__getFreeTemporaryBools();
    cce__allocateUBObuffers(map->UBO_ID, map->moveGroupsQuantity, map->extensionGroupsQuantity);
 
    cce__beginBaseActions(map);
@@ -950,30 +984,36 @@ static struct Map2Darray* loadMap2DwithDependies (struct Map2Darray *maps, uint1
    if (maps->main)
    {
       uint8_t oldExitMapsQuantity = maps->main->exitMapsQuantity;
-      if (maps->main->ID != number)
+      if (maps->main->ID == number)
+         return maps;
+      if ((((map2Dflags & CCE_PROCESS_LOGIC_FLAGS) == CCE_PROCESS_LOGIC_ONLY_FOR_CURRENT_MAP) ||
+           ((map2Dflags & CCE_PROCESS_LOGIC_FLAGS) == CCE_DONT_PROCESS_LOGIC)) &&
+           ((map2Dflags & CCE_FORCE_INITIALIZE_MAP_ONLOAD) == 0))
       {
-         if (maps->dependies)
+         cce__releaseTemporaryBools(maps->main->temporaryBools);
+         cce__releaseUBO(maps->main->UBO_ID);
+      }
+      if (maps->dependies)
+      {
+         for (struct Map2D **iterator = maps->dependies, **end = (maps->dependies + oldExitMapsQuantity - 1u);; ++iterator)
          {
-            for (struct Map2D **iterator = maps->dependies, **end = (maps->dependies + oldExitMapsQuantity - 1u);; ++iterator)
+            if (((*iterator)->ID) == number)
             {
-               if (((*iterator)->ID) == number)
-               {
-                  swapMap2D(&(maps->main), iterator);
-                  break;
-               }
-               if (iterator >= end)
-               {
-                  cceFreeMap2D(maps->main);
-                  maps->main = cceLoadMap2D(number);
-                  break;
-               }
+               swapMap2D(&(maps->main), iterator);
+               break;
+            }
+            if (iterator >= end)
+            {
+               cceFreeMap2D(maps->main);
+               maps->main = cceLoadMap2D(number);
+               break;
             }
          }
-         else
-         {
-            cceFreeMap2D(maps->main);
-            maps->main = cceLoadMap2D(number);
-         }
+      }
+      else
+      {
+         cceFreeMap2D(maps->main);
+         maps->main = cceLoadMap2D(number);
       }
       if (!(maps->main->exitMapsQuantity))
       {
@@ -986,34 +1026,36 @@ static struct Map2Darray* loadMap2DwithDependies (struct Map2Darray *maps, uint1
             free(maps->dependies);
             maps->dependies = NULL;
          }
-         return maps;
       }
-      struct Map2D **dependies = (struct Map2D**) malloc(maps->main->exitMapsQuantity * sizeof(struct Map2D*));
-      struct Map2D **j = dependies;
-      for (struct ExitMap2D *i = maps->main->exitMaps, *iend = (maps->main->exitMaps + maps->main->exitMapsQuantity - 1u); i <= iend; ++i, ++j)
+      else
       {
-         for (struct Map2D **k = maps->dependies, **kend = (maps->dependies + oldExitMapsQuantity);; ++k)
+         struct Map2D **dependies = (struct Map2D**) malloc(maps->main->exitMapsQuantity * sizeof(struct Map2D*));
+         struct Map2D **j = dependies;
+         for (struct ExitMap2D *i = maps->main->exitMaps, *iend = (maps->main->exitMaps + maps->main->exitMapsQuantity); i < iend; ++i, ++j)
          {
-            if (!(*k)) continue;
-            if ((*k)->ID == i->ID)
+            for (struct Map2D **k = maps->dependies, **kend = (maps->dependies + oldExitMapsQuantity);; ++k)
             {
-               (*j) = (*k);
-               (*k) = NULL;
-               break;
-            }
-            if (k >= kend)
-            {
-               (*j) = cceLoadMap2D(i->ID);
-               break;
+               if (k >= kend)
+               {
+                  (*j) = cceLoadMap2D(i->ID);
+                  break;
+               }
+               if ((*k) == NULL) continue;
+               if ((*k)->ID == i->ID)
+               {
+                  (*j) = (*k);
+                  (*k) = NULL;
+                  break;
+               }
             }
          }
+         for (struct Map2D **iterator = maps->dependies, **end = (maps->dependies + oldExitMapsQuantity); iterator < end; ++iterator)
+         {
+            cceFreeMap2D((*iterator));
+         }
+         free(maps->dependies);
+         maps->dependies = dependies;
       }
-      for (struct Map2D **iterator = maps->dependies, **end = (maps->dependies + oldExitMapsQuantity); iterator < end; ++iterator)
-      {
-         cceFreeMap2D((*iterator));
-      }
-      free(maps->dependies);
-      maps->dependies = dependies;
    }
    else
    {
@@ -1028,6 +1070,13 @@ static struct Map2Darray* loadMap2DwithDependies (struct Map2Darray *maps, uint1
       {
          (*iterator) = cceLoadMap2D(exitmap->ID);
       }
+   }
+   cce__setCurrentArrayOfMaps(maps);
+   if ((((map2Dflags & CCE_PROCESS_LOGIC_FLAGS) == CCE_PROCESS_LOGIC_ONLY_FOR_CURRENT_MAP) ||
+        ((map2Dflags & CCE_PROCESS_LOGIC_FLAGS) == CCE_DONT_PROCESS_LOGIC)) &&
+        ((map2Dflags & CCE_FORCE_INITIALIZE_MAP_ONLOAD) == 0))
+   {
+      cce__initLogicMap2D(maps->main);
    }
    return maps;
 }
@@ -1048,7 +1097,7 @@ static inline int getMapBorderDistance (struct ExitMap2D *borderInfo)
       globalOffsetA = -globalOffset[1];
       globalOffsetB = -globalOffset[0];
    }
-   if (globalOffsetB > borderInfo->b1Border && globalOffsetB < borderInfo->b2Border)
+   if (globalOffsetB > borderInfo->b1Border && globalOffsetB <= borderInfo->b2Border)
    {
       if (borderInfo->flags & 0x2)
       {
@@ -1216,7 +1265,6 @@ CCE_PUBLIC_OPTIONS int cceEngine2D (void)
          }
       }
       maps = loadMap2DwithDependies(maps, cceLoadedMap2Dnumber);
-      cce__setCurrentArrayOfMaps(maps);
    }
    for (struct Map2D **iterator = maps->dependies, **end = maps->dependies + maps->main->exitMapsQuantity; iterator < end; ++iterator)
    {

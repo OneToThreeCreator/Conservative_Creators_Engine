@@ -44,7 +44,7 @@ extern C:
 #define CCE_DONT_PROCESS_LOGIC                 0x004
 #define CCE_PROCESS_LOGIC_FOR_CLOSEST_MAP      0x008
 #define CCE_PROCESS_LOGIC_FOR_ALL_MAPS         0x00C
-#define CCE_FORCE_INITIALIZE_MAP_ONLOAD        0x010
+#define CCE_FORCE_INITIALIZE_MAP_ONLOAD        0x040
 #define CCE_DEFAULT (CCE_RENDER_CLOSEST_MAP | CCE_PROCESS_LOGIC_ONLY_FOR_CURRENT_MAP)
 
 typedef uint_fast32_t cce_flag;
@@ -175,8 +175,7 @@ CCE_PUBLIC_OPTIONS void cceFreeMap2Ddev (struct Map2Ddev *map);
 CCE_PUBLIC_OPTIONS struct Map2Ddev* cceLoadMap2Ddev (uint16_t number);
 CCE_PUBLIC_OPTIONS int cceWriteMap2Ddev (struct Map2Ddev *map, void (*writeFunc)(FILE*));
 CCE_PUBLIC_OPTIONS int cceInitEngine2D (uint16_t globalBoolsQuantity, uint32_t textureMaxWidth, uint32_t textureMaxHeight,
-                      const char *windowLabel, const char *resourcePath);
-CCE_PUBLIC_OPTIONS void cceSetFlags2D (cce_flag flags);
+                                        const char *windowLabel, const char *resourcePath, cce_flag flags);
 CCE_PUBLIC_OPTIONS uint8_t cceRegisterAction (uint32_t ID, void (*action)(void*));
 CCE_PUBLIC_OPTIONS void cceSetTexturesPath (const char *path);
 CCE_PUBLIC_OPTIONS int cceEngine2D (void);

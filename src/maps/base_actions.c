@@ -179,12 +179,10 @@ static void endBaseActionsCommon (uint16_t uboID)
    GL_CHECK_ERRORS;
    if (ubo->moveGroupValuesQuantity == 0 && ubo->extensionGroupValuesQuantity == 0)
       return;
-   printf("ubo->moveGroupValues {%i %i}\nmoveOffset == %u\n", ubo->moveGroupValues->x, ubo->moveGroupValues->y, *(g_uniformsOffsets + CCE_MOVEGROUP_OFFSET));
    struct cce_ivec2 *buffer = glMapBufferRange(GL_UNIFORM_BUFFER, *(g_uniformsOffsets + CCE_MOVEGROUP_OFFSET), 2 * sizeof(struct cce_ivec2) * 255,
                                                GL_MAP_WRITE_BIT | (GL_MAP_INVALIDATE_RANGE_BIT * (((ubo->moveGroupValuesQuantity)      >= 255) &&
                                                                                                   ((ubo->extensionGroupValuesQuantity) >= 255))));
    GL_CHECK_ERRORS;
-   //memset(buffer, ubo->moveGroupValues->x, MIN(ubo->moveGroupValuesQuantity, 255) * sizeof(struct cce_ivec2));
    memcpy(buffer, ubo->moveGroupValues, MIN(ubo->moveGroupValuesQuantity, 255) * sizeof(struct cce_ivec2));
    buffer += 255;
    struct
