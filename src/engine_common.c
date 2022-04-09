@@ -27,10 +27,10 @@
 #include "engine_common.h"
 #include "engine_common_internal.h"
 #include "shader.h"
-#include "path_getters.h"
+#include "platform/path_getters.h"
 #include "external/stb_image.h"
 
-#include "engine_common_glfw.h"
+#include "platform/engine_common_glfw.h"
 
 struct GlobalVariables
 {
@@ -42,7 +42,7 @@ struct GlobalVariables
 uint16_t      g_globalBoolsQuantity;    /* Quantity of 8-byte variables */
 static struct GlobalVariables cce_Gvars;
 
-static struct alObjects *AL;
+//static struct alObjects *AL;
 
 static struct UsedTemporaryBools *g_temporaryBools;
 static uint16_t                   g_temporaryBoolsQuantity;
@@ -253,7 +253,7 @@ void cce__processLogic (uint32_t logicQuantity, struct ElementLogic *logic, stru
                va_end(argcp);
             }
          }
-         // Some dark portable (probably) magic for checking results and exit earlier if only false or only true is possible (and no other options).
+         // Some portable (probably) magic for checking results and exit earlier if only false or only true is possible (and no other options).
          switch (logic->logicElementsQuantity - 1u - j)
          {
             #if UINT_FAST16_MAX < UINT64_MAX
@@ -393,110 +393,6 @@ CCE_PUBLIC_OPTIONS cce_ubyte cceCheckCollision (int32_t element1_x, int32_t elem
    return 1u;
 }
 
-struct ElementGroup* cce__loadGroups (uint16_t groupsQuantity, FILE *map_f)
-{
-   if (!groupsQuantity)
-   {
-      return NULL;
-   }
-   struct ElementGroup *groups = (struct ElementGroup*) malloc(groupsQuantity * sizeof(struct ElementGroup));
-   for (struct ElementGroup *iterator = groups, *end = (groups + groupsQuantity); iterator < end; ++iterator)
-   {
-      fread(&(iterator->elementsQuantity), 2u/*uint16_t*/, 1u, map_f);
-      if (iterator->elementsQuantity)
-      {
-         iterator->elementIDs = (uint32_t*) malloc(iterator->elementsQuantity * sizeof(uint32_t));
-         fread(iterator->elementIDs, 4u/*uint32_t*/, iterator->elementsQuantity, map_f);
-      }
-      else
-      {
-         iterator->elementIDs = NULL;
-      }
-   }
-   return groups;
-}
-
-void cce__writeGroups (uint16_t groupsQuantity, struct ElementGroup *groups, FILE *map_f)
-{
-   for (struct ElementGroup *iterator = groups, *end = (groups + groupsQuantity); iterator < end; ++iterator)
-   {
-      fwrite(&(iterator->elementsQuantity), 2u/*uint16_t*/, 1u, map_f);
-      if (iterator->elementsQuantity)
-      {
-         fwrite(iterator->elementIDs, 4u/*uint32_t*/, iterator->elementsQuantity, map_f);
-      }
-   }
-}
-
-struct ElementLogic* cce__loadLogic (uint8_t logicQuantity, FILE *map_f)
-{
-   if (!logicQuantity)
-   {
-      return NULL;
-   }
-   struct ElementLogic *logic = (struct ElementLogic*) malloc(logicQuantity * sizeof(struct ElementLogic));
-   struct ElementLogic *end = (logic + logicQuantity);
-
-   uint_fast32_t operationsQuantityInBytes;
-   uint8_t isLogicQuantityHigherThanThree;
-   for (struct ElementLogic *iterator = logic; iterator < end; ++iterator)
-   {
-      fread(&(iterator->logicElementsQuantity), 1u/*uint8_t*/,   1u,                                                        map_f);
-      (iterator->logicElements) = (uint16_t *) malloc((iterator->logicElementsQuantity) * sizeof(uint16_t));
-      fread( (iterator->logicElements),         2u/*uint16_t*/,  (iterator->logicElementsQuantity),                         map_f);
-      
-      isLogicQuantityHigherThanThree = iterator->logicElementsQuantity > 3u;
-      operationsQuantityInBytes = ((0x01 << ((iterator->logicElementsQuantity) - 3u)) * isLogicQuantityHigherThanThree) + (!isLogicQuantityHigherThanThree);
-      (iterator->operations) = (uint_fast16_t*) calloc((operationsQuantityInBytes > sizeof(uint_fast16_t)) ? operationsQuantityInBytes : sizeof(uint_fast16_t), 1u);
-      if (operationsQuantityInBytes > sizeof(uint_fast16_t))
-      {
-         fread( (iterator->operations),         sizeof(uint_fast16_t),     operationsQuantityInBytes >> SHIFT_OF_FAST_SIZE, map_f);
-      }
-      else
-      {
-         fread(iterator->operations,            operationsQuantityInBytes, 1u,                                              map_f);
-      }
-      fread(&(iterator->elementType),           8u/*uint64_t*/,  1u,                                                        map_f);
-      fread(&(iterator->actionsQuantity),       1u/*uint8_t*/,   1u,                                                        map_f);
-      (iterator->actionIDs) = (uint32_t *) malloc((iterator->actionsQuantity) * sizeof(uint32_t));
-      fread( (iterator->actionIDs),             4u/*uint32_t*/,  (iterator->actionsQuantity),                               map_f);
-      (iterator->actionsArgOffsets) = (uint32_t *) malloc((iterator->actionsQuantity + 1u) * sizeof(uint32_t));
-      *(iterator->actionsArgOffsets) = 0u;
-      fread( (iterator->actionsArgOffsets + 1), 4u/*uint32_t*/,  (iterator->actionsQuantity),                               map_f);
-      (iterator->actionsArg) = (cce_void *) malloc(*(iterator->actionsArgOffsets + iterator->actionsQuantity)/* sizeof(cce_void)*/);
-      fread( (iterator->actionsArg),            1u/*cce_void*/, *(iterator->actionsArgOffsets + iterator->actionsQuantity), map_f);
-   }
-   return logic;
-}
-
-void cce__writeLogic (uint8_t logicQuantity, struct ElementLogic *logic, FILE *map_f)
-{
-   struct ElementLogic *end = (logic + logicQuantity - 1u);
-   uint_fast32_t operationsQuantityInBytes;
-   uint8_t isLogicQuantityHigherThanThree;
-   for (struct ElementLogic *iterator = logic; iterator <= end; ++iterator)
-   {
-      fwrite(&(iterator->logicElementsQuantity), 1u/*uint8_t*/,   1u,                                                        map_f);
-      fwrite( (iterator->logicElements),         2u/*uint16_t*/,  (iterator->logicElementsQuantity),                         map_f);
-      
-      isLogicQuantityHigherThanThree = iterator->logicElementsQuantity > 3u;
-      operationsQuantityInBytes = ((0x01 << ((iterator->logicElementsQuantity) - 3u)) * isLogicQuantityHigherThanThree) + (!isLogicQuantityHigherThanThree);
-      if (operationsQuantityInBytes > sizeof(uint_fast16_t))
-      {
-         fwrite( (iterator->operations),         sizeof(uint_fast16_t), operationsQuantityInBytes >> SHIFT_OF_FAST_SIZE,     map_f);
-      }
-      else
-      {
-         fwrite(iterator->operations,            operationsQuantityInBytes, 1u,                                              map_f);
-      }
-      fwrite(&(iterator->elementType),           8u/*uint64_t*/,  1u,                                                        map_f);
-      fwrite(&(iterator->actionsQuantity),       1u/*uint8_t*/,   1u,                                                        map_f);
-      fwrite( (iterator->actionIDs),             4u/*uint32_t*/,  (iterator->actionsQuantity),                               map_f);
-      fwrite( (iterator->actionsArgOffsets + 1), 4u/*uint32_t*/,  (iterator->actionsQuantity),                               map_f);
-      fwrite( (iterator->actionsArg),            1u/*cce_void*/, *(iterator->actionsArgOffsets + iterator->actionsQuantity), map_f);
-   }
-}
-
 CCE_PUBLIC_OPTIONS size_t cceBinarySearch (const void *const array, const size_t arraySize, const size_t typeSize, const size_t step, const size_t value)
 {
    if (!arraySize)
@@ -513,7 +409,7 @@ CCE_PUBLIC_OPTIONS size_t cceBinarySearch (const void *const array, const size_t
    }
    else
    {
-   typeMask = (((size_t) 1u) << typeSize * 8u) - 1u;
+      typeMask = (((size_t) 1u) << typeSize * 8u) - 1u;
    }
    do
    {
@@ -556,7 +452,7 @@ static struct operationsStack* pushToOperationsStack (struct operationsStack *re
    struct operationsStack *currentStack = (struct operationsStack*) malloc(sizeof(struct operationsStack));
    currentStack->operationPriority = priority;
    currentStack->operations = operations;
-   currentStack->flags = operations > 0u;
+   currentStack->flags = operations != NULL;
    currentStack->operation = operation;
    currentStack->prev = stack;
    return currentStack;
@@ -783,7 +679,7 @@ static int compare (const void *a, const void *b)
    return (char_a > char_b) - (char_a < char_b);
 }
 
-/* Parsing string to truth table. Has hardcoced limit to 32 elements (already 512MiB size), bigger amount could not fit into memory while parsing */
+/* Parse string to truth table. Has hardcoced limit - 32 elements (already 512MiB size), bigger quantities might not fit into memory while parsing */
 CCE_PUBLIC_OPTIONS uint_fast16_t* cceParseStringToLogicOperations (const char *const string, uint_fast8_t *const logicQuantity)
 {
    char dictionary[33] = ""; //last is '\0'
@@ -969,6 +865,7 @@ int cce__initEngine (const char *label, uint16_t globalBoolsQuantity)
    g_temporaryBoolsQuantityAllocated = CCE_ALLOCATION_STEP;
    g_globalBoolsQuantity = globalBoolsQuantity;
    cce_Gvars.globalBools  = (uint_fast16_t*) calloc((globalBoolsQuantity >> SHIFT_OF_FAST_SIZE) + ((globalBoolsQuantity & BITWIZE_AND_OF_FAST_SIZE) > 0u), sizeof(uint_fast16_t));
+   cce__initEndianConversion();
    return 0;
 }
 

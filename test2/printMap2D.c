@@ -33,10 +33,13 @@ void printMap2Ddev (struct Map2Ddev *map)
    printf(" %u elements, with %u ones without collider:\n", map->elementsQuantity, map->elementsWithoutColliderQuantity);
    for (struct Map2DElement *iterator = map->elements, *end = map->elements + map->elementsQuantity; iterator < end; ++iterator)
    {
-      printf("  %lu: x: %d, y: %d, width: %u, height: %u, textureCoords: {sx: %f, sy: %f, ex: %f, ey: %f, ID: %u}, rotateGroup: %u, textureOffsetGroup: %u, colorGroup: %u\n",
+      printf("  %lu: x: %d, y: %d, width: %u, height: %u, textureCoords: {sx: %f, sy: %f, ex: %f, ey: %f, ID: %u}, rotateGroup: %u, "
+             "textureOffsetGroup: {%u, %u, %u, %u}, colorGroup: {%u, %u, %u, %u}\n",
       iterator - map->elements, iterator->x, iterator->y, iterator->width, iterator->height,
       iterator->textureInfo.startX, iterator->textureInfo.startY, iterator->textureInfo.endX, iterator->textureInfo.endY, iterator->textureInfo.ID,
-      iterator->rotateGroup, iterator->textureOffsetGroups, iterator->colorGroups);
+      iterator->rotateGroup,
+      iterator->textureOffsetGroups[0], iterator->textureOffsetGroups[1], iterator->textureOffsetGroups[2], iterator->textureOffsetGroups[3],
+      iterator->colorGroups[0], iterator->colorGroups[1], iterator->colorGroups[2], iterator->colorGroups[3]);
    }
    printf(" %u colliders:\n", map->elementsQuantity - map->elementsWithoutColliderQuantity + map->collidersQuantity);
    for (struct Map2DElement *iterator = map->elements + map->elementsWithoutColliderQuantity, *end = map->elements + map->elementsQuantity; iterator < end; ++iterator)
@@ -308,6 +311,11 @@ void printMap2D (struct Map2D *map)
          case 3u:
          {
             arrow = '^';
+            break;
+         }
+         default:
+         {
+            arrow = ' ';
             break;
          }
       }

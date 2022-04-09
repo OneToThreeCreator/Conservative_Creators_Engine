@@ -26,7 +26,7 @@
 
 #include "../engine_common.h"
 #include "../engine_common_internal.h"
-#include "../path_getters.h"
+#include "../platform/path_getters.h"
 #include "map2D.h"
 #include "map2D_internal.h"
 

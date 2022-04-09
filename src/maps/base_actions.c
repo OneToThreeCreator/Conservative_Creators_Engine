@@ -26,7 +26,8 @@
 
 #include "../engine_common.h"
 #include "../shader.h"
-#include "../path_getters.h"
+#include "../platform/endianess.h"
+#include "../platform/path_getters.h"
 #include "map2D.h"
 #include "map2D_internal.h"
 #include "base_actions.h"
@@ -148,6 +149,74 @@ static void loadMap2Daction (void *data)
    }
 }
 
+static void moveActionSwapEndian (void *data)
+{
+   struct moveActionStruct *params = (struct moveActionStruct*) data;
+   cceSwapEndianArrayIntN(&(params->x), 2, 4);
+   params->groupID = cceSwapEndianInt16(params->groupID);
+}
+
+static void extendActionSwapEndian (void *data)
+{
+   struct extendActionStruct *params = (struct extendActionStruct*) data;
+   cceSwapEndianArrayIntN(&(params->x), 2, 4);
+   params->groupID = cceSwapEndianInt16(params->groupID);
+}
+
+static void rotateActionSwapEndian (void *data)
+{
+   struct rotateActionStruct *params = (struct rotateActionStruct*) data;
+   cceSwapEndianArrayIntN(&(params->angle), 3, 4); // Assuming float endianess is the same as int's
+}
+
+static void offsetTextureActionSwapEndian (void *data)
+{
+   struct offsetTextureActionStruct *params = (struct offsetTextureActionStruct*) data;
+   cceSwapEndianArrayIntN(&(params->offsetX), 2, 4);
+}
+
+static void changeColorActionSwapEndian (void *data)
+{
+   struct changeColorActionStruct *params = (struct changeColorActionStruct*) data;
+   cceSwapEndianArrayIntN(&(params->red), 4, 4); // Assuming float endianess is the same as int's
+}
+
+static void setBoolActionSwapEndian (void *data)
+{
+   struct setBoolActionStruct *params = (struct setBoolActionStruct*) data;
+   params->boolID = cceSwapEndianInt16(params->boolID);
+}
+
+static void setPlotNumberActionSwapEndian (void *data)
+{
+   struct setPlotNumberActionStruct *params = (struct setPlotNumberActionStruct*) data;
+   params->value = cceSwapEndianInt16(params->value);
+}
+
+static void startTimerActionSwapEndian (void *data)
+{
+   struct startTimerActionStruct *params = (struct startTimerActionStruct*) data;
+   params->ID = cceSwapEndianInt16(params->ID);
+}
+
+static void setDynamicTimerDelayActionSwapEndian (void *data)
+{
+   struct setDynamicTimerDelayActionStruct *params = (struct setDynamicTimerDelayActionStruct*) data;
+   params->delay = cceSwapEndianInt32(params->delay);
+   params->ID = cceSwapEndianInt16(params->ID);
+}
+
+static void setGridSizeActionSwapEndian (void *data)
+{
+   *((uint32_t*) data) = cceSwapEndianInt32(*(uint32_t*) data);
+}
+
+static void loadMap2DActionSwapEndian (void *data)
+{
+   struct loadMap2DactionStruct *params = (struct loadMap2DactionStruct*) data;
+   params->ID = cceSwapEndianInt16(params->ID);
+}
+
 void cce__beginBaseActions (const struct Map2D *map)
 {
    currentMap = map;
@@ -228,17 +297,17 @@ void cce__baseActionsInit (const struct DynamicMap2D *dynamic_map, struct UsedUB
    g_setUniformBufferToDefault = setUniformBufferToDefault;
    g_uniformBufferSize = uniformBufferSize;
    uniformOffset = *(g_uniformsOffsets + CCE_COLORGROUP_OFFSET);
-   cceRegisterAction(0,  moveAction);
-   cceRegisterAction(1,  extendAction);
-   cceRegisterAction(2,  rotateAction);
-   cceRegisterAction(3,  offsetTextureAction);
-   cceRegisterAction(4,  changeColorAction);
-   cceRegisterAction(5,  setBoolAction);
-   cceRegisterAction(6,  setPlotNumberAction);
-   cceRegisterAction(7,  startTimerAction);
-   cceRegisterAction(8,  setDynamicTimerDelayAction);
-   cceRegisterAction(9,  setGridSizeAction);
-   cceRegisterAction(10, loadMap2Daction);
+   cceRegisterAction(0,  moveAction, moveActionSwapEndian);
+   cceRegisterAction(1,  extendAction, extendActionSwapEndian);
+   cceRegisterAction(2,  rotateAction, rotateActionSwapEndian);
+   cceRegisterAction(3,  offsetTextureAction, offsetTextureActionSwapEndian);
+   cceRegisterAction(4,  changeColorAction, changeColorActionSwapEndian);
+   cceRegisterAction(5,  setBoolAction, setBoolActionSwapEndian);
+   cceRegisterAction(6,  setPlotNumberAction, setPlotNumberActionSwapEndian);
+   cceRegisterAction(7,  startTimerAction, startTimerActionSwapEndian);
+   cceRegisterAction(8,  setDynamicTimerDelayAction, setDynamicTimerDelayActionSwapEndian);
+   cceRegisterAction(9,  setGridSizeAction, setGridSizeActionSwapEndian);
+   cceRegisterAction(10, loadMap2Daction, loadMap2DActionSwapEndian);
 }
 
 static inline void moveElements (int32_t *firstElementX, int32_t *firstElementY, ptrdiff_t step, struct ElementGroup *group, int32_t x, int32_t y)

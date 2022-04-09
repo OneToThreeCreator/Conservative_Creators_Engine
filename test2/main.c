@@ -27,6 +27,8 @@
 #include <coffeechain/map2D/map2D.h>
 #include <coffeechain/path_getters.h>
 
+#include "printMap2D.h"
+
 static void initPlayer (uint32_t globalBoolsQuantity)
 {
    struct Map2DElementDev player = {-1, -1, 1, 2, {0.5625f, 0.0f, 1.0f, 1.0f, 1}, {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, 0, 0};

@@ -20,8 +20,8 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include "engine_common.h"
-#include "engine_common_internal.h"
+#include "../engine_common.h"
+#include "../engine_common_internal.h"
 #include <GLFW/glfw3.h>
 
 #define CCE_FULLSCREEN 0x10

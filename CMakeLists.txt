@@ -20,7 +20,7 @@
 
 cmake_minimum_required(VERSION 3.13)
 
-project(CoffeeChain VERSION 0.2 DESCRIPTION "open 2D engine for creating games - shared library" LANGUAGES C)
+project(CoffeeChain VERSION 0.3 DESCRIPTION "open 2D engine for creating games - shared library" LANGUAGES C)
 
 option(CoffeeChain_BUILD_SHARED_LIBS     "Build CoffeeChain as shared library" ON)
 option(CoffeeChain_BUILD_TESTING         "Build CoffeeChain test program" ON)
@@ -33,20 +33,24 @@ find_package(glfw3 3.3 REQUIRED)
 add_library(coffeechain
    #src/audio.c
    #src/audio.h
-   src/engine_common.c
-   include/coffeechain/engine_common.h
-   src/engine_common_internal.h
-   src/engine_common_glfw.c
-   src/engine_common_glfw.h
-   src/path_getters.c
-   src/path_getters.h
    src/shader.c
    src/shader.h
+   src/engine_common.c
+   src/engine_common_file_IO.c
+   src/engine_common.h
+   src/engine_common_internal.h
+   src/platform/engine_common_glfw.c
+   src/platform/engine_common_glfw.h
+   src/platform/path_getters.c
+   src/platform/path_getters.h
+   src/platform/platforms.h
+   src/platform/endianess.c
+   src/platform/endianess.h
    src/maps/base_actions.c
-   include/coffeechain/map2D/base_actions.h
+   src/maps/base_actions.h
    src/maps/dynamic_map2D.c
    src/maps/map2D.c
-   include/coffeechain/map2D/map2D.h
+   src/maps/map2D.h
    src/maps/map2D_internal.h
    src/maps/map2D_file_IO.c
    src/maps/log.c
@@ -61,7 +65,7 @@ add_library(coffeechain
 
 set_target_properties(coffeechain PROPERTIES 
 	VERSION ${CoffeeChain_VERSION}
-   SOVERSION 3
+   SOVERSION 1
 )
 
 
@@ -105,6 +109,7 @@ if(CoffeeChain_BUILD_TESTING)
    add_executable(coffeechain-test2
       test2/main.c
       test2/printMap2D.c
+      test2/printMap2D.h
    )
    target_include_directories(coffeechain-test1
       PRIVATE include

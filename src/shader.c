@@ -23,7 +23,7 @@
 #include <string.h>
 
 #include "shader.h"
-#include "path_getters.h"
+#include "platform/path_getters.h"
 
 #undef NDEBUG
 /* There is EPIC workaround to set defines in GLSL at runtime */
@@ -51,7 +51,7 @@ unsigned int makeVFshaderProgram  (const char *const vertexPath, const char *con
       fprintf(stderr, "OPENGL::SHADER::FRAGMENT::FAILED_TO_LOAD:\n%s\n", fragmentPath);
       goto FINAL;
    }
-   shaderModifiedSrc = addStringsInShader(shadersVersion, vertexShaderAdditionalString, shaderSrc);
+   shaderModifiedSrc = addStringsInShader(shadersVersion, fragmentShaderAdditionalString, shaderSrc);
    free(shaderSrc);
    fragmentShader = compileShader(shaderModifiedSrc, GL_FRAGMENT_SHADER);
    free(shaderModifiedSrc);

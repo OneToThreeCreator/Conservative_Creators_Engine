@@ -28,7 +28,7 @@ extern C:
 {
 #endif // __cplusplus
 
-#if defined(_WIN32) || defined(__WIN32__) || defined(WIN32) || defined(_WIN64) || defined(__TOS_WIN__) || defined(__WINDOWS__) ||  \
+#if defined(_WIN32) || defined(__WIN32__) || defined(WIN32) || defined(_WIN64) || defined(__TOS_WIN__) || defined(__WINDOWS__) || \
     defined(__MINGW32__) || defined(__MINGW64__) || defined(__CYGWIN__)
 #include "cce_exports.h"
 #define CCE_PUBLIC_OPTIONS CCE_EXPORTS
@@ -43,7 +43,7 @@ extern C:
 #define CCE_SHIFT CCE_SWITCH_BOOL
 
 /*
-   Every structure here has 32-bit alignment. Using 64-bit aligned structure is not recommended, due to possibility of misaligned reading
+   Every structure here has 32-bit alignment. Using 64-bit aligned structures is not recommended, due to a possibility of misaligned reading
 */
 
 struct moveActionStruct

@@ -161,7 +161,7 @@ char* cce__createNewPathFromOldPath (const char *const oldPath, const char *cons
 void cce__baseActionsInit (const struct DynamicMap2D *dynamic_map, struct UsedUBO *UBOs, const GLint *bufferUniformsOffsets,
                            const GLint *uniformLocations, GLuint shaderProgram, void (*setUniformBufferToDefault)(GLuint, GLint),
                            const GLint *uniformBufferSize);
-void cce__initMap2DLoaders (GLuint EBO, const cce_flag *flagsPointer);
+void cce__initMap2DLoaders (GLuint *EBO, const cce_flag *flagsPointer, void (***endianConvertAction)(void*));
 void cce__setCurrentArrayOfMaps (const struct Map2Darray *maps);
 void cce__beginBaseActions (const struct Map2D *map);
 void cce__endBaseActions (void);

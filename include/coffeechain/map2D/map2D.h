@@ -176,7 +176,7 @@ CCE_PUBLIC_OPTIONS struct Map2Ddev* cceLoadMap2Ddev (uint16_t number);
 CCE_PUBLIC_OPTIONS int cceWriteMap2Ddev (struct Map2Ddev *map, void (*writeFunc)(FILE*));
 CCE_PUBLIC_OPTIONS int cceInitEngine2D (uint16_t globalBoolsQuantity, uint32_t textureMaxWidth, uint32_t textureMaxHeight,
                                         const char *windowLabel, const char *resourcePath, cce_flag flags);
-CCE_PUBLIC_OPTIONS uint8_t cceRegisterAction (uint32_t ID, void (*action)(void*));
+CCE_PUBLIC_OPTIONS uint8_t cceRegisterAction (uint32_t ID, void (*action)(void*), void (*endianSwap)(void*));
 CCE_PUBLIC_OPTIONS void cceSetTexturesPath (const char *path);
 CCE_PUBLIC_OPTIONS int cceEngine2D (void);
 
