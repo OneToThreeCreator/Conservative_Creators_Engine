@@ -30,6 +30,7 @@ set(CMAKE_C_STANDARD_REQUIRED True)
 find_package(glfw3 3.3 REQUIRED)
 #find_package(OpenAL    REQUIRED)
 
+set(BUILD_SHARED_LIBS CoffeeChain_BUILD_SHARED_LIBS)
 add_library(coffeechain
    #src/audio.c
    #src/audio.h
@@ -38,19 +39,24 @@ add_library(coffeechain
    src/engine_common.c
    src/engine_common_file_IO.c
    src/engine_common.h
+   include/coffeechain/engine_common.h
    src/engine_common_internal.h
    src/platform/engine_common_glfw.c
    src/platform/engine_common_glfw.h
    src/platform/path_getters.c
    src/platform/path_getters.h
+   include/coffeechain/path_getters.h
    src/platform/platforms.h
    src/platform/endianess.c
    src/platform/endianess.h
+   include/coffeechain/endianess.h
    src/maps/base_actions.c
    src/maps/base_actions.h
+   include/coffeechain/map2D/base_actions.h
    src/maps/dynamic_map2D.c
    src/maps/map2D.c
    src/maps/map2D.h
+   include/coffeechain/map2D/map2D.h
    src/maps/map2D_internal.h
    src/maps/map2D_file_IO.c
    src/maps/log.c
@@ -84,7 +90,6 @@ endif()
 
 configure_file(src/config.h.in include/coffeechain/config.h)
 target_include_directories(coffeechain PUBLIC ${CoffeeChain_BINARY_DIR}/include/coffeechain)
-target_link_libraries(coffeechain PRIVATE glfw m)
 
 if(WIN32)
    include(GenerateExportHeader)
@@ -95,8 +100,10 @@ if(WIN32)
       INCLUDE_GUARD_NAME CCE_EXPORTS_H
    )
    install(FILES ${CoffeeChain_BINARY_DIR}/include/coffeechain/cce_exports.h DESTINATION include/coffeechain)
+   target_link_libraries(coffeechain PRIVATE glfw)
 else()
    target_compile_definitions(coffeechain PRIVATE SYSTEM_SHADER_PATH=\"${CMAKE_INSTALL_PREFIX}/share/coffeechain/shaders\")
+   target_link_libraries(coffeechain PRIVATE glfw m)
    # Windows don't have standartized path for storing shared data (or libraries, or anything that isn't self-contained)
 endif()
 
@@ -140,4 +147,3 @@ install(TARGETS coffeechain
 install(DIRECTORY shaders DESTINATION share/coffeechain)
 install(DIRECTORY include/coffeechain DESTINATION include)
 install(FILES ${CoffeeChain_BINARY_DIR}/include/coffeechain/config.h DESTINATION include/coffeechain)
-

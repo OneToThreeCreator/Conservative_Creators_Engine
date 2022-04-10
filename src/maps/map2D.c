@@ -88,7 +88,7 @@ static void setUniformBufferToDefault_withoutCBOext (GLuint UBO, GLint RotateAng
    void *uboData = glMapBuffer(GL_UNIFORM_BUFFER, GL_WRITE_ONLY);
    GL_CHECK_ERRORS;
    memset(uboData, 0, g_uniformBufferSize);
-   struct cce_vec2 *sinCos = (struct cce_vec2*) (uboData + RotateAngleSinCosOffset);
+   struct cce_vec2 *sinCos = (struct cce_vec2*) (((cce_void*) uboData) + RotateAngleSinCosOffset);
    for (struct cce_vec2 *end = sinCos + 255; sinCos < end; ++sinCos)
    {
       sinCos->y = 1.0f;

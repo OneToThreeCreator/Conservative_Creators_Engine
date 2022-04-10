@@ -77,7 +77,7 @@ void cce__writeGroups (uint16_t groupsQuantity, struct ElementGroup *groups, FIL
    }
 }
 
-struct ElementLogic* cce__loadLogic (uint8_t logicQuantity, FILE *map_f, void (**endianConvertAction)(void*))
+struct ElementLogic* cce__loadLogic (uint32_t logicQuantity, FILE *map_f, void (**endianConvertAction)(void*))
 {
    if (!logicQuantity)
    {
@@ -128,7 +128,7 @@ struct ElementLogic* cce__loadLogic (uint8_t logicQuantity, FILE *map_f, void (*
    return logic;
 }
 
-void cce__writeLogic (uint8_t logicQuantity, struct ElementLogic *logic, FILE *map_f, void (**endianConvertAction)(void*))
+void cce__writeLogic (uint32_t logicQuantity, struct ElementLogic *logic, FILE *map_f, void (**endianConvertAction)(void*))
 {
    struct ElementLogic *end = (logic + logicQuantity - 1u);
    uint_fast16_t *bufferfast16array = NULL;
@@ -183,44 +183,34 @@ void cce__writeLogic (uint8_t logicQuantity, struct ElementLogic *logic, FILE *m
       {
          for (uint32_t *jiterator = iterator->actionIDs, *jend = iterator->actionIDs + iterator->actionsQuantity; jiterator < jend; ++jiterator)
          {
-            buffer32 = cceBigEndianToLittleEndianInt16(*jiterator);
+            buffer32 = cceBigEndianToLittleEndianInt32(*jiterator);
             fwrite(&buffer32,                    4u/*uint32_t*/,  1u,                                                        map_f);
          }
          for (uint32_t *jiterator = iterator->actionsArgOffsets + 1, *jend = iterator->actionsArgOffsets + 1 + iterator->actionsQuantity;
               jiterator < jend; ++jiterator)
          {
-            buffer32 = cceBigEndianToLittleEndianInt16(*jiterator);
+            buffer32 = cceBigEndianToLittleEndianInt32(*jiterator);
             fwrite(&buffer32,                    4u/*uint32_t*/,  1u,                                                        map_f);
          }
          for (uint32_t *jiterator = iterator->actionsArgOffsets, *action = iterator->actionIDs, *jend = iterator->actionsArgOffsets + iterator->actionsQuantity;
               jiterator < jend; ++jiterator, ++action)
          {
             uint32_t size = *(jiterator + 1) - *jiterator;
-            if (size > 512)
+            uint32_t *buffer;
+            if (size > operationsQuantityInBytes)
             {
-               uint32_t *buffer;
-               if (size > operationsQuantityInBytes)
-               {
-                  buffer = malloc(size);
-               }
-               else
-               {
-                  buffer = (uint32_t*) bufferfast16array;
-               }
-               memcpy(buffer, iterator->actionsArg + *jiterator, size);
-               (*(endianConvertAction + *action))(buffer);
-               fwrite(buffer, size, 1, map_f);
-               if (size > operationsQuantityInBytes)
-               {
-                  free(buffer);
-               }
+                buffer = malloc(size);
             }
             else
             {
-               uint32_t buffer[size/sizeof(uint32_t)];
-               memcpy(&buffer, iterator->actionsArg + *jiterator, size);
-               (*(endianConvertAction + *action))(&buffer);
-               fwrite(&buffer, size, 1, map_f);
+                buffer = (uint32_t*) bufferfast16array;
+            }
+            memcpy(buffer, iterator->actionsArg + *jiterator, size);
+            (*(endianConvertAction + *action))(buffer);
+            fwrite(buffer, size, 1, map_f);
+            if (size > operationsQuantityInBytes)
+            {
+                free(buffer);
             }
          }
       }

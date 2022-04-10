@@ -21,6 +21,8 @@
 #ifndef SHADER_H
 #define SHADER_H
 #include "external/glad.h"
+#include <stdint.h>
+
 unsigned int makeVFshaderProgram  (const char *const vertexPath, const char *const fragmentPath, uint16_t shadersVersion,
                                    const char *const vertexShaderAdditionalString, const char *const fragmentShaderAdditionalString);
 unsigned int makeVGFshaderProgram (const char *const vertexPath, const char *const geometryPath, const char *const fragmentPath, uint16_t shadersVersion,

@@ -85,8 +85,8 @@ void cce__processLogic (uint32_t logicQuantity, struct ElementLogic *logic, stru
 void cce__terminateEngine (void);
 struct ElementGroup* cce__loadGroups (uint16_t groupsQuantity, FILE *map_f);
 void cce__writeGroups (uint16_t groupsQuantity, struct ElementGroup *groups, FILE *map_f);
-struct ElementLogic* cce__loadLogic (uint8_t logicQuantity, FILE *map_f, void (**endianConvertAction)(void*));
-void cce__writeLogic (uint8_t logicQuantity, struct ElementLogic *logic, FILE *map_f, void (**endianConvertAction)(void*));
+struct ElementLogic* cce__loadLogic (uint32_t logicQuantity, FILE *map_f, void (**endianConvertAction)(void*));
+void cce__writeLogic (uint32_t logicQuantity, struct ElementLogic *logic, FILE *map_f, void (**endianConvertAction)(void*));
 void cce__callActions (void (**doAction)(void*), uint8_t actionsQuantity, uint32_t *actionsIDs, uint32_t *actionsArgOffsets, cce_void *actionsArg);
 uint16_t cce__getFreeTemporaryBools (void);
 void cce__releaseTemporaryBools (uint16_t ID);

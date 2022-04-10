@@ -894,4 +894,3 @@ void cce__doNothing (void)
 {
    return;
 }
-

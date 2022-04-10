@@ -2,7 +2,7 @@
 #define ENDIANESS_H
 
 #include <stdint.h>
-#include "../engine_common.h"
+#include "engine_common.h"
 
 typedef uint8_t cce_endianess;
 

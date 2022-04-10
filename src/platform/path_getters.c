@@ -418,7 +418,7 @@ CCE_PUBLIC_OPTIONS char* cceGetDirectory (char *path, size_t bufferSize)
       error = GetLastError();
       switch (error)
       {
-         case ERROR_PATH_NOT_FOUND:
+         case ERROR_FILE_NOT_FOUND:
          {
             SetLastError(ERROR_SUCCESS);
             if (CreateDirectoryA(path, NULL) == 0u) // CreateDirectoryA returns zero if failed
@@ -433,7 +433,7 @@ CCE_PUBLIC_OPTIONS char* cceGetDirectory (char *path, size_t bufferSize)
          }
          default:
          {
-            fprintf(stderr, "DIRECTORY::FAILED_TO_GET:\n%s - %s\n", path, getErrorMessage(error));
+            fprintf(stderr, "DIRECTORY::FAILED_TO_GET:\n%s - %s", path, getErrorMessage(error));
             return NULL;
          }
       }
@@ -444,14 +444,12 @@ CCE_PUBLIC_OPTIONS char* cceGetDirectory (char *path, size_t bufferSize)
    }
    
    size_t length = strnlen(path, bufferSize);
-   if (length + 1u >= bufferSize)
+   if ((*(path + length - 1) == '\\') || (*(path + length - 1) == '/'))
+       --length;
+   uint8_t symbolsRemaining = bufferSize - (length + 1u);
+   for (uint8_t symbolsQuantity = 1u; symbolsQuantity <= symbolsRemaining; ++symbolsQuantity)
    {
-      return NULL;
-   }
-   size_t symbolsRemaining = bufferSize - (length + 1u);
-   for (size_t symbolsQuantity = 1u; symbolsQuantity <= symbolsRemaining; ++symbolsQuantity)
-   {
-      for (size_t number = 0u; number < (1 << (symbolsQuantity * 6u)); ++number)
+      for (size_t number = 0u; number < (((size_t) 1) << (symbolsQuantity * 6u)); ++number)
       {
          cceConvertIntToBase64String(number, path + length, symbolsQuantity);
          *(path + length + symbolsQuantity) = '\0';
@@ -461,7 +459,7 @@ CCE_PUBLIC_OPTIONS char* cceGetDirectory (char *path, size_t bufferSize)
             error = GetLastError();
             switch (error)
             {
-               case ERROR_PATH_NOT_FOUND:
+               case ERROR_FILE_NOT_FOUND:
                {
                   SetLastError(ERROR_SUCCESS);
                   if (CreateDirectoryA(path, NULL) == 0u) // CreateDirectoryA returns zero if failed
@@ -528,7 +526,7 @@ CCE_PUBLIC_OPTIONS char* cceGetTemporaryDirectory (size_t spaceToLeave)
    if (!tmpPath)
    {
       tmpPath = malloc(MAX_PATH * sizeof(char));
-      tmpPathLength = GetTempPathA(tmpPath, MAX_PATH);
+      tmpPathLength = GetTempPathA(MAX_PATH, tmpPath);
       if (!tmpPathLength)
       {
          free(tmpPath);
@@ -559,18 +557,22 @@ CCE_PUBLIC_OPTIONS char* cceGetTemporaryDirectory (size_t spaceToLeave)
       tmpPathLength += CCE_TMPDIR_NAME_TEMPLATE_SIZE;
       
       *(tmpPath + tmpPathLength) = '\\';
-      *(tmpPath + tmpPathLength + 1u) = '\0';
-      cceConvertIntToBase64String(time(0), tmpPath + (tmpPathLength - 6u - 1u), 6u);
+      ++tmpPathLength;
+      *(tmpPath + tmpPathLength) = '\0';
+      cceConvertIntToBase64String(time(0), tmpPath + (tmpPathLength - 6u - 1u - 2u), 6u);
+      CreateDirectoryA(tmpPath, NULL);
    }
    char *buffer = malloc((tmpPathLength + spaceToLeave + 1u) * sizeof(char));
-   return memcpy(buffer, tmpPath, tmpPathLength + 1u);
+   memcpy(buffer, tmpPath, tmpPathLength + 1u);
+   return buffer;
 }
 
 CCE_PUBLIC_OPTIONS void cceDeleteDirectory (const char *aPath)
 {
    WIN32_FIND_DATA fileData;
    size_t bufferSize;
-   size_t pathLength = strlen(aPath);
+   size_t aPathLength = strlen(aPath);
+   size_t pathLength = aPathLength;
    size_t fileNameLength;
    HANDLE file;
    char *path;
@@ -587,6 +589,7 @@ CCE_PUBLIC_OPTIONS void cceDeleteDirectory (const char *aPath)
    if (*(path + pathLength - 1u) != '\\' && *(path + pathLength - 1u) != '/')
    {
       *(path + pathLength) = '\\';
+      ++aPathLength;
       ++pathLength;
    }
    *(path + pathLength) = '*';
@@ -597,39 +600,39 @@ CCE_PUBLIC_OPTIONS void cceDeleteDirectory (const char *aPath)
       for (;;)
       {
          fileNameLength = strlen(fileData.cFileName);
-         if ((*(fileData.cFileName) == '.') && (fileNameLength < 3u))
-            continue;
-         
-         if ((pathLength + fileNameLength + 1u) > bufferSize)
+         if ((*(fileData.cFileName) != '.') || (fileNameLength > 2) || ((fileNameLength > 1) && (*(fileData.cFileName + 1) != '.')))
          {
-            bufferSize = pathLength + fileNameLength + 23u;
-            path = realloc(path, bufferSize * sizeof(char));
-         }
-         
-         memcpy(path + pathLength, fileData.cFileName, fileNameLength + 1u);
-         
-         if (fileData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
-         {
-            pathLength += fileNameLength + 1u;
-            *(path + pathLength - 1u) = '\\';
-            *(path + pathLength)      = '*';
-            *(path + pathLength + 1u) = '\0';
-            break;
-         }
-         else
-         {
+            if ((pathLength + fileNameLength + 1u) > bufferSize)
+            {
+                bufferSize = pathLength + fileNameLength + 23u;
+                path = realloc(path, bufferSize * sizeof(char));
+            }
+
+            memcpy(path + pathLength, fileData.cFileName, fileNameLength + 1);
+
+            if (fileData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
+            {
+                pathLength += fileNameLength + 1u;
+                *(path + pathLength - 1u) = '\\';
+                *(path + pathLength) = '*';
+                *(path + pathLength + 1u) = '\0';
+                FindClose(file);
+                break;
+            }
             remove(path);
+            *(path + pathLength) = '\0';
          }
-         
          if (!FindNextFileA(file, &fileData))
          {
             RemoveDirectoryA(path);
-            if (!(strcmp(path, aPath)))
+            FindClose(file);
+            if (pathLength <= aPathLength)
             {
                free(path);
                return;
             }
-            while (*(path + pathLength - 1u) != '\\')
+            pathLength -= 1;
+            while (*(path + pathLength - 1) != '\\')
             {
                --pathLength;
             }

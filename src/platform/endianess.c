@@ -70,7 +70,7 @@ CCE_PUBLIC_OPTIONS void* cceSwapEndianArrayIntN (void *array, size_t size, size_
 {
    printf("Endian conversion!!!\n");
    register uint8_t buffer;
-   for (uint8_t *iterator = (uint8_t*) array, *end = (uint8_t*) (array + size); iterator < end; iterator += n)
+   for (uint8_t *iterator = (uint8_t*) array, *end = ((uint8_t*) array) + size * n; iterator < end; iterator += n)
    {
       for (size_t i = 0; i < (n / 2); ++i)
       {
@@ -85,7 +85,7 @@ CCE_PUBLIC_OPTIONS void* cceSwapEndianArrayIntN (void *array, size_t size, size_
 CCE_PUBLIC_OPTIONS void* cceSwapEndianNewArrayIntN (void *newArray, const void *array, size_t size, size_t n)
 {
    printf("Endian conversion!!!\n");
-   for (uint8_t *iterator = (uint8_t*) array, *jiterator = (uint8_t*) newArray, *end = (uint8_t*) (array + size);
+   for (uint8_t *iterator = (uint8_t*) array, *jiterator = (uint8_t*) newArray, *end = ((uint8_t*) array) + size * n;
         iterator < end; iterator += n)
    {
       for (size_t i = 0; i < (n / 2); ++i)

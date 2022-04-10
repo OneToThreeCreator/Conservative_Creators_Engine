@@ -388,18 +388,6 @@ static struct Map2DCollider* elementsToColliders (uint32_t  elementsQuantity, ui
    return colliders;
 }
 
-#include <stdio.h>
-
-#define printMap2DElementsCoords(elements, elementsQuantity) \
-do \
-{  \
-   for (size_t n = 0; n < elementsQuantity; ++n) \
-   { \
-      printf("   element %lu: {x: %i, y: %i, width: %u, height: %u}\n", n, elements[n].x, elements[n].y, elements[n].width, elements[n].height); \
-   } \
-} \
-while(0)
-
 static struct Map2DElement* cce__loadMap2DElements (uint32_t elementsQuantity, FILE *file)
 {
    struct Map2DElement *elements = malloc(elementsQuantity * sizeof(struct Map2DElement));

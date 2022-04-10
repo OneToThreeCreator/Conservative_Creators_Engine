@@ -23,7 +23,7 @@
 
 static uint8_t createTestFile (char *path)
 {
-   FILE *file = fopen(path, "w+");
+   FILE *file = fopen(path, "w");
    if (file == NULL)
    {
       return 0u;
@@ -33,8 +33,19 @@ static uint8_t createTestFile (char *path)
    return 1u;
 }
 
-static uint8_t test1 (size_t iterationsQuantity)
+static uint8_t test1 (void)
 {
+   char *path = cceGetTemporaryDirectory(8u + 1u);
+   size_t pathLength = strlen(path);
+   cceAppendPath(path, pathLength + 8u + 1u + 1u, "test.txt");
+   if (!createTestFile(path))
+   {
+       printf("TEST1::FAILED\nfile at path %s cannot be created\n", path);
+       return 0;
+   }
+   cceTerminateTemporaryDirectory();
+   return 1;
+   /*
    size_t i = 0u;
    char **tmpPaths = malloc(iterationsQuantity * sizeof(char*));
    while (i < iterationsQuantity)
@@ -61,6 +72,7 @@ static uint8_t test1 (size_t iterationsQuantity)
       remove(tmpPaths[j]);
    }
    return (i == iterationsQuantity);
+   */
 }
 
 static uint8_t test2 (void)
@@ -112,6 +124,7 @@ static uint8_t test2 (void)
    {
       printf("TEST2::FAILED:\nfile at path %s cannot be created\n", path2);
    }
+   path2[path2Length] = '\0';
    cceDeleteDirectory(path2);
    return result;
 }
@@ -136,7 +149,7 @@ int main (int argc, char **argv)
    }
    printf("Testing path functions...\n");
    size_t testsPassed = 0u;
-   testsPassed += test1(iterationsQuantity);
+   testsPassed += test1();
    testsPassed += test2();
    printf("%lu/%lu\n", testsPassed, TESTS_QUANTITY);
    return testsPassed != TESTS_QUANTITY;

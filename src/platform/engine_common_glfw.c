@@ -153,12 +153,14 @@ static void toFullscreen__glfw (void)
    }
    glfwSetWindowSizeCallback(g_GLFWstate.window, windowResizeCallback);
    g_GLFWstate.flags |= CCE_FULLSCREEN;
+   glfwSwapInterval(1);
 }
 
 static void toWindow__glfw (void)
 {
    glfwSetWindowMonitor(g_GLFWstate.window, NULL, g_GLFWstate.windowPositionX, g_GLFWstate.windowPositionY, g_GLFWstate.windowWidth, g_GLFWstate.windowHeight, g_GLFWstate.vidMode->refreshRate);
    g_GLFWstate.flags &= ~CCE_FULLSCREEN;
+   glfwSwapInterval(1);
 }
 
 static void showWindow__glfw (void)
@@ -512,6 +514,7 @@ int cce__initEngine__glfw (const char *label, uint16_t globalBoolsQuantity)
    registerKey__glfw(GLFW_KEY_F11, GLFW_FALSE, 0x2, 0x0);
    qsort(cce_keys, keysQuantity, sizeof(struct RegisteredKeys), compare);
    
+   glfwSwapInterval(1);
    
    cceSetWindowParameters = setWindowParameters__glfw;
    if (internalFlags && CCE_WAYLAND)
