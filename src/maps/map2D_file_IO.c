@@ -40,14 +40,12 @@ const cce_flag *map2Dflags;
 
 static void (*cce_fileParseFunc)(FILE*, uint16_t);
 static void (*cce_callbackOnFreeing)(uint16_t);
-void (***cce_endianConvertAction)(void*);
 static GLuint *g_EBO;
 
-void cce__initMap2DLoaders (GLuint *EBO, const cce_flag *flagsPointer, void (***endianConvertAction)(void*))
+void cce__initMap2DLoaders (GLuint *EBO, const cce_flag *flagsPointer)
 {
    g_EBO = EBO;
    map2Dflags = flagsPointer;
-   cce_endianConvertAction = endianConvertAction;
 }
 
 CCE_PUBLIC_OPTIONS void cceSetMap2Dpath (const char *path)
@@ -106,7 +104,6 @@ CCE_PUBLIC_OPTIONS void cceFreeMap2D (struct Map2D *map)
    if (map->collisionQuantity)
    {
       free(map->collision);
-      free(map->collisionCache);
    }
    if (map->timersQuantity)
       free(map->timers);
@@ -144,6 +141,7 @@ CCE_PUBLIC_OPTIONS void cceFreeMap2D (struct Map2D *map)
       cce__releaseTemporaryBools(map->temporaryBools);
       cce__releaseUBO(map->UBO_ID);
    }
+   llrmlist(&map->delayedActions);
    free(map);
 }
 
@@ -468,6 +466,7 @@ struct Map2D* cceLoadMap2D (uint16_t number)
    
    struct Map2D *map = (struct Map2D*) malloc(sizeof(struct Map2D));
    map->ID = number;
+   map->delayedActions = LL_LIST_INIT(LL_SINGLELINKED);
    // GL elements
    {
       struct Map2DElement *elements;
@@ -518,12 +517,10 @@ struct Map2D* cceLoadMap2D (uint16_t number)
       (map->collision) = (struct CollisionGroup*) malloc((map->collisionQuantity) * sizeof(struct CollisionGroup));
       fread((map->collision), sizeof(struct CollisionGroup), (map->collisionQuantity), mapFile);
       cceLittleEndianToHostEndianArrayInt16(map->collision, map->collisionQuantity * 2);
-      (map->collisionCache) = (double*) calloc((map->collisionQuantity), sizeof(double));
    }
    else
    {
       (map->collision) = NULL;
-      (map->collisionCache) = NULL;
    }
    fread(&(map->timersQuantity), 2u/*uint16_t*/, 1u, mapFile);
    map->timersQuantity = cceLittleEndianToHostEndianInt16(map->timersQuantity);
@@ -548,7 +545,7 @@ struct Map2D* cceLoadMap2D (uint16_t number)
    map->logicQuantity = cceLittleEndianToHostEndianInt32(map->logicQuantity);
    if ((map->logicQuantity))
    {
-      map->logic = cce__loadLogic(map->logicQuantity, mapFile, *cce_endianConvertAction);
+      map->logic = cce__loadLogic(map->logicQuantity, mapFile, cce_endianSwapActions);
    }
    else
    {
@@ -601,6 +598,7 @@ struct Map2D* cceMap2DdevToMap2D (struct Map2Ddev *mapdev)
 {
    struct Map2D *map = (struct Map2D*) malloc(sizeof(struct Map2D));
    map->ID = mapdev->ID;
+   map->delayedActions = LL_LIST_INIT(LL_SINGLELINKED);
    map->moveGroupsQuantity = mapdev->moveGroupsQuantity;
    if (mapdev->moveGroupsQuantity)
    {
@@ -676,12 +674,10 @@ struct Map2D* cceMap2DdevToMap2D (struct Map2Ddev *mapdev)
    {
       map->collision = (struct CollisionGroup*) malloc(map->collisionQuantity * sizeof(struct CollisionGroup));
       memcpy(map->collision, mapdev->collision, (mapdev->collisionQuantity) * sizeof(struct CollisionGroup));
-      map->collisionCache = (double*) calloc(map->collisionQuantity, sizeof(double));
    }
    else
    {
       map->collision = NULL;
-      map->collisionCache = NULL;
    }
    map->timersQuantity = mapdev->timersQuantity;
    if (mapdev->timersQuantity)
@@ -812,7 +808,7 @@ struct Map2Ddev* cceLoadMap2Ddev (uint16_t number)
    map->logicQuantity = cceLittleEndianToHostEndianInt16(map->logicQuantity);
    if (map->logicQuantity)
    {
-      map->logic = cce__loadLogic(map->logicQuantity, mapFile, *cce_endianConvertAction);
+      map->logic = cce__loadLogic(map->logicQuantity, mapFile, cce_endianSwapActions);
    }
    fread(&(map->actionsQuantity), 1u/*uint8_t*/, 1u, mapFile);
    if (map->actionsQuantity)
@@ -950,7 +946,7 @@ int cceWriteMap2Ddev (struct Map2Ddev *map, void (*writeFunc)(FILE*))
    fwrite(&(temporary.u32), 4/*uint32_t*/, 1, mapFile);
    if (map->logicQuantity)
    {
-      cce__writeLogic(map->logicQuantity, map->logic, mapFile, *cce_endianConvertAction);
+      cce__writeLogic(map->logicQuantity, map->logic, mapFile, cce_endianSwapActions);
    }
    fwrite(&(map->actionsQuantity), 1/*uint8_t*/, 1, mapFile);
    if (map->actionsQuantity)

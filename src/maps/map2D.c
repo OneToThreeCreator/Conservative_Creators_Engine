@@ -36,9 +36,6 @@
 
 CCE_PUBLIC_OPTIONS uint16_t cceLoadedMap2Dnumber;
 
-static void (**cce_actions)(void*);
-static void (**cce_endianSwapActions)(void*);
-
 static uint32_t                   g_texturesWidth;
 static uint32_t                   g_texturesHeight;
 static struct LoadedTextures     *g_textures;
@@ -54,15 +51,13 @@ static GLint                      g_uniformBufferSize;
 static GLuint                     g_EBO;
 static uint32_t                   g_elementBufferSize = 0;
 
-static const struct DynamicMap2D *g_dynamicMap;
+static struct DynamicMap2D *g_dynamicMap;
 
 static void (*cce_setUniformBufferToDefault)(GLuint, GLint);
 static void (*drawMap2Ddependant)(struct Map2D*);
 static GLint *bufferUniformsOffsets;
 static GLint *uniformLocations;
 static GLuint shaderProgram;
-
-static uint32_t actionsQuantity;
 
 static char *texturesPath = NULL;
 static size_t texturesPathLength;
@@ -396,14 +391,11 @@ CCE_PUBLIC_OPTIONS int cceInitEngine2D (uint16_t globalBoolsQuantity, uint32_t t
    glEnable(GL_BLEND);
    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
    glGenBuffers(1, &g_EBO);
-   cce__initMap2DLoaders(&g_EBO, &map2Dflags, &cce_endianSwapActions);
+   cce__initMap2DLoaders(&g_EBO, &map2Dflags);
    cceAppendPath(pathBuffer, pathLength + 11, "maps");
    cceSetMap2Dpath(pathBuffer);
    *(pathBuffer + pathLength) = '\0';
    
-   actionsQuantity = CCE_BASIC_ACTIONS_QUANTITY + CCE_ALLOCATION_STEP;
-   cce_actions = (void (**)(void*)) calloc((actionsQuantity), sizeof(void (*)(void*)));
-   cce_endianSwapActions = (void (**)(void*)) calloc((actionsQuantity), sizeof(void (*)(void*)));
    g_texturesWidth = textureMaxWidth;
    g_texturesHeight = textureMaxHeight;
    g_textures = (struct LoadedTextures*) calloc(CCE_ALLOCATION_STEP, sizeof(struct LoadedTextures));
@@ -417,31 +409,13 @@ CCE_PUBLIC_OPTIONS int cceInitEngine2D (uint16_t globalBoolsQuantity, uint32_t t
    cceSetTexturesPath(resourcePath);
    *(pathBuffer + pathLength) = '\0';
    g_dynamicMap = cce__initDynamicMap2D(g_EBO);
-   cce__baseActionsInit(g_dynamicMap, g_UBOs, bufferUniformsOffsets, uniformLocations, shaderProgram, cce_setUniformBufferToDefault, &g_uniformBufferSize);
+   cce__baseActionsInit(g_dynamicMap, g_UBOs, bufferUniformsOffsets, uniformLocations, shaderProgram, cce_setUniformBufferToDefault, &g_uniformBufferSize, &map2Dflags);
    cceSetFlags2D(flags);
    map2Dflags &= ~CCE_INIT;
    free(pathBuffer);
    glUseProgram(shaderProgram);
    cceSetGridMultiplier(1.0f);
    return 0;
-}
-
-CCE_PUBLIC_OPTIONS uint8_t cceRegisterAction (uint32_t ID, void (*action)(void*), void (*endianSwap)(void*))
-{
-   if (ID >= actionsQuantity)
-   {
-      uint32_t lastActionsQuantity = actionsQuantity;
-      actionsQuantity = (ID & (CCE_ALLOCATION_STEP - 1u)) + CCE_ALLOCATION_STEP;
-      cce_actions = (void (**)(void*)) realloc(cce_actions, actionsQuantity * sizeof(void (*)(void*)));
-      memset(cce_actions + lastActionsQuantity, 0u, actionsQuantity - lastActionsQuantity);
-      cce_endianSwapActions = (void (**)(void*)) realloc(cce_endianSwapActions, actionsQuantity * sizeof(void (*)(void*)));
-      memset(cce_endianSwapActions + lastActionsQuantity, 0u, actionsQuantity - lastActionsQuantity);
-   }
-   if ((ID < CCE_BASIC_ACTIONS_QUANTITY) != ((map2Dflags & CCE_BASIC_ACTIONS_NOT_SET) > 0u))
-      return CCE_ATTEMPT_TO_OVERRIDE_DEFAULT_ELEMENT;
-   *(cce_actions + ID) = action;
-   *(cce_endianSwapActions + ID) = endianSwap;
-   return 0u;
 }
 
 CCE_PUBLIC_OPTIONS void cceSetTexturesPath (const char *path)

@@ -20,7 +20,7 @@
 
 cmake_minimum_required(VERSION 3.13)
 
-project(CoffeeChain VERSION 0.3 DESCRIPTION "open 2D engine for creating games - shared library" LANGUAGES C)
+project(CoffeeChain VERSION 0.4 DESCRIPTION "open 2D engine for creating games - shared library" LANGUAGES C)
 
 option(CoffeeChain_BUILD_SHARED_LIBS     "Build CoffeeChain as shared library" ON)
 option(CoffeeChain_BUILD_TESTING         "Build CoffeeChain test program" ON)
@@ -74,7 +74,9 @@ set_target_properties(coffeechain PROPERTIES
    SOVERSION 1
 )
 
-
+add_subdirectory(external/listlib)
+target_include_directories(coffeechain PRIVATE external/listlib/src)
+target_link_libraries(coffeechain PRIVATE listlib)
 
 if(CMAKE_BUILD_TYPE MATCHES "Debug" OR CMAKE_BUILD_TYPE MATCHES "DEBUG" OR CMAKE_BUILD_TYPE MATCHES "debug")
    if(NOT MSVC)
@@ -93,18 +95,17 @@ target_include_directories(coffeechain PUBLIC ${CoffeeChain_BINARY_DIR}/include/
 
 if(WIN32)
    include(GenerateExportHeader)
-   target_link_libraries(coffeechain PRIVATE shell32 kernel32)
    generate_export_header(coffeechain
       EXPORT_MACRO_NAME CCE_EXPORTS
       EXPORT_FILE_NAME ${CoffeeChain_BINARY_DIR}/include/coffeechain/cce_exports.h
       INCLUDE_GUARD_NAME CCE_EXPORTS_H
    )
    install(FILES ${CoffeeChain_BINARY_DIR}/include/coffeechain/cce_exports.h DESTINATION include/coffeechain)
-   target_link_libraries(coffeechain PRIVATE glfw)
+   target_link_libraries(coffeechain PRIVATE glfw shell32 kernel32)
+   # Windows don't have standartized path for storing shared data (or libraries, or anything that isn't self-contained)
 else()
    target_compile_definitions(coffeechain PRIVATE SYSTEM_SHADER_PATH=\"${CMAKE_INSTALL_PREFIX}/share/coffeechain/shaders\")
    target_link_libraries(coffeechain PRIVATE glfw m)
-   # Windows don't have standartized path for storing shared data (or libraries, or anything that isn't self-contained)
 endif()
 
 if(CoffeeChain_BUILD_TESTING)

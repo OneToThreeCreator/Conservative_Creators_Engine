@@ -23,7 +23,6 @@ CCE_PUBLIC_OPTIONS const cce_endianess *const g_endianess = &endianess;
 
 CCE_PUBLIC_OPTIONS uint16_t cceSwapEndianInt16 (uint16_t value)
 {
-   printf("Endian conversion!!!\n");
    uint8_t *bytes = (uint8_t*) &value;
    register uint8_t buffer;
    buffer   = bytes[0];
@@ -34,7 +33,6 @@ CCE_PUBLIC_OPTIONS uint16_t cceSwapEndianInt16 (uint16_t value)
 
 CCE_PUBLIC_OPTIONS uint32_t cceSwapEndianInt32 (uint32_t value)
 {
-   printf("Endian conversion!!!\n");
    uint8_t *bytes = (uint8_t*) &value;
    register uint8_t buffer;
    buffer   = bytes[0];
@@ -48,7 +46,6 @@ CCE_PUBLIC_OPTIONS uint32_t cceSwapEndianInt32 (uint32_t value)
 
 CCE_PUBLIC_OPTIONS uint64_t cceSwapEndianInt64 (uint64_t value)
 {
-   printf("Endian conversion!!!\n");
    uint8_t *bytes = (uint8_t*) &value;
    register uint8_t buffer;
    buffer   = bytes[0];
@@ -68,7 +65,6 @@ CCE_PUBLIC_OPTIONS uint64_t cceSwapEndianInt64 (uint64_t value)
 
 CCE_PUBLIC_OPTIONS void* cceSwapEndianArrayIntN (void *array, size_t size, size_t n)
 {
-   printf("Endian conversion!!!\n");
    register uint8_t buffer;
    for (uint8_t *iterator = (uint8_t*) array, *end = ((uint8_t*) array) + size * n; iterator < end; iterator += n)
    {
@@ -84,7 +80,6 @@ CCE_PUBLIC_OPTIONS void* cceSwapEndianArrayIntN (void *array, size_t size, size_
 
 CCE_PUBLIC_OPTIONS void* cceSwapEndianNewArrayIntN (void *newArray, const void *array, size_t size, size_t n)
 {
-   printf("Endian conversion!!!\n");
    for (uint8_t *iterator = (uint8_t*) array, *jiterator = (uint8_t*) newArray, *end = ((uint8_t*) array) + size * n;
         iterator < end; iterator += n)
    {

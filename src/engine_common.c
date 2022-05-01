@@ -90,6 +90,11 @@ CCE_PUBLIC_OPTIONS void cceStartTimer (struct Timer *timer)
    timer->initTime = *cceCurrentTime - maxTimerCheckDelay;
 }
 
+CCE_PUBLIC_OPTIONS void resetTimerDelayCompensation (void)
+{
+   maxTimerCheckDelay = 0.0;
+}
+
 CCE_PUBLIC_OPTIONS uint8_t cceGetBool (uint16_t boolID)
 {
    uint_fast16_t *boolean;
@@ -216,14 +221,12 @@ void cce__processLogic (uint32_t logicQuantity, struct ElementLogic *logic, stru
    va_start(argp, fourth_if_func);
    uint_fast32_t boolSum;
    uint16_t boolNumber;
-   //logicQuantity = (logicQuantity > 0) * 2u;
-   //printf("logicQuantity = %u\n", logicQuantity);
    struct ElementLogic *endLogic = (logic + logicQuantity);
    uint_fast16_t currentOperations;
    cce_byte isLogic;
    while (logic < endLogic)
    {
-      maxTimerCheckDelay = 0.0;
+      resetTimerDelayCompensation();
       boolSum = 0u;
       currentOperations = (*logic->operations);
       for (cce_ubyte j = 0;; ++j)

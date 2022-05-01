@@ -184,6 +184,7 @@ void printMap2Ddev (struct Map2Ddev *map)
    }
 }
 
+/*
 void printMap2D (struct Map2D *map)
 {
    printf("2-Dimentional Map with ID %u consists:\n", map->ID);
@@ -323,3 +324,4 @@ void printMap2D (struct Map2D *map)
       iterator->ID, iterator->xOffset, iterator->yOffset, arrow);
    }
 }
+*/

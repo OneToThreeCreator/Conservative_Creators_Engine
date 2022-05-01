@@ -32,9 +32,11 @@
 #include "map2D_internal.h"
 #include "base_actions.h"
 
+void (**cce_actions)(void*);
+void (**cce_endianSwapActions)(void*);
 static const struct Map2Darray *allMaps;
-static const struct Map2D *currentMap;
-static const struct DynamicMap2D *g_dynamicMap;
+static struct Map2D *currentMap;
+static struct DynamicMap2D *g_dynamicMap;
 static struct UsedUBO *g_UBOs;
 static const GLint *g_uniformsOffsets;
 static const GLint *g_uniformLocations;
@@ -43,7 +45,9 @@ static GLuint g_shaderProgram;
 cce_void *g_currentMapBuffer = NULL;
 cce_void *g_dynamicMapBuffer = NULL;
 static void (*g_setUniformBufferToDefault)(GLuint, GLint);
+static uint32_t actionsQuantity;
 static GLint uniformOffset;
+static const cce_flag *map2Dflags;
 
 #define PI 3.14159265f
 
@@ -149,6 +153,14 @@ static void loadMap2Daction (void *data)
    }
 }
 
+static void delayActionAction (void *data)
+{
+   struct delayActionStruct *params = data;
+   if (params->executeNowFirst)
+      (*(cce_actions + params->actionID))(((void*) (params + 1)));
+   cceDelayActionMap2D(params->actionID, params->actionStructSize, ((void*) (params + 1)), params->repeatsQuantity, params->delay, params->mapType);
+}
+
 static void moveActionSwapEndian (void *data)
 {
    struct moveActionStruct *params = (struct moveActionStruct*) data;
@@ -217,7 +229,17 @@ static void loadMap2DActionSwapEndian (void *data)
    params->ID = cceSwapEndianInt16(params->ID);
 }
 
-void cce__beginBaseActions (const struct Map2D *map)
+static void delayActionActionSwapEndian (void *data)
+{
+   struct delayActionStruct *params = data;
+   params->actionID = cceSwapEndianInt32(params->actionID);
+   params->actionStructSize = cceSwapEndianInt32(params->actionStructSize);
+   params->delay = cceSwapEndianInt32(params->delay);
+   params->repeatsQuantity = cceSwapEndianInt32(params->repeatsQuantity);
+   (*(cce_endianSwapActions + params->actionID))(((void*) (params + 1)));
+}
+
+void cce__beginBaseActions (struct Map2D *map)
 {
    currentMap = map;
    if ((g_UBOs + currentMap->UBO_ID)->flags & 0x4)
@@ -237,6 +259,24 @@ void cce__beginBaseActions (const struct Map2D *map)
       GL_CHECK_ERRORS;
    }
    glBindBuffer(GL_UNIFORM_BUFFER, 0);
+}
+
+static void runDelayedActions (struct list *delayedActions)
+{
+   for (cce_void *prevnode = NULL, *node = delayedActions->chain; node != NULL; prevnode = node, node = LL_NEXT(node))
+   {
+      resetTimerDelayCompensation();
+      struct DelayedAction *head = (struct DelayedAction*) node;
+      if (!(cceIsTimerEnded(&head->timer)))
+         continue;
+      
+      cceStartTimer(&head->timer);
+      (*(cce_endianSwapActions + head->actionID))(node + sizeof(struct DelayedAction));
+      
+      --(head->repeatsLeft);
+      if (head->repeatsLeft == 0)
+         llrmsublistp(delayedActions, prevnode, 1);
+   }
 }
 
 static void endBaseActionsCommon (uint16_t uboID)
@@ -269,6 +309,7 @@ static void endBaseActionsCommon (uint16_t uboID)
 
 void cce__endBaseActions (void)
 {
+   runDelayedActions(&currentMap->delayedActions);
    endBaseActionsCommon(currentMap->UBO_ID);
    currentMap = NULL;
    g_currentMapBuffer = NULL;
@@ -276,6 +317,7 @@ void cce__endBaseActions (void)
 
 void cce__endBaseActionsDynamicMap2D (void)
 {
+   runDelayedActions(&g_dynamicMap->delayedActions);
    endBaseActionsCommon(g_dynamicMap->UBO_ID);
    g_dynamicMapBuffer = NULL;
 }
@@ -285,10 +327,11 @@ void cce__setCurrentArrayOfMaps (const struct Map2Darray *maps)
    allMaps = maps;
 }
 
-void cce__baseActionsInit (const struct DynamicMap2D *dynamic_map, struct UsedUBO *UBOs, const GLint *bufferUniformsOffsets, 
+void cce__baseActionsInit (struct DynamicMap2D *dynamic_map, struct UsedUBO *UBOs, const GLint *bufferUniformsOffsets, 
                            const GLint *uniformLocations, GLuint shaderProgram, void (*setUniformBufferToDefault)(GLuint, GLint),
-                           const GLint *uniformBufferSize)
+                           const GLint *uniformBufferSize, const cce_flag *flags)
 {
+   map2Dflags = flags;
    g_dynamicMap = dynamic_map;
    g_UBOs = UBOs;
    g_uniformsOffsets = bufferUniformsOffsets;
@@ -297,6 +340,9 @@ void cce__baseActionsInit (const struct DynamicMap2D *dynamic_map, struct UsedUB
    g_setUniformBufferToDefault = setUniformBufferToDefault;
    g_uniformBufferSize = uniformBufferSize;
    uniformOffset = *(g_uniformsOffsets + CCE_COLORGROUP_OFFSET);
+   actionsQuantity = CCE_BASIC_ACTIONS_QUANTITY + CCE_ALLOCATION_STEP;
+   cce_actions = (void (**)(void*)) calloc((actionsQuantity), sizeof(void (*)(void*)));
+   cce_endianSwapActions = (void (**)(void*)) calloc((actionsQuantity), sizeof(void (*)(void*)));
    cceRegisterAction(0,  moveAction, moveActionSwapEndian);
    cceRegisterAction(1,  extendAction, extendActionSwapEndian);
    cceRegisterAction(2,  rotateAction, rotateActionSwapEndian);
@@ -308,6 +354,25 @@ void cce__baseActionsInit (const struct DynamicMap2D *dynamic_map, struct UsedUB
    cceRegisterAction(8,  setDynamicTimerDelayAction, setDynamicTimerDelayActionSwapEndian);
    cceRegisterAction(9,  setGridSizeAction, setGridSizeActionSwapEndian);
    cceRegisterAction(10, loadMap2Daction, loadMap2DActionSwapEndian);
+   cceRegisterAction(11, delayActionAction, delayActionActionSwapEndian);
+}
+
+CCE_PUBLIC_OPTIONS uint8_t cceRegisterAction (uint32_t ID, void (*action)(void*), void (*endianSwap)(void*))
+{
+   if (ID >= actionsQuantity)
+   {
+      uint32_t lastActionsQuantity = actionsQuantity;
+      actionsQuantity = (ID & (CCE_ALLOCATION_STEP - 1u)) + CCE_ALLOCATION_STEP;
+      cce_actions = (void (**)(void*)) realloc(cce_actions, actionsQuantity * sizeof(void (*)(void*)));
+      memset(cce_actions + lastActionsQuantity, 0u, actionsQuantity - lastActionsQuantity);
+      cce_endianSwapActions = (void (**)(void*)) realloc(cce_endianSwapActions, actionsQuantity * sizeof(void (*)(void*)));
+      memset(cce_endianSwapActions + lastActionsQuantity, 0u, actionsQuantity - lastActionsQuantity);
+   }
+   if ((ID < CCE_BASIC_ACTIONS_QUANTITY) != ((*map2Dflags & CCE_BASIC_ACTIONS_NOT_SET) > 0u))
+      return CCE_ATTEMPT_TO_OVERRIDE_DEFAULT_ELEMENT;
+   *(cce_actions + ID) = action;
+   *(cce_endianSwapActions + ID) = endianSwap;
+   return 0u;
 }
 
 static inline void moveElements (int32_t *firstElementX, int32_t *firstElementY, ptrdiff_t step, struct ElementGroup *group, int32_t x, int32_t y)
@@ -570,4 +635,30 @@ CCE_PUBLIC_OPTIONS void cceOffsetTextureGroupMap2D (uint8_t groupID, int32_t off
 
    (((struct cce_ivec2*) (glBuffer + *(g_uniformsOffsets + CCE_TEXTUREOFFSET_OFFSET) - uniformOffset)) + (groupID - 1u))->x = offsetX;
    (((struct cce_ivec2*) (glBuffer + *(g_uniformsOffsets + CCE_TEXTUREOFFSET_OFFSET) - uniformOffset)) + (groupID - 1u))->y = offsetY;
+}
+
+CCE_PUBLIC_OPTIONS void cceDelayActionMap2D (uint32_t actionID, uint32_t actionStructSize, void *actionStruct,
+                                             uint32_t repeatsQuantity, float delay, cce_enum mapType)
+{
+   struct list *delayedActions;
+   switch (mapType)
+   {
+      case CCE_CURRENT_MAP2D:
+         delayedActions = &(currentMap->delayedActions);
+         break;
+      case CCE_DYNAMIC_MAP2D:
+         delayedActions = &(g_dynamicMap->delayedActions);
+         break;
+      default: return;
+   }
+   cce_void *data = llnodealloc(sizeof(struct DelayedAction) + actionStructSize, delayedActions->type);
+   {
+      struct DelayedAction *head = (struct DelayedAction*) data;
+      head->actionID = actionID;
+      head->repeatsLeft = repeatsQuantity;
+      head->timer.delay = delay;
+      head->timer.initTime = *cceCurrentTime;
+   }
+   memcpy(data + sizeof(struct DelayedAction), actionStruct, actionStructSize);
+   llappendchain(delayedActions, data);
 }

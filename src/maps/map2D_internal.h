@@ -24,6 +24,7 @@
 #include "map2D.h"
 #include "../engine_common_internal.h"
 #include "log.h"
+#include <list.h>
 
 #define CCE_GLOBAL_OFFSET_MASK 0x10
 
@@ -38,6 +39,13 @@
 
 #define CCE_BASIC_ACTIONS_NOT_SET 0x100
 #define CCE_INIT CCE_BASIC_ACTIONS_NOT_SET
+
+struct DelayedAction
+{
+   uint32_t actionID;
+   uint32_t repeatsLeft;
+   struct Timer timer;
+};
 
 struct LoadedTextures
 {
@@ -107,35 +115,42 @@ struct DynamicCollisionGroup
 
 struct DynamicMap2D
 {
-   struct DynamicMap2DElement   *elements;
-   struct DynamicElementGroup   *moveGroups;
-   
-   struct DynamicElementGroup   *extensionGroups;
-   struct DynamicElementGroup   *collisionGroups; 
-   struct DynamicCollisionGroup *collision;
-   struct Timer                 *timers;
-   struct ElementLogic          *logic;
-   
-   uint32_t VAO;
-   uint32_t VBO;
-   uint32_t objectBufferAllocatedSpace; /* usually equals to elementsAllocatedQuantity, or lower */
    uint32_t elementsQuantity;
    uint32_t elementsAllocatedQuantity;
-   uint32_t logicQuantity;
-   uint32_t logicAllocatedQuantity;
+   struct DynamicMap2DElement   *elements;
    
-   uint16_t UBO_ID;
    uint16_t moveGroupsQuantity;
    uint16_t moveGroupsAllocatedQuantity;
    uint16_t extensionGroupsQuantity;
    uint16_t extensionGroupsAllocatedQuantity;
+   struct DynamicElementGroup   *moveGroups;
+   struct DynamicElementGroup   *extensionGroups;
+   
    uint16_t collisionGroupsQuantity;
    uint16_t collisionGroupsAllocatedQuantity;
    uint16_t collisionQuantity;
    uint16_t collisionAllocatedQuantity;
+   struct DynamicElementGroup   *collisionGroups; 
+   struct DynamicCollisionGroup *collision;
+   
    uint16_t timersQuantity;
    uint16_t timersAllocatedQuantity;
+   
+   uint16_t UBO_ID;
    uint16_t temporaryBools;
+   
+   uint32_t logicQuantity;
+   uint32_t logicAllocatedQuantity;
+   
+   struct Timer                 *timers;
+   struct ElementLogic          *logic;
+   
+   struct list                   delayedActions;
+   
+   uint32_t VAO;
+   uint32_t VBO;
+   uint32_t objectBufferAllocatedSpace; /* usually equals to elementsAllocatedQuantity, or lower */
+   
 };
 
 struct Map2DElementVertices
@@ -156,14 +171,52 @@ struct Map2DElementVertices
    uint8_t colorIDs[4];
 }; // 52 bytes
 
+struct Map2D
+{
+   uint32_t elementsQuantity;
+   uint32_t collidersQuantity;
+   struct Map2DCollider  *colliders;
+   
+   uint16_t moveGroupsQuantity;
+   uint16_t extensionGroupsQuantity;
+   uint16_t collisionGroupsQuantity;
+   uint16_t collisionQuantity;
+   struct ElementGroup   *moveGroups;
+   struct ElementGroup   *extensionGroups;
+   struct ElementGroup   *collisionGroups;
+   struct CollisionGroup *collision;
+   uint32_t logicQuantity;
+   uint16_t timersQuantity;
+   uint8_t  exitMapsQuantity;
+   uint8_t  staticActionsQuantity;
+   struct Timer          *timers;
+   struct ElementLogic   *logic;
+   struct ExitMap2D      *exitMaps;
+   uint16_t              *texturesMapReliesOn;
+   uint32_t              *staticActionIDs;
+   uint32_t              *staticActionArgOffsets;
+   cce_void              *staticActionArgs;
+   struct list            delayedActions;
+
+   uint32_t VAO;
+   uint32_t VBO;
+   uint16_t temporaryBools;
+   uint16_t texturesMapReliesOnQuantity;
+   uint16_t ID;
+   uint16_t UBO_ID;
+};
+
+extern void (**cce_actions)(void*);
+extern void (**cce_endianSwapActions)(void*);
+
 char* cce__createNewPathFromOldPath (const char *const oldPath, const char *const appendPath, size_t freeSpaceToLeave);
 
-void cce__baseActionsInit (const struct DynamicMap2D *dynamic_map, struct UsedUBO *UBOs, const GLint *bufferUniformsOffsets,
+void cce__baseActionsInit (struct DynamicMap2D *dynamic_map, struct UsedUBO *UBOs, const GLint *bufferUniformsOffsets,
                            const GLint *uniformLocations, GLuint shaderProgram, void (*setUniformBufferToDefault)(GLuint, GLint),
-                           const GLint *uniformBufferSize);
-void cce__initMap2DLoaders (GLuint *EBO, const cce_flag *flagsPointer, void (***endianConvertAction)(void*));
+                           const GLint *uniformBufferSize, const cce_flag *flags);
+void cce__initMap2DLoaders (GLuint *EBO, const cce_flag *flagsPointer);
 void cce__setCurrentArrayOfMaps (const struct Map2Darray *maps);
-void cce__beginBaseActions (const struct Map2D *map);
+void cce__beginBaseActions (struct Map2D *map);
 void cce__endBaseActions (void);
 void cce__endBaseActionsDynamicMap2D (void);
 
@@ -199,7 +252,7 @@ void cce__releaseUBO (uint16_t ID);
 void cce__releaseUnusedUBO (uint16_t ID);
 void cce__allocateUBObuffers (uint16_t uboID, uint16_t moveGroupsQuantity, uint16_t extensionGroupsQuantity);
 struct UsedUBO* cce__getFreeUBOdata (uint16_t ID);
-const struct DynamicMap2D* cce__initDynamicMap2D (GLuint EBO);
+struct DynamicMap2D* cce__initDynamicMap2D (GLuint EBO);
 void cce__terminateDynamicMap2D (void);
 void cce__terminateEngine2D (void);
 

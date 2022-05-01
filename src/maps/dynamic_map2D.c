@@ -52,7 +52,7 @@ static inline void bindVBOtoVAO (GLuint VBO, GLuint VAO)
    GL_CHECK_ERRORS;
 }
 
-const struct DynamicMap2D* cce__initDynamicMap2D (GLuint EBO)
+struct DynamicMap2D* cce__initDynamicMap2D (GLuint EBO)
 {
    g_dynamicMap = (struct DynamicMap2D*) malloc(sizeof(struct DynamicMap2D));
    g_dynamicMap->elementsQuantity = 0u;
@@ -102,6 +102,8 @@ const struct DynamicMap2D* cce__initDynamicMap2D (GLuint EBO)
    g_dynamicMap->temporaryBools = cce__getFreeTemporaryBools();
    
    g_dynamicMap->UBO_ID = cce__getFreeUBO();
+   g_dynamicMap->delayedActions = LL_LIST_INIT(LL_SINGLELINKED);
+   
    usedUBO = cce__getFreeUBOdata(g_dynamicMap->UBO_ID);
    usedUBO->moveGroupValues = calloc(CCE_ALLOCATION_STEP, sizeof(struct cce_ivec2));
    usedUBO->moveGroupValuesQuantity = CCE_ALLOCATION_STEP;
@@ -1078,6 +1080,8 @@ void cce__terminateDynamicMap2D (void)
       free(iterator->actionsArg);
    }
    free(g_dynamicMap->logic);
+   
+   llrmlist(&g_dynamicMap->delayedActions);
    
    free(g_dynamicMap);
    g_dynamicMap = NULL;

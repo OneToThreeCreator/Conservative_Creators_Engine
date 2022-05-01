@@ -131,21 +131,16 @@ struct loadMap2DactionStruct
    uint8_t __pad;
 };
 
-/*
 // action data should be located right after this struct
-struct delayedActionStruct
+struct delayActionStruct
 {
-   uint32_t action;
+   uint32_t actionID;
    uint32_t actionStructSize;
    uint32_t repeatsQuantity;
    float delay;
+   cce_enum mapType;
+   uint8_t executeNowFirst;
 };
-
-struct eachFrameActionStruct
-{
-   uint32_t action;
-   uint32_t actionStructSize;
-}; */
 
 CCE_PUBLIC_OPTIONS void  cceMoveGlobalOffsetGroupMap2D (int32_t x, int32_t y, cce_enum actionType);
 CCE_PUBLIC_OPTIONS void  cceMoveGroupMap2D (uint16_t groupID, int32_t x, int32_t y, cce_enum actionType, cce_enum mapType);
@@ -154,6 +149,22 @@ CCE_PUBLIC_OPTIONS float cceNormalizeAngle (float angleInDegrees);
 CCE_PUBLIC_OPTIONS void  cceRotateGroupMap2D (uint8_t groupID, float normalizedAngle, int32_t xOffset, int32_t yOffset, cce_enum actionType, cce_enum mapType);
 CCE_PUBLIC_OPTIONS void  cceOffsetTextureGroupMap2D (uint8_t groupID, int32_t offsetX, int32_t offsetY, cce_enum mapType);
 CCE_PUBLIC_OPTIONS void  cceChangeColorGroupMap2D (uint8_t groupID, float r, float g, float b, float a, cce_enum mapType);
+CCE_PUBLIC_OPTIONS void cceDelayActionMap2D (uint32_t actionID, uint32_t actionStructSize, void *actionStruct,
+                                             uint32_t repeatsQuantity, float delay, cce_enum mapType);
+
+#define CCE_MOVE_ACTION 0
+#define CCE_EXTEND_ACTION 1
+#define CCE_ROTATE_ACTION 2
+#define CCE_OFFSETTEXTURE_ACTION 3
+#define CCE_CHANGECOLOR_ACTION 4
+#define CCE_SETBOOL_ACTION 5
+#define CCE_SETPLOTNUMBER_ACTION 6
+#define CCE_STARTTIMER_ACTION 7
+#define CCE_SETDYNAMICTIMERDELAY_ACTION 8
+#define CCE_SETGRIDSIZE_ACTION 9
+#define CCE_LOADMAP2D_ACTION 10
+#define CCE_DELAYACTION_ACTION 11
+
 
 #ifdef __cplusplus
 }

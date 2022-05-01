@@ -101,43 +101,6 @@ struct Map2DElementDev
    uint8_t isGlobalOffset;
 };
 
-struct Map2D
-{
-   struct Map2DCollider  *colliders;
-   struct ElementGroup   *moveGroups;
-   struct ElementGroup   *extensionGroups;
-   struct ElementGroup   *collisionGroups;
-   struct CollisionGroup *collision;
-   double                *collisionCache;
-   struct Timer          *timers;
-   struct ElementLogic   *logic;
-   struct ExitMap2D      *exitMaps;
-   uint16_t              *texturesMapReliesOn;
-   uint32_t              *staticActionIDs;
-   uint32_t              *staticActionArgOffsets;
-   cce_void              *staticActionArgs;
-   
-   uint32_t VAO;
-   uint32_t VBO;
-   uint32_t elementsQuantity;
-   uint32_t collidersQuantity;
-   uint32_t logicQuantity;
-   
-   uint16_t flags; // 0x1 UBO was used
-   uint16_t ID;
-   uint16_t UBO_ID;
-   uint16_t moveGroupsQuantity;
-   uint16_t extensionGroupsQuantity;
-   uint16_t collisionGroupsQuantity;
-   uint16_t collisionQuantity;
-   uint16_t timersQuantity;
-   uint16_t temporaryBools;
-   uint16_t texturesMapReliesOnQuantity;
-   
-   uint8_t  exitMapsQuantity;
-   uint8_t  staticActionsQuantity;
-};
-
 struct Map2Ddev
 {
    uint16_t ID;
@@ -165,6 +128,8 @@ struct Map2Ddev
    uint8_t                exitMapsQuantity;
    struct ExitMap2D      *exitMaps;
 };
+
+struct Map2D;
 
 CCE_PUBLIC_OPTIONS void cceSetGridMultiplier (float multiplier);
 CCE_PUBLIC_OPTIONS void cceSetMap2Dpath (const char *path);
