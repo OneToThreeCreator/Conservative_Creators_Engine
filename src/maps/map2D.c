@@ -197,7 +197,7 @@ static void cceSetFlags2D (cce_flag flags)
       default:
       {
          drawMap2Dcommon = drawMap2Dnearest;
-         flags |= (CCE_DEFAULT & CCE_RENDER_MAP_FLAGS);
+         flags |= CCE_RENDER_CLOSEST_MAP;
       }
    }
    
@@ -226,7 +226,7 @@ static void cceSetFlags2D (cce_flag flags)
       default:
       {
          processLogicMap2Dcommon = processLogicMap2Dmain;
-         flags |= (CCE_DEFAULT & CCE_PROCESS_LOGIC_FLAGS);
+         flags |= CCE_PROCESS_LOGIC_ONLY_FOR_CURRENT_MAP;
       }
    }
    if ((((flags & CCE_PROCESS_LOGIC_FLAGS) == CCE_PROCESS_LOGIC_ONLY_FOR_CURRENT_MAP) ||
@@ -691,8 +691,8 @@ void cce__allocateUBObuffers (uint16_t uboID, uint16_t moveGroupsQuantity, uint1
    ubo->moveGroupValuesQuantity = moveGroupsQuantity;
    if (extensionGroupsQuantity > 0)
    {
-      ubo->extensionGroupValues = realloc(ubo->extensionGroupValues, extensionGroupsQuantity * sizeof(ubo->extensionGroupValues));
-      memset(ubo->extensionGroupValues, 0, extensionGroupsQuantity * sizeof(ubo->extensionGroupValues));
+      ubo->extensionGroupValues = realloc(ubo->extensionGroupValues, extensionGroupsQuantity * sizeof(*(ubo->extensionGroupValues)));
+      memset(ubo->extensionGroupValues, 0, extensionGroupsQuantity * sizeof(*(ubo->extensionGroupValues)));
    }
    else
    {
@@ -1086,7 +1086,7 @@ static inline int getMapBorderDistance (struct ExitMap2D *borderInfo)
    {
       if (borderInfo->flags & 0x2)
       {
-         return -(borderInfo->aBorder - globalOffsetA);
+         return -(borderInfo->aBorder - globalOffsetA) - 1;
       }
       else
       {
@@ -1209,10 +1209,13 @@ CCE_PUBLIC_OPTIONS int cceEngine2D (void)
          for (uint32_t *iterator = g_dynamicMap->moveGroups->elementIDs, *end = g_dynamicMap->moveGroups->elementIDs + g_dynamicMap->moveGroups->elementsQuantity;
               iterator < end; ++iterator)
          {
-            (g_dynamicMap->elements + *iterator)->x += globalOffset[0];
-            (g_dynamicMap->elements + *iterator)->y += globalOffset[1];
+            (g_dynamicMap->elements + *iterator)->x -= exitMap->xOffset;
+            (g_dynamicMap->elements + *iterator)->y -= exitMap->yOffset;
             for (uint32_t i = *iterator, iend = elements; i > iend; --i)
             {
+               if ((cce__getDynamicElementFlags(i - 1) & 0x12) == 0x00) // No collider AND doesn't follow global offset
+                  continue;
+               
                cceDeleteMap2DElementDynamicMap2D(i - 1);
             }
             elements = *iterator + 1;
@@ -1238,6 +1241,9 @@ CCE_PUBLIC_OPTIONS int cceEngine2D (void)
             {
                for (uint32_t i = *iterator, iend = elements; i > iend; --i)
                {
+                  if ((cce__getDynamicElementFlags(i - 1) & 0x12) == 0x00) // No collider AND doesn't follow global offset
+                     continue;
+                  
                   cceDeleteMap2DElementDynamicMap2D(i - 1);
                }
                elements = *iterator + 1;

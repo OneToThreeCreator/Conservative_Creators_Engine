@@ -45,7 +45,8 @@ extern C:
 #define CCE_PROCESS_LOGIC_FOR_CLOSEST_MAP      0x008
 #define CCE_PROCESS_LOGIC_FOR_ALL_MAPS         0x00C
 #define CCE_FORCE_INITIALIZE_MAP_ONLOAD        0x040
-#define CCE_DEFAULT (CCE_RENDER_CLOSEST_MAP | CCE_PROCESS_LOGIC_ONLY_FOR_CURRENT_MAP)
+
+#define CCE_DEFAULT 0
 
 typedef uint_fast32_t cce_flag;
 
@@ -54,6 +55,10 @@ typedef uint_fast32_t cce_flag;
 #define CCE_COLLISION_GROUP 0x12
 
 #define CCE_COLLISION_LOGIC_ELEMENT   0xB
+
+#define CCE_COLLIDER              0x20
+#define CCE_ELEMENT_WITHOUT_COLLIDER 0x40
+#define CCE_ELEMENT_WITH_COLLIDER (CCE_COLLIDER | CCE_ELEMENT_WITHOUT_COLLIDER)
 
 struct ExitMap2D
 {
@@ -155,7 +160,7 @@ CCE_PUBLIC_OPTIONS uint8_t cceCreateGroupDynamicMap2D (cce_enum group_type, uint
 CCE_PUBLIC_OPTIONS uint8_t cceAddElementInGroupDynamicMap2D (cce_enum group_type, uint16_t ID, uint32_t elementID);
 CCE_PUBLIC_OPTIONS uint8_t cceAddElementInGroupVisibleDynamicMap2D (cce_enum group_type, uint16_t ID, uint32_t elementID);
 CCE_PUBLIC_OPTIONS void cceReplaceMap2DElementDynamicMap2D (struct Map2DElementDev *element, uint32_t ID, uint8_t hasCollider, uint8_t isCurrentPosition);
-CCE_PUBLIC_OPTIONS uint32_t cceCreateMap2DElementDynamicMap2D (struct Map2DElementDev *element, uint8_t hasCollider, uint8_t isCurrentPosition);
+CCE_PUBLIC_OPTIONS uint32_t cceCreateMap2DElementDynamicMap2D (struct Map2DElementDev *element, cce_enum elementType, uint8_t isCurrentPosition);
 CCE_PUBLIC_OPTIONS uint8_t cceDeleteGroupVisibilityFromElementDynamicMap2D (cce_enum group_type, uint16_t ID, uint32_t elementID);
 CCE_PUBLIC_OPTIONS uint8_t cceDeleteElementFromGroupDynamicMap2D (cce_enum group_type, uint16_t ID, uint32_t elementID);
 CCE_PUBLIC_OPTIONS void cceDeleteMap2DElementDynamicMap2D (uint32_t ID);

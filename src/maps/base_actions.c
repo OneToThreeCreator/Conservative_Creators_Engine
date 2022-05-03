@@ -263,19 +263,33 @@ void cce__beginBaseActions (struct Map2D *map)
 
 static void runDelayedActions (struct list *delayedActions)
 {
-   for (cce_void *prevnode = NULL, *node = delayedActions->chain; node != NULL; prevnode = node, node = LL_NEXT(node))
+   cce_void *prevnode = NULL, *node = delayedActions->chain;
+   struct DelayedAction *head;
+   while (node != NULL)
    {
       resetTimerDelayCompensation();
-      struct DelayedAction *head = (struct DelayedAction*) node;
+      head = (struct DelayedAction*) node;
       if (!(cceIsTimerEnded(&head->timer)))
-         continue;
+         goto CONTINUE;
       
       cceStartTimer(&head->timer);
-      (*(cce_endianSwapActions + head->actionID))(node + sizeof(struct DelayedAction));
+      (*(cce_actions + head->actionID))(node + sizeof(struct DelayedAction));
       
       --(head->repeatsLeft);
       if (head->repeatsLeft == 0)
+      {
          llrmsublistp(delayedActions, prevnode, 1);
+         if (prevnode == NULL)
+            node = delayedActions->chain;
+         else
+            node = LL_NEXT(prevnode);
+      }
+      else
+      {
+CONTINUE:
+         prevnode = node;
+         node = LL_NEXT(node);
+      }
    }
 }
 

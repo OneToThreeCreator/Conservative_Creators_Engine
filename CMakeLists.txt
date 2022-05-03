@@ -71,7 +71,7 @@ add_library(coffeechain
 
 set_target_properties(coffeechain PROPERTIES 
 	VERSION ${CoffeeChain_VERSION}
-   SOVERSION 1
+   SOVERSION 2
 )
 
 add_subdirectory(external/listlib)
@@ -116,8 +116,11 @@ if(CoffeeChain_BUILD_TESTING)
    )
    add_executable(coffeechain-test2
       test2/main.c
-      test2/printMap2D.c
-      test2/printMap2D.h
+   )
+   add_executable(coffeechain-test3
+      test3/main.c
+      test3/printMap2D.c
+      test3/printMap2D.h
    )
    target_include_directories(coffeechain-test1
       PRIVATE include
@@ -127,14 +130,22 @@ if(CoffeeChain_BUILD_TESTING)
       PRIVATE include
       PRIVATE ${CoffeeChain_BINARY_DIR}/include
    )
+   target_include_directories(coffeechain-test3
+      PRIVATE include
+      PRIVATE ${CoffeeChain_BINARY_DIR}/include
+   )
    target_link_directories(coffeechain-test1 PRIVATE ${CoffeeChain_BINARY_DIR})
    target_link_directories(coffeechain-test2 PRIVATE ${CoffeeChain_BINARY_DIR})
+   target_link_directories(coffeechain-test3 PRIVATE ${CoffeeChain_BINARY_DIR})
    target_link_libraries(coffeechain-test1 coffeechain)
    target_link_libraries(coffeechain-test2 coffeechain)
+   target_link_libraries(coffeechain-test3 coffeechain)
    add_test(NAME coffeechain-test1
             COMMAND coffeechain-test1)
    add_test(NAME coffeechain-test2
-            COMMAND coffeechain-test2 ${CoffeeChain_SOURCE_DIR})
+            COMMAND coffeechain-test2)
+   add_test(NAME coffeechain-test3
+            COMMAND coffeechain-test3 ${CoffeeChain_SOURCE_DIR})
    
    if(NOT WIN32)
       target_link_options(coffeechain-test1 PRIVATE -Wl,-rpath=${CoffeeChain_BINARY_DIR})

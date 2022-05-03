@@ -372,24 +372,24 @@ CCE_PUBLIC_OPTIONS cce_ubyte cceCheckCollision (int32_t element1_x, int32_t elem
 {
    if (element1_x < element2_x)
    {
-      if (element1_x + element1_width < element2_x)
+      if (element1_x + element1_width <= element2_x)
       {
          return 0u;
       }
    }
-   else if (element1_x > element2_x + element2_width)
+   else if (element1_x >= element2_x + element2_width)
    {
       return 0u;
    }
    
    if (element1_y < element2_y)
    {
-      if (element1_y + element1_height < element2_y)
+      if (element1_y + element1_height <= element2_y)
       {
          return 0u;
       }
    }
-   else if (element1_y > element2_y + element2_height)
+   else if (element1_y >= element2_y + element2_height)
    { 
       return 0u;
    }
@@ -483,9 +483,9 @@ static uint_fast16_t* generateOperationsFromLogicElement (uint8_t ID, uint8_t is
    size_t operationsQuantity = (0x01 << (logicElementsQuantity - (3u + SHIFT_OF_FAST_SIZE))) * isLogicQuantityHigherThanVariableSize + (!isLogicQuantityHigherThanVariableSize);
    uint_fast16_t *operations = calloc(operationsQuantity, sizeof(uint_fast16_t));
    uint_fast16_t step;
-   if (ID < (3u + SHIFT_OF_FAST_SIZE)) 
+   if ((logicElementsQuantity - ID - 1u) < (3u + SHIFT_OF_FAST_SIZE)) 
    {
-      step = 1u << ID;
+      step = 1u << (logicElementsQuantity - ID - 1);
       for (uint_fast16_t mask = (UINT_FAST16_MAX >> (sizeof(uint_fast16_t) * 8u - step)) << (!isInverted * step);; mask <<= step * 2u)
       {
          *operations |= mask;
@@ -501,7 +501,7 @@ static uint_fast16_t* generateOperationsFromLogicElement (uint8_t ID, uint8_t is
    }
    else
    {
-      step = 1u << (ID - (3u + SHIFT_OF_FAST_SIZE));
+      step = 1u << (logicElementsQuantity - ID - 1 - (3u + SHIFT_OF_FAST_SIZE));
       for (uint_fast16_t *iterator = operations + (!isInverted * step), *end = operations + operationsQuantity; iterator < end; iterator += step * 2u)
       {
          memset(iterator, 1u, step * sizeof(uint_fast16_t));

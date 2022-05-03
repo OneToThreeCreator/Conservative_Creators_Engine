@@ -79,9 +79,6 @@ struct UsedUBO
 
 struct DynamicMap2DElement
 {
-   uint16_t *moveGroups;
-   uint16_t *extensionGroups;
-   uint16_t *collisionGroups;
    int32_t   x;
    int32_t   y;
    uint16_t  width;
@@ -89,6 +86,9 @@ struct DynamicMap2DElement
    struct Texture textureInfo;
    uint16_t  moveGroupsQuantity;
    uint16_t  extensionGroupsQuantity;
+   uint16_t *moveGroups;
+   uint16_t *extensionGroups;
+   uint16_t *collisionGroups;
    uint16_t  collisionGroupsQuantity;
    uint16_t  textureElementReliesOn;
    uint8_t   visibleMoveGroups[4];
@@ -253,6 +253,7 @@ void cce__releaseUnusedUBO (uint16_t ID);
 void cce__allocateUBObuffers (uint16_t uboID, uint16_t moveGroupsQuantity, uint16_t extensionGroupsQuantity);
 struct UsedUBO* cce__getFreeUBOdata (uint16_t ID);
 struct DynamicMap2D* cce__initDynamicMap2D (GLuint EBO);
+uint8_t cce__getDynamicElementFlags (uint16_t ID);
 void cce__terminateDynamicMap2D (void);
 void cce__terminateEngine2D (void);
 
