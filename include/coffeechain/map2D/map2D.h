@@ -183,6 +183,8 @@ CCE_PUBLIC_OPTIONS uint16_t cceCreateLogicDynamicMap2D (void);
 CCE_PUBLIC_OPTIONS extern uint16_t cceLoadedMap2Dnumber;
 
 #define cceCheckCollisionMap2D(element1, element2) cceCheckCollision((element1)->x, (element1)->y, (element1)->width, (element1)->height, (element2)->x, (element2)->y, (element2)->width, (element2)->height)
+#define cceCheckCollisionMap2DWithOffset(element1, element2, offset) \
+cceCheckCollision((element1)->x, (element1)->y, (element1)->width, (element1)->height, (element2)->x + (offset)->x, (element2)->y + (offset)->y, (element2)->width, (element2)->height)
 #ifdef __cplusplus
 }
 #endif // __cplusplus

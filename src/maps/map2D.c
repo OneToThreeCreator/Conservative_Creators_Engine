@@ -140,6 +140,22 @@ static void drawMap2Dall (struct Map2Darray *maps)
    glUniform2i(*(uniformLocations + 2), 0, 0);
 }
 
+static cce_ubyte cce__fourthLogicTypeFuncDynamicMap2Dnearest (uint16_t ID, va_list argp)
+{
+   struct Map2D *map = va_arg(argp, struct Map2D*);
+   struct Map2D **nearestMaps = va_arg(argp, struct Map2D**);
+   size_t nearestMapsQuantity = va_arg(argp, size_t);
+   struct cce_ivec2 *offsets = va_arg(argp, struct cce_ivec2*);
+   return cce__checkCollisionDynamicMap2DmultipleMaps(ID, map, nearestMaps, nearestMapsQuantity, offsets, sizeof(struct cce_ivec2));
+
+}
+
+static cce_ubyte cce__fourthLogicTypeFuncDynamicMap2Dall (uint16_t ID, va_list argp)
+{
+   struct Map2Darray *maps = va_arg(argp, struct Map2Darray*);
+   return cce__checkCollisionDynamicMap2DmultipleMaps(ID, maps->main, maps->dependies, maps->main->exitMapsQuantity, (struct cce_ivec2*) &(maps->main->exitMaps->xOffset), sizeof(struct ExitMap2D));
+}
+
 static void dontProcessLogicMap2D (struct Map2Darray *maps)
 {
    return;
@@ -147,13 +163,23 @@ static void dontProcessLogicMap2D (struct Map2Darray *maps)
 
 static void processLogicMap2Dmain (struct Map2Darray *maps)
 {
-   cce__processLogicMap2D(maps->main);
+   struct Map2D *map = maps->main;
+   if ((map)->logicQuantity) 
+      cce__setCurrentTemporaryBools(map->temporaryBools);
+   cce__beginBaseActions(map);
+   cce__processLogic(map->logicQuantity, map->logic, map->timers, cce_actions, cce__fourthLogicTypeFuncMap2D, map);
+   cce__setCurrentTemporaryBools(g_dynamicMap->temporaryBools);
+   cce__processLogic(g_dynamicMap->logicQuantity, g_dynamicMap->logic, g_dynamicMap->timers, cce_actions, cce__fourthLogicTypeFuncDynamicMap2D, map);
+   cce__endBaseActions();
+   cce__endBaseActionsDynamicMap2D();
 }
 
 static void processLogicMap2Dnearest (struct Map2Darray *maps)
 {
    cce__processLogicMap2D(maps->main);
    cce__processLogicMap2D(*(maps->dependies + lastNearestMap2D));
+   struct cce_ivec2 offset = {(maps->main->exitMaps + lastNearestMap2D)->xOffset, (maps->main->exitMaps + lastNearestMap2D)->yOffset};
+   cce__processLogicDynamicMap2D(g_dynamicMap, maps->main, cce__fourthLogicTypeFuncDynamicMap2Dnearest, maps->main, maps->dependies + lastNearestMap2D, 1, &offset);
 }
 
 static void processLogicMap2Dall (struct Map2Darray *maps)
@@ -163,6 +189,7 @@ static void processLogicMap2Dall (struct Map2Darray *maps)
    {
       cce__processLogicMap2D((*iterator));
    }
+   cce__processLogicDynamicMap2D(g_dynamicMap, maps->main, cce__fourthLogicTypeFuncDynamicMap2Dall, maps);
 }
 
 static void (*drawMap2Dcommon) (struct Map2Darray*);
@@ -924,24 +951,18 @@ void cce__releaseTexture (uint16_t textureID)
    return;
 }
 
-cce_ubyte cce__fourthLogicTypeFuncMap2D(uint16_t ID, va_list argp)
+cce_ubyte cce__checkCollision (const uint32_t *group1firstID, uint16_t groups1quantity, const uint32_t *group2firstID, uint16_t groups2quantity,
+                               const cce_void *elements1, size_t element1size, const cce_void *elements2, size_t element2size)
 {
-   struct Map2D *map = (struct Map2D*) va_arg(argp, struct Map2D*);
-   uint32_t *group1IDs = ((map->collisionGroups + (map->collision + ID)->group1)->elementIDs);
-   uint32_t *group1lastID = (group1IDs + (map->collisionGroups + (map->collision + ID)->group1)->elementsQuantity - 1u);
-   uint32_t *group2firstID = ((map->collisionGroups + (map->collision + ID)->group2)->elementIDs);
-   uint32_t *group2IDs;
-   uint32_t *group2lastID = (group2firstID + (map->collisionGroups + (map->collision + ID)->group2)->elementsQuantity - 1u);
-   struct Map2DCollider *element1, *element2;
-   while (group1IDs <= group1lastID)
+   cce_ubyte isDifferent = (elements1 != elements2);
+   const uint32_t *group1IDs = group1firstID, *group2IDs, *groups1end = group1firstID + groups1quantity, *groups2end = group2firstID + groups2quantity;
+   while (group1IDs < groups1end)
    {
       group2IDs = group2firstID;
-      while (group2IDs <= group2lastID)
+      while (group2IDs < groups2end)
       {
-         element1 = (map->colliders + *group1IDs);
-         element2 = (map->colliders + *group2IDs);
-         // ignore comparing with itself
-         if ((element1 != element2) && cceCheckCollisionMap2D(element1, element2))
+         if (((*group1IDs != *group2IDs) || isDifferent) &&
+         cceCheckCollisionMap2D((struct Map2DCollider*) (elements1 + (*group1IDs * element1size)), (struct Map2DCollider*) (elements2 + (*group2IDs * element2size))))
          {
             return 1u;
          }
@@ -950,6 +971,38 @@ cce_ubyte cce__fourthLogicTypeFuncMap2D(uint16_t ID, va_list argp)
       ++group1IDs;
    }
    return 0u;
+}
+
+cce_ubyte cce__checkCollisionWithOffset (const uint32_t *group1firstID, uint16_t groups1quantity, const uint32_t *group2firstID, uint16_t groups2quantity,
+                                         const cce_void *elements1, size_t element1size, const struct cce_ivec2 *elements1offset,
+                                         const cce_void *elements2, size_t element2size, const struct cce_ivec2 *elements2offset)
+{
+   cce_ubyte isDifferent = (elements1 != elements2);
+   const uint32_t *group1IDs = group1firstID, *group2IDs, *groups1end = group1firstID + groups1quantity, *groups2end = group2firstID + groups2quantity;
+   while (group1IDs < groups1end)
+   {
+      group2IDs = group2firstID;
+      while (group2IDs < groups2end)
+      {
+         struct cce_ivec2 offset = {elements2offset->x - elements1offset->x, elements2offset->y - elements1offset->y};
+         if (((*group1IDs != *group2IDs) || isDifferent) &&
+         cceCheckCollisionMap2DWithOffset((struct Map2DCollider*) (elements1 + (*group1IDs * element1size)), (struct Map2DCollider*) (elements2 + (*group2IDs * element2size)), &offset))
+         {
+            return 1u;
+         }
+         ++group2IDs;
+      }
+      ++group1IDs;
+   }
+   return 0u;
+}
+
+cce_ubyte cce__fourthLogicTypeFuncMap2D(uint16_t ID, va_list argp)
+{
+   struct Map2D *map = (struct Map2D*) va_arg(argp, struct Map2D*);
+   return cce__checkCollision((map->collisionGroups + (map->collision + ID)->group1)->elementIDs, (map->collisionGroups + (map->collision + ID)->group1)->elementsQuantity,
+                              (map->collisionGroups + (map->collision + ID)->group2)->elementIDs, (map->collisionGroups + (map->collision + ID)->group2)->elementsQuantity,
+                              (cce_void*) map->colliders, sizeof(struct Map2DCollider), (cce_void*) map->colliders, sizeof(struct Map2DCollider));
 }
 
 static void swapMap2D (struct Map2D **a, struct Map2D **b)
@@ -1180,7 +1233,6 @@ CCE_PUBLIC_OPTIONS int cceEngine2D (void)
       cce__swapBuffers();
       cce__engineUpdate();
       processLogicMap2Dcommon(maps);
-      cce__processLogicDynamicMap2D(g_dynamicMap, maps->main);
 #ifndef NDEBUG
       {
          static uint16_t frames = 0;

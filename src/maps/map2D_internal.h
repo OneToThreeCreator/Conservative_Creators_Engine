@@ -239,8 +239,15 @@ cce__elementToMap2DElementVertices(buffer, (element)->x, (element)->y, (element)
 ((element)->flags & CCE_GLOBAL_OFFSET_MASK) > 0, (element)->rotateGroup, &((element)->textureInfo), (element)->textureElementReliesOn, \
 (element)->textureOffsetGroups, 4, (element)->colorGroups, 4)
 
+cce_ubyte cce__checkCollision (const uint32_t *group1firstID, uint16_t groups1quantity, const uint32_t *group2firstID, uint16_t groups2quantity,
+                               const cce_void *elements1, size_t element1size, const cce_void *elements2, size_t element2size);
+
+cce_ubyte cce__checkCollisionWithOffset (const uint32_t *group1firstID, uint16_t groups1quantity, const uint32_t *group2firstID, uint16_t groups2quantity,
+                                         const cce_void *elements1, size_t element1size, const struct cce_ivec2 *elements1offset,
+                                         const cce_void *elements2, size_t element2size, const struct cce_ivec2 *elements2offset);
 cce_ubyte cce__fourthLogicTypeFuncMap2D(uint16_t ID, va_list argp);
 cce_ubyte cce__fourthLogicTypeFuncDynamicMap2D(uint16_t ID, va_list argp);
+cce_ubyte cce__checkCollisionDynamicMap2DmultipleMaps (uint16_t ID, struct Map2D *map, struct Map2D **maps, size_t mapsQuantity, const struct cce_ivec2 *mapOffsets, size_t mapOffsetsSize);
 uint16_t cce__loadTexture (uint32_t ID);
 void cce__processDynamicMap2DElements (void);
 uint16_t* cce__loadTexturesMap2D (struct Map2DElement *elements, uint32_t elementsQuantity, uint16_t *texturesLoadedMapReliesOnQuantity);
@@ -262,8 +269,8 @@ void cce__terminateEngine2D (void);
 cce__beginBaseActions(map); \
 cce__processLogic((map)->logicQuantity, (map)->logic, (map)->timers, cce_actions, cce__fourthLogicTypeFuncMap2D, map); \
 cce__endBaseActions()
-#define cce__processLogicDynamicMap2D(dynamicMap, currentMap) cce__setCurrentTemporaryBools((dynamicMap)->temporaryBools); cce__beginBaseActions(currentMap); \
-cce__processLogic((dynamicMap)->logicQuantity, (dynamicMap)->logic, (dynamicMap)->timers, cce_actions, cce__fourthLogicTypeFuncDynamicMap2D, currentMap); \
+#define cce__processLogicDynamicMap2D(dynamicMap, currentMap, cce__fourthLogicTypeFunc, ...) cce__setCurrentTemporaryBools((dynamicMap)->temporaryBools); cce__beginBaseActions(currentMap); \
+cce__processLogic((dynamicMap)->logicQuantity, (dynamicMap)->logic, (dynamicMap)->timers, cce_actions, cce__fourthLogicTypeFunc, __VA_ARGS__); \
 cce__endBaseActions(); \
 cce__endBaseActionsDynamicMap2D()
 

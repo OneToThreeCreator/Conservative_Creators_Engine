@@ -790,41 +790,19 @@ CCE_PUBLIC_OPTIONS void cceReplaceColliderDynamicMap2D (struct Map2DCollider *co
    (g_dynamicMap->elements + ID)->height = collider->height;
 }
 
-static cce_ubyte cce__checkCollision (uint32_t *group1firstID, uint32_t *group1lastID, uint32_t *group2firstID, uint32_t *group2lastID,
-                                      cce_void *elements1, size_t element1size, cce_void *elements2, size_t element2size)
-{
-   cce_ubyte isDifferent = (elements1 != elements2);
-   uint32_t *group1IDs = group1firstID, *group2IDs;
-   while (group1IDs <= group1lastID)
-   {
-      group2IDs = group2firstID;
-      while (group2IDs <= group2lastID)
-      {
-         // Identical iterating with 2 different structs without duplication. Dangerous! Also ignore comparing with itself.
-         if (((*group1IDs != *group2IDs) || isDifferent) &&
-         cceCheckCollisionMap2D((struct Map2DCollider*) (elements1 + (*group1IDs * element1size)), (struct Map2DCollider*) (elements2 + (*group2IDs * element2size))))
-         {
-            return 1u;
-         }
-         ++group2IDs;
-      }
-      ++group1IDs;
-   }
-   return 0u;
-}
-
 cce_ubyte cce__fourthLogicTypeFuncDynamicMap2D (uint16_t ID, va_list argp)
 {
    struct Map2D *map = (struct Map2D*) va_arg(argp, struct Map2D*);
-   uint32_t *group1firstID, *group1lastID, *group2firstID, *group2lastID;
+   uint32_t *group1firstID, *group2firstID;
    cce_void *elements1, *elements2;
+   uint16_t groups1Quantity, groups2Quantity;
    uint8_t element1Size, element2Size;
    if ((g_dynamicMap->collision + ID)->flags & 0x2)
    {
       if ((g_dynamicMap->collision + ID)->group1 >= map->collisionGroupsQuantity)
          return 0;
       group1firstID = (map->collisionGroups + (g_dynamicMap->collision + ID)->group1)->elementIDs;
-      group1lastID = (group1firstID + (map->collisionGroups + (g_dynamicMap->collision + ID)->group1)->elementsQuantity - 1u);
+      groups1Quantity = (map->collisionGroups + (g_dynamicMap->collision + ID)->group1)->elementsQuantity;
       elements1 = (cce_void*) map->colliders;
       element1Size = sizeof(struct Map2DCollider);
    }
@@ -833,7 +811,7 @@ cce_ubyte cce__fourthLogicTypeFuncDynamicMap2D (uint16_t ID, va_list argp)
       if ((g_dynamicMap->collision + ID)->group1 >= g_dynamicMap->collisionGroupsQuantity)
          return 0;
       group1firstID = (g_dynamicMap->collisionGroups + (g_dynamicMap->collision + ID)->group1)->elementIDs;
-      group1lastID = (group1firstID + (g_dynamicMap->collisionGroups + (g_dynamicMap->collision + ID)->group1)->elementsQuantity - 1u);
+      groups1Quantity = (g_dynamicMap->collisionGroups + (g_dynamicMap->collision + ID)->group1)->elementsQuantity;
       elements1 = (cce_void*) g_dynamicMap->elements;
       element1Size = sizeof(struct DynamicMap2DElement);
    }
@@ -842,7 +820,7 @@ cce_ubyte cce__fourthLogicTypeFuncDynamicMap2D (uint16_t ID, va_list argp)
       if ((g_dynamicMap->collision + ID)->group2 >= map->collisionGroupsQuantity)
          return 0;
       group2firstID = ((map->collisionGroups + (g_dynamicMap->collision + ID)->group2)->elementIDs);
-      group2lastID = (group2firstID + (map->collisionGroups + (g_dynamicMap->collision + ID)->group2)->elementsQuantity - 1u);
+      groups2Quantity = (map->collisionGroups + (g_dynamicMap->collision + ID)->group2)->elementsQuantity;
       elements2 = (cce_void*) map->colliders;
       element2Size = sizeof(struct Map2DCollider);
    }
@@ -851,14 +829,77 @@ cce_ubyte cce__fourthLogicTypeFuncDynamicMap2D (uint16_t ID, va_list argp)
       if ((g_dynamicMap->collision + ID)->group2 >= g_dynamicMap->collisionGroupsQuantity)
          return 0;
       group2firstID = ((g_dynamicMap->collisionGroups + (g_dynamicMap->collision + ID)->group2)->elementIDs);
-      group2lastID = (group2firstID + (g_dynamicMap->collisionGroups + (g_dynamicMap->collision + ID)->group2)->elementsQuantity - 1u);
+      groups2Quantity = (g_dynamicMap->collisionGroups + (g_dynamicMap->collision + ID)->group2)->elementsQuantity;
       elements2 = (cce_void*) g_dynamicMap->elements;
       element2Size = sizeof(struct DynamicMap2DElement);
    }
-   if (cce__checkCollision(group1firstID, group1lastID, group2firstID, group2lastID, elements1, element1Size, elements2, element2Size) == 1)
-      return 1u;
-   
-   return 0u;
+   return cce__checkCollision(group1firstID, groups1Quantity, group2firstID, groups2Quantity, elements1, element1Size, elements2, element2Size);
+}
+
+#define cce__checkCollisionBetweenMaps(collision, collisionGroups1, collisionGroups2, elements1, elements2) \
+cce__checkCollision(((collisionGroups1) + (collision)->group1)->elementIDs, ((collisionGroups1) + (collision)->group1)->elementsQuantity, \
+                    ((collisionGroups2) + (collision)->group2)->elementIDs, ((collisionGroups2) + (collision)->group2)->elementsQuantity, \
+                    (cce_void*) elements1, sizeof(*(elements1)), (cce_void*) elements2, sizeof(*(elements2)))
+
+#define cce__checkCollisionBetweenMapsWithOffset(collision, collisionGroups1, collisionGroups2, elements1, elements2, offset1, offset2) \
+cce__checkCollisionWithOffset(((collisionGroups1) + (collision)->group1)->elementIDs, ((collisionGroups1) + (collision)->group1)->elementsQuantity, \
+                              ((collisionGroups2) + (collision)->group2)->elementIDs, ((collisionGroups2) + (collision)->group2)->elementsQuantity, \
+                              (cce_void*) elements1, sizeof(*(elements1)), offset1, (cce_void*) elements2, sizeof(*(elements2)), offset2)
+
+cce_ubyte cce__checkCollisionDynamicMap2DmultipleMaps (uint16_t ID, struct Map2D *map, struct Map2D **maps, size_t mapsQuantity, const struct cce_ivec2 *mapOffsets, size_t mapOffsetsSize)
+{
+   const struct DynamicCollisionGroup *collision = (g_dynamicMap->collision + ID);
+   const struct cce_ivec2 *offsets = mapOffsets;
+   struct cce_ivec2 zero = {0, 0};
+   switch (collision->flags & 0x6)
+   {
+      case 0x0:
+         return cce__checkCollisionBetweenMaps(collision, g_dynamicMap->collisionGroups, g_dynamicMap->collisionGroups, g_dynamicMap->elements, g_dynamicMap->elements);
+      case 0x2:
+         if (cce__checkCollisionBetweenMaps(collision, map->collisionGroups, g_dynamicMap->collisionGroups, map->colliders, g_dynamicMap->elements))
+            return 1;
+         for (struct Map2D **iterator = maps, **end = maps + mapsQuantity; iterator < end; ++iterator, offsets = (const struct cce_ivec2*) (((cce_void*) offsets) + mapOffsetsSize))
+         {
+            if (cce__checkCollisionBetweenMapsWithOffset(collision, (*iterator)->collisionGroups, g_dynamicMap->collisionGroups, (*iterator)->colliders, g_dynamicMap->elements, offsets, &zero))
+               return 1;
+         }
+         break;
+      case 0x4:
+         if (cce__checkCollisionBetweenMaps(collision, g_dynamicMap->collisionGroups, map->collisionGroups, g_dynamicMap->elements, map->colliders))
+            return 1;
+         for (struct Map2D **iterator = maps, **end = maps + mapsQuantity; iterator < end; ++iterator, offsets = (const struct cce_ivec2*) (((cce_void*) offsets) + mapOffsetsSize))
+         {
+            if (cce__checkCollisionBetweenMapsWithOffset(collision, g_dynamicMap->collisionGroups, (*iterator)->collisionGroups, g_dynamicMap->elements, (*iterator)->colliders, &zero, offsets))
+               return 1;
+         }
+         break;
+      case 0x6: // Both collisions are not with dynamicMap
+      {
+         if (cce__checkCollisionBetweenMaps(collision, map->collisionGroups, map->collisionGroups, map->colliders, map->colliders))
+            return 1;
+         offsets = mapOffsets;
+         // Check collision between currentMap and all nearest maps
+         for (struct Map2D **iterator = maps, **end = maps + mapsQuantity; iterator < end; ++iterator, offsets = (const struct cce_ivec2*) (((cce_void*) offsets) + mapOffsetsSize))
+         {
+            if (cce__checkCollisionBetweenMapsWithOffset(collision, map->collisionGroups, (*iterator)->collisionGroups, map->colliders, (*iterator)->colliders, &zero, offsets))
+               return 1;
+         }
+         offsets = mapOffsets;
+         // Check collision between all nearest maps
+         for (struct Map2D **iterator = maps, **end = maps + mapsQuantity; iterator < end; ++iterator, offsets = (const struct cce_ivec2*) (((cce_void*) offsets) + mapOffsetsSize))
+         {
+            const struct cce_ivec2 *offsets2 = offsets;
+            for (struct Map2D **jiterator = iterator, **jend = maps + mapsQuantity; jiterator < jend; ++jiterator, offsets2 = (const struct cce_ivec2*) (((cce_void*) offsets2) + mapOffsetsSize))
+            {
+               if (cce__checkCollisionBetweenMapsWithOffset(collision, (*iterator)->collisionGroups, (*jiterator)->collisionGroups,
+                                                            (*iterator)->colliders, (*jiterator)->colliders, offsets, offsets2))
+                  return 1;
+            }
+         }
+         break;
+      }
+   }
+   return 0;
 }
 
 CCE_PUBLIC_OPTIONS void cceUpdateCollisionDynamicMap2D (uint16_t ID, uint16_t group1ID, cce_ubyte isGroup1BelongsToCurrentMap2D, uint16_t group2ID, cce_ubyte isGroup2BelongsToCurrentMap2D)
