@@ -1,6 +1,6 @@
 /*
     CoffeeChain - open source engine for making games.
-    Copyright (C) 2020-2021 Andrey Givoronsky
+    Copyright (C) 2020-2022 Andrey Givoronsky
 
     This library is free software; you can redistribute it and/or
     modify it under the terms of the GNU Lesser General Public
@@ -26,6 +26,7 @@
 
 #include "../engine_common.h"
 #include "../engine_common_internal.h"
+#include "../tools.h"
 #include "../platform/path_getters.h"
 #include "map2D.h"
 #include "map2D_internal.h"

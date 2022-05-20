@@ -41,6 +41,9 @@ add_library(coffeechain
    src/engine_common.h
    include/coffeechain/engine_common.h
    src/engine_common_internal.h
+   src/tools.c
+   src/tools.h
+   include/coffeechain/tools.h
    src/platform/engine_common_glfw.c
    src/platform/engine_common_glfw.h
    src/platform/path_getters.c

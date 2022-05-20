@@ -1,6 +1,6 @@
 /*
     CoffeeChain - open source engine for making games.
-    Copyright (C) 2020-2021 Andrey Givoronsky
+    Copyright (C) 2020-2022 Andrey Givoronsky
 
     This library is free software; you can redistribute it and/or
     modify it under the terms of the GNU Lesser General Public
@@ -24,12 +24,6 @@
 #include <stdio.h>
 //#include "audio.h"
 #include "external/glad.h"
-
-#if !defined(CCE_ALLOCATION_STEP)
-#define CCE_ALLOCATION_STEP 8u
-#elif ((CCE_ALLOCATION_STEP) & ((CCE_ALLOCATION_STEP) - 1)) != 0
-#error "CCE_ALLOCATION_STEP must be a power of 2"
-#endif
 
 // Some default resolutions for different aspect ratios
 #define CCE_DEFAULT_WINDOW_WIDTH        800u
@@ -65,11 +59,6 @@
 
 #define MAX(x,y) (((x) > (y))?(x):(y))
 #define MIN(x,y) (((x) < (y))?(x):(y))
-
-#define MACRO_TO_STR_IMPL(x) #x 
-#define MACRO_TO_STR(x) MACRO_TO_STR_IMPL(x)
-
-#define CCE_CEIL_SIZE_TO_ALLOCATION_STEP(s) ((s & ~(CCE_ALLOCATION_STEP - 1u)) + CCE_ALLOCATION_STEP * ((s & (CCE_ALLOCATION_STEP - 1u)) > 0))
 
 struct UsedTemporaryBools
 {

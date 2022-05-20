@@ -1,6 +1,6 @@
 /*
     CoffeeChain - open source engine for making games.
-    Copyright (C) 2020-2021 Andrey Givoronsky
+    Copyright (C) 2020-2022 Andrey Givoronsky
 
     This library is free software; you can redistribute it and/or
     modify it under the terms of the GNU Lesser General Public
@@ -28,6 +28,7 @@
 #include "../engine_common.h"
 #include "../engine_common_internal.h"
 #include "../shader.h"
+#include "../tools.h"
 #include "../platform/endianess.h"
 #include "../platform/path_getters.h"
 #include "../external/stb_image.h"
@@ -38,14 +39,10 @@ CCE_PUBLIC_OPTIONS uint16_t cceLoadedMap2Dnumber;
 
 static uint32_t                   g_texturesWidth;
 static uint32_t                   g_texturesHeight;
-static struct LoadedTextures     *g_textures;
-static uint16_t                   g_texturesQuantity;
-static uint16_t                   g_texturesQuantityAllocated;
+CCE_ARRAY(g_textures, static struct LoadedTextures, static uint16_t);
 static GLuint                     glTexturesArray;
 static uint16_t                   glTexturesArraySize;
-static struct UsedUBO            *g_UBOs;
-static uint16_t                   g_UBOsQuantity;
-static uint16_t                   g_UBOsQuantityAllocated;
+CCE_ARRAY(g_UBOs, static struct UsedUBO, static uint16_t);
 static GLuint                     g_cleanUBO;
 static GLint                      g_uniformBufferSize;
 static GLuint                     g_EBO;
@@ -362,8 +359,7 @@ CCE_PUBLIC_OPTIONS int cceInitEngine2D (uint16_t globalBoolsQuantity, uint32_t t
       glUniformBlockBinding(shaderProgram, glGetUniformBlockIndex(shaderProgram, "Variables"), 1u);
       GL_CHECK_ERRORS;
    }
-   g_UBOsQuantityAllocated = CCE_ALLOCATION_STEP;
-   g_UBOs = (struct UsedUBO*) malloc(g_UBOsQuantityAllocated * sizeof(struct UsedUBO));
+   CCE_ALLOC_ARRAY(g_UBOs);
    {
       GLint maxUniformOffset = 0;
       uint8_t i = 0, maxI;
@@ -425,9 +421,7 @@ CCE_PUBLIC_OPTIONS int cceInitEngine2D (uint16_t globalBoolsQuantity, uint32_t t
    
    g_texturesWidth = textureMaxWidth;
    g_texturesHeight = textureMaxHeight;
-   g_textures = (struct LoadedTextures*) calloc(CCE_ALLOCATION_STEP, sizeof(struct LoadedTextures));
-   g_texturesQuantity = 0u;
-   g_texturesQuantityAllocated = CCE_ALLOCATION_STEP;
+   CCE_CALLOC_ARRAY(g_textures);
    glTexturesArray = createTextureArray(CCE_ALLOCATION_STEP);
    glTexturesArraySize = CCE_ALLOCATION_STEP;
    g_elementBufferSize = 0;
@@ -553,12 +547,7 @@ void cce__updateTexturesArray (void)
         (iterator >= g_textures) && (iterator->dependantMapsQuantity == 0u); --iterator, ++freeTexturesQuantityFromEnd);
 
    g_texturesQuantity -= freeTexturesQuantityFromEnd;
-   uint16_t size = CCE_CEIL_SIZE_TO_ALLOCATION_STEP(g_texturesQuantity);
-   if (size < g_texturesQuantityAllocated)
-   {
-      g_textures = realloc(g_textures, size * sizeof(struct LoadedTextures));
-      g_texturesQuantityAllocated = size;
-   }
+   CCE_FIT_ARRAY_TO_SIZE(g_textures);
    int width, height, nrChannels;
    uint8_t arrayResized = 0u;
    cce_ubyte *data;
@@ -756,12 +745,6 @@ void cce__initLogicMap2D (struct Map2D *map)
    cce__endBaseActions();
 }
 
-static void extendLoadedTextures (uint16_t amount)
-{
-   g_texturesQuantityAllocated = CCE_CEIL_SIZE_TO_ALLOCATION_STEP(amount);
-   g_textures = realloc(g_textures, g_texturesQuantityAllocated * sizeof(struct LoadedTextures));
-}
-
 struct UsedUBO* cce__getFreeUBOdata (uint16_t ID)
 {
    if (ID >= g_UBOsQuantity)
@@ -784,7 +767,7 @@ uint16_t cce__loadTexture (uint32_t textureID)
          ++g_texturesQuantity;
          if (g_texturesQuantity > g_texturesQuantityAllocated)
          {
-            extendLoadedTextures(CCE_ALLOCATION_STEP);
+            CCE_REALLOC_ARRAY(g_textures, (g_texturesQuantityAllocated + CCE_ALLOCATION_STEP));
          }
          break;
       }
@@ -915,7 +898,7 @@ uint16_t* cce__loadTexturesMap2D (struct Map2DElement *elements, uint32_t elemen
          ++g_texturesQuantity;
          if (g_texturesQuantity > g_texturesQuantityAllocated)
          {
-            extendLoadedTextures(CCE_ALLOCATION_STEP);
+            CCE_REALLOC_ARRAY(g_textures, g_texturesQuantityAllocated + CCE_ALLOCATION_STEP);
          }
       }
       ((g_textures + current_g_texture)->ID) = (*kiterator);

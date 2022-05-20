@@ -1,6 +1,6 @@
 /*
     CoffeeChain - open source engine for making games.
-    Copyright (C) 2020-2021 Andrey Givoronsky
+    Copyright (C) 2020-2022 Andrey Givoronsky
 
     This library is free software; you can redistribute it and/or
     modify it under the terms of the GNU Lesser General Public
@@ -22,6 +22,7 @@
 #include <stdlib.h>
 #include "../engine_common.h"
 #include "../engine_common_internal.h"
+#include "../tools.h"
 #include <GLFW/glfw3.h>
 
 #define CCE_FULLSCREEN 0x10

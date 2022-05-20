@@ -1,6 +1,6 @@
 /*
     CoffeeChain - open source engine for making games.
-    Copyright (C) 2020-2021 Andrey Givoronsky
+    Copyright (C) 2020-2022 Andrey Givoronsky
 
     This library is free software; you can redistribute it and/or
     modify it under the terms of the GNU Lesser General Public
@@ -27,6 +27,7 @@
 #include "engine_common.h"
 #include "engine_common_internal.h"
 #include "shader.h"
+#include "tools.h"
 #include "platform/path_getters.h"
 #include "external/stb_image.h"
 
@@ -44,10 +45,8 @@ static struct GlobalVariables cce_Gvars;
 
 //static struct alObjects *AL;
 
-static struct UsedTemporaryBools *g_temporaryBools;
-static uint16_t                   g_temporaryBoolsQuantity;
-static uint16_t                   g_temporaryBoolsQuantityAllocated;
-static uint8_t                    g_flags;
+CCE_ARRAY(g_temporaryBools, static struct UsedTemporaryBools, static uint16_t);
+static uint8_t g_flags;
 
 void (*cce__engineUpdate__api) (void);
 void (*cce__terminateEngine__api) (void);
@@ -394,36 +393,6 @@ CCE_PUBLIC_OPTIONS cce_ubyte cceCheckCollision (int32_t element1_x, int32_t elem
       return 0u;
    }
    return 1u;
-}
-
-CCE_PUBLIC_OPTIONS size_t cceBinarySearch (const void *const array, const size_t arraySize, const size_t typeSize, const size_t step, const size_t value)
-{
-   if (!arraySize)
-      return -1;
-      
-   const uint8_t *iterator = (uint8_t*) array;
-   const uint8_t *end = ((uint8_t*) array) + arraySize * step;
-   size_t remain = arraySize;
-   size_t typeRemain;
-   size_t typeMask;
-   if (typeSize >= sizeof(size_t))
-   {
-      typeMask = SIZE_MAX;
-   }
-   else
-   {
-      typeMask = (((size_t) 1u) << typeSize * 8u) - 1u;
-   }
-   do
-   {
-      remain >>= 1u;
-      typeRemain = remain * step;
-      if (iterator + typeRemain + step >= end)
-         continue;
-      iterator += (typeRemain + step) * (((*((size_t*) (iterator + typeRemain))) & typeMask) < value);
-   }
-   while (remain > 0u); /* Checking for last valid value, because we cannot detect underflow of unsigned variable */
-   return (iterator - (uint8_t*) array) / step;
 }
 
 struct operationsStack
