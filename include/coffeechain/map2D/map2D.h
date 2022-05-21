@@ -38,11 +38,11 @@ extern C:
 
 
 #define CCE_RENDER_ONLY_CURRENT_MAP            0x001
-#define CCE_RENDER_CLOSEST_MAP                 0x002
+#define CCE_RENDER_VISIBLE_MAPS                0x002
 #define CCE_RENDER_ALL_LOADED_MAPS             0x003
 #define CCE_PROCESS_LOGIC_ONLY_FOR_CURRENT_MAP 0x000 // default
 #define CCE_DONT_PROCESS_LOGIC                 0x004
-#define CCE_PROCESS_LOGIC_FOR_CLOSEST_MAP      0x008
+#define CCE_PROCESS_LOGIC_FOR_VISIBLE_MAPS     0x008
 #define CCE_PROCESS_LOGIC_FOR_ALL_MAPS         0x00C
 #define CCE_FORCE_INITIALIZE_MAP_ONLOAD        0x040
 
@@ -149,6 +149,8 @@ CCE_PUBLIC_OPTIONS int cceInitEngine2D (uint16_t globalBoolsQuantity, uint32_t t
 CCE_PUBLIC_OPTIONS uint8_t cceRegisterAction (uint32_t ID, void (*action)(void*), void (*endianSwap)(void*));
 CCE_PUBLIC_OPTIONS void cceSetTexturesPath (const char *path);
 CCE_PUBLIC_OPTIONS int cceEngine2D (void);
+CCE_PUBLIC_OPTIONS void cceSetLoadedMap2D (uint16_t number, struct cce_ivec2 globalPosition);
+CCE_PUBLIC_OPTIONS extern const uint16_t *const cceLoadedMap2Dnumber;
 
 // dynamicMap2D
 
@@ -180,7 +182,6 @@ CCE_PUBLIC_OPTIONS void cceUpdateLogicElementsByTruthTableDynamicMap2D (const ui
 CCE_PUBLIC_OPTIONS uint8_t cceUpdateLogicElementsByBooleanExpressionDynamicMap2D (const uint16_t ID, const uint16_t *const logicElements, const cce_enum *const logicElementTypes, const char *const booleanExpression);
 CCE_PUBLIC_OPTIONS void cceUpdateLogicActionsDynamicMap2D (const uint16_t ID, const uint8_t actionsQuantity, uint32_t *actionIDs, const void **actionArgs, const uint32_t *const actionArgSizes);
 CCE_PUBLIC_OPTIONS uint16_t cceCreateLogicDynamicMap2D (void);
-CCE_PUBLIC_OPTIONS extern uint16_t cceLoadedMap2Dnumber;
 
 #define cceCheckCollisionMap2D(element1, element2) cceCheckCollision((element1)->x, (element1)->y, (element1)->width, (element1)->height, (element2)->x, (element2)->y, (element2)->width, (element2)->height)
 #define cceCheckCollisionMap2DWithOffset(element1, element2, offset) \

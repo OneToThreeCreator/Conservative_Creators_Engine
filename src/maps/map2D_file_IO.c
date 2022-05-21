@@ -136,7 +136,7 @@ CCE_PUBLIC_OPTIONS void cceFreeMap2D (struct Map2D *map)
       }
       cce_callbackOnFreeing(map->ID);
    }
-   if (*map2Dflags & (CCE_PROCESS_LOGIC_FOR_CLOSEST_MAP | CCE_PROCESS_LOGIC_FOR_ALL_MAPS | CCE_FORCE_INITIALIZE_MAP_ONLOAD))
+   if (*map2Dflags & (CCE_PROCESS_LOGIC_FOR_VISIBLE_MAPS | CCE_PROCESS_LOGIC_FOR_ALL_MAPS | CCE_FORCE_INITIALIZE_MAP_ONLOAD))
    {
       cce__releaseTemporaryBools(map->temporaryBools);
       cce__releaseUBO(map->UBO_ID);
@@ -565,7 +565,7 @@ struct Map2D* cceLoadMap2D (uint16_t number)
       map->staticActionArgs = (cce_void *) malloc((*(map->staticActionArgOffsets + map->staticActionsQuantity)) * sizeof(uint8_t));
       fread( (map->staticActionArgs), 1u, *(map->staticActionArgOffsets + map->staticActionsQuantity), mapFile);
 
-      if (*map2Dflags & (CCE_PROCESS_LOGIC_FOR_CLOSEST_MAP | CCE_PROCESS_LOGIC_FOR_ALL_MAPS | CCE_FORCE_INITIALIZE_MAP_ONLOAD))
+      if (*map2Dflags & (CCE_PROCESS_LOGIC_FOR_VISIBLE_MAPS | CCE_PROCESS_LOGIC_FOR_ALL_MAPS | CCE_FORCE_INITIALIZE_MAP_ONLOAD))
       {
          cce__initLogicMap2D(map);
       }
@@ -735,7 +735,7 @@ struct Map2D* cceMap2DdevToMap2D (struct Map2Ddev *mapdev)
       map->staticActionArgs = malloc(*(mapdev->actionsArgOffsets + mapdev->actionsQuantity) * sizeof(cce_void));
       memcpy(map->staticActionArgs, mapdev->actionsArg, *(mapdev->actionsArgOffsets + mapdev->actionsQuantity) * sizeof(cce_void));
 
-      if (*map2Dflags & (CCE_PROCESS_LOGIC_FOR_CLOSEST_MAP | CCE_PROCESS_LOGIC_FOR_ALL_MAPS | CCE_FORCE_INITIALIZE_MAP_ONLOAD))
+      if (*map2Dflags & (CCE_PROCESS_LOGIC_FOR_VISIBLE_MAPS | CCE_PROCESS_LOGIC_FOR_ALL_MAPS | CCE_FORCE_INITIALIZE_MAP_ONLOAD))
       {
          cce__initLogicMap2D(map);
       }

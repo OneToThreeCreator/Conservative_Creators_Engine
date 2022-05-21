@@ -36,6 +36,10 @@
 
 #define CCE_PROCESS_TEXTURES 0x010
 #define CCE_PROCESS_UBO_ARRAY 0x020
+#define CCE_PROCESS_NEAREST_MAPS 0x040
+#define CCE_PROCESS_LOADEDMAP2D  0x080
+#define CCE_PROCESS_GLOBALOFFSET 0x200
+#define CCE_GLOBAL_OFFSET_CHANGED (CCE_PROCESS_NEAREST_MAPS | CCE_PROCESS_GLOBALOFFSET)
 
 #define CCE_BASIC_ACTIONS_NOT_SET 0x100
 #define CCE_INIT CCE_BASIC_ACTIONS_NOT_SET
@@ -208,12 +212,13 @@ struct Map2D
 
 extern void (**cce_actions)(void*);
 extern void (**cce_endianSwapActions)(void*);
+extern struct cce_ivec2 cce__globalOffset;
 
 char* cce__createNewPathFromOldPath (const char *const oldPath, const char *const appendPath, size_t freeSpaceToLeave);
 
 void cce__baseActionsInit (struct DynamicMap2D *dynamic_map, struct UsedUBO *UBOs, const GLint *bufferUniformsOffsets,
                            const GLint *uniformLocations, GLuint shaderProgram, void (*setUniformBufferToDefault)(GLuint, GLint),
-                           const GLint *uniformBufferSize, const cce_flag *flags);
+                           const GLint *uniformBufferSize, cce_flag *flags);
 void cce__initMap2DLoaders (GLuint *EBO, const cce_flag *flagsPointer);
 void cce__setCurrentArrayOfMaps (const struct Map2Darray *maps);
 void cce__beginBaseActions (struct Map2D *map);
@@ -235,7 +240,7 @@ moveGroups, 4, extensionGroups, 4, globalOffset, (element)->rotateGroup, &((elem
 
 #define cce__dynamicMap2DElementToMap2DElementVertices(buffer, element) \
 cce__elementToMap2DElementVertices(buffer, (element)->x, (element)->y, (element)->width, (element)->height, \
-(element)->visibleMoveGroups, (element)->moveGroupsQuantity, (element)->visibleExtensionGroups, (element)->extensionGroupsQuantity, \
+(element)->visibleMoveGroups, 4, (element)->visibleExtensionGroups, 4, \
 ((element)->flags & CCE_GLOBAL_OFFSET_MASK) > 0, (element)->rotateGroup, &((element)->textureInfo), (element)->textureElementReliesOn, \
 (element)->textureOffsetGroups, 4, (element)->colorGroups, 4)
 
@@ -261,6 +266,7 @@ void cce__allocateUBObuffers (uint16_t uboID, uint16_t moveGroupsQuantity, uint1
 struct UsedUBO* cce__getFreeUBOdata (uint16_t ID);
 struct DynamicMap2D* cce__initDynamicMap2D (GLuint EBO);
 uint8_t cce__getDynamicElementFlags (uint16_t ID);
+void cce__setToBeProcessedDynamicMap2D (void);
 void cce__terminateDynamicMap2D (void);
 void cce__terminateEngine2D (void);
 
@@ -280,5 +286,7 @@ cce__endBaseActionsDynamicMap2D()
 #define CCE_TEXTUREOFFSET_OFFSET 3u
 #define CCE_ROTATIONOFFSET_OFFSET 4u
 #define CCE_ROTATEANGLESINCOS_OFFSET 5u
+
+#define CCE_GLOBALOFFSET_OFFSET 1u
 
 #endif // MAP2D_INTERNAL_H

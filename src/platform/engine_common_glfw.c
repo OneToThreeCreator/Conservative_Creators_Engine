@@ -307,7 +307,7 @@ struct cce_uvec2 getCurrentStep__glfw (void)
       }
       default:
       {
-         return (struct cce_uvec2) {16u, 16u / g_GLFWstate.monitorAspectRatio.x * g_GLFWstate.monitorAspectRatio.y};
+         return (struct cce_uvec2) {16u, (uint32_t) (16.0f / g_GLFWstate.monitorAspectRatio.x * g_GLFWstate.monitorAspectRatio.y)};
       }
    }
 }

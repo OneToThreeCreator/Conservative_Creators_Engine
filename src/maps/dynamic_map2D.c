@@ -38,6 +38,11 @@ static struct DynamicMap2DElement nullElement = {0, 0, 0u, 0u, {0, 0, 0, 0, 0u},
 static struct UsedUBO *usedUBO;
 static cce_ubyte flags;
 
+void cce__setToBeProcessedDynamicMap2D (void)
+{
+   flags |= CCE_DYNAMIC_MAP2D_TO_BE_PROCESSED;
+}
+
 static inline void bindVBOtoVAO (GLuint VBO, GLuint VAO)
 {
    glBindVertexArray(VAO);
@@ -461,6 +466,11 @@ static void updateMap2DElementDynamicMap2D (struct Map2DElementDev *element, uin
             cceAddElementInGroupVisibleDynamicMap2D(CCE_EXTENSION_GROUP, *iterator, ID);
       }
    }
+   else
+   {
+      memcpy(dynamicElement->visibleMoveGroups, element->moveGroups, 4 * sizeof(uint8_t));
+      memcpy(dynamicElement->visibleExtensionGroups, element->extensionGroups, 4 * sizeof(uint8_t));
+   }
    // elementType is a bitfield, not just enum (intentional)
    dynamicElement->flags = 0x1 + (((elementType & CCE_COLLIDER) > 0) << 1) + 0x4 + (((elementType & CCE_ELEMENT_WITHOUT_COLLIDER) > 0) << 3) + 
                            ((element->isGlobalOffset) << 4) + (isCurrentPosition << 5);
@@ -725,12 +735,18 @@ void cce__processDynamicMap2DElements (void)
             cce__dynamicMap2DElementToMap2DElementVertices(bufferPtr + (iterator - g_dynamicMap->elements) * 4, &nullElement);
          
          iterator->flags &= ~0x4u;
-         iterator->x += moveGroupOffset.x;
-         iterator->y += moveGroupOffset.y;
-         iterator->width  += extensionGroupOffset.x;
-         iterator->height += extensionGroupOffset.y;
          if (iterator->flags & 0x2)
+         {
+            iterator->x += moveGroupOffset.x;
+            iterator->y += moveGroupOffset.y;
+            iterator->width  += extensionGroupOffset.x;
+            iterator->height += extensionGroupOffset.y;
             iterator->flags |= 0x20;
+         }
+         else
+         {
+            iterator->flags &= ~0x20;
+         }
       }
    }
    glUnmapBuffer(GL_ARRAY_BUFFER);

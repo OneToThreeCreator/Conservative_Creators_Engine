@@ -95,8 +95,8 @@ CCE_PUBLIC_OPTIONS extern void* (*cceBigEndianConversionNewArrayIntN) (void*, co
 CCE_PUBLIC_OPTIONS uint16_t cceSwapEndianInt16 (uint16_t value);
 CCE_PUBLIC_OPTIONS uint32_t cceSwapEndianInt32 (uint32_t value);
 CCE_PUBLIC_OPTIONS uint64_t cceSwapEndianInt64 (uint64_t value);
-CCE_PUBLIC_OPTIONS void* cceSwapEndianArrayIntN (void *array, size_t size, size_t n);
-CCE_PUBLIC_OPTIONS void* cceSwapEndianNewArrayIntN (void *newArray, const void *array, size_t size, size_t n);
+CCE_PUBLIC_OPTIONS void* cceSwapEndianArrayIntN (void *array, size_t arraySize, size_t n);
+CCE_PUBLIC_OPTIONS void* cceSwapEndianNewArrayIntN (void *newArray, const void *array, size_t arraySize, size_t n);
 
 #define cceBigEndianToLittleEndianInt16(value) cceSwapEndianInt16(value)
 #define cceLittleEndianToBigEndianInt16(value) cceSwapEndianInt16(value)

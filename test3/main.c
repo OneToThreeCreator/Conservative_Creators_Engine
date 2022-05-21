@@ -49,7 +49,6 @@ static void initPlayer (uint32_t globalBoolsQuantity)
       if (cceAddElementInGroupDynamicMap2D(CCE_COLLISION_GROUP, i + 1, colliders[i]) != 0)
          printf("cceAddElementInGroupDynamicMap2D indicates an error!\n");
       collisions[i] = cceCreateCollisionDynamicMap2D(i + 1, 0, 0, 1);
-      printf("created collision %u\n", collisions[i]);
    }
    uint_fast16_t *abNc = cceParseStringToLogicOperations("a & b & !c", NULL);
    uint16_t logicIDs[5];
@@ -71,14 +70,14 @@ static void initPlayer (uint32_t globalBoolsQuantity)
    free(abNc);
    uint32_t moveAndSetBoolAction[2] = {0, 5};
    struct setBoolActionStruct setBoolSt = {globalBoolsQuantity, CCE_ENABLE_BOOL};
-   struct moveActionStruct moveSt = {0, -1, 0, CCE_SHIFT, CCE_DYNAMIC_MAP2D};
+   struct moveActionStruct moveSt = {{0, -1}, 0, CCE_SHIFT, CCE_DYNAMIC_MAP2D};
    const void *moveVerticallyActionArgs[2] = {&moveSt, &setBoolSt};
    uint32_t moveVerticallyActionArgSizes[2] = {sizeof(struct moveActionStruct), sizeof(struct setBoolActionStruct)};
    cceUpdateLogicActionsDynamicMap2D(logicIDs[0], 2, moveAndSetBoolAction, moveVerticallyActionArgs, moveVerticallyActionArgSizes);
-   moveSt.y = 1;
+   moveSt.coords.y = 1;
    cceUpdateLogicActionsDynamicMap2D(logicIDs[1], 2, moveAndSetBoolAction, moveVerticallyActionArgs, moveVerticallyActionArgSizes);
-   moveSt.x = 1;
-   moveSt.y = 0;
+   moveSt.coords.x = 1;
+   moveSt.coords.y = 0;
    setBoolSt.action = CCE_DISABLE_BOOL;
    struct startTimerActionStruct startTimerSt = {timerID, CCE_DYNAMIC_MAP2D};
    const void *moveHorizontallyActionArgs[3] = {&moveSt, &setBoolSt, &startTimerSt};
@@ -86,7 +85,7 @@ static void initPlayer (uint32_t globalBoolsQuantity)
 
    uint32_t moveAndSetBoolAndTimerAction[3] = {0, 5, 7};
    cceUpdateLogicActionsDynamicMap2D(logicIDs[2], 3, moveAndSetBoolAndTimerAction, moveHorizontallyActionArgs, moveHorizontallyActionArgSizes);
-   moveSt.x = -1;
+   moveSt.coords.x = -1;
    cceUpdateLogicActionsDynamicMap2D(logicIDs[3], 3, moveAndSetBoolAndTimerAction, moveHorizontallyActionArgs, moveHorizontallyActionArgSizes);
    uint32_t setBoolAndTimerAction[2] = {5, 7};
    const void *timerAndBool[2] = {&setBoolSt, &startTimerSt};
@@ -98,7 +97,7 @@ static void initPlayer (uint32_t globalBoolsQuantity)
 static void createAdditionalDynamicElement (struct cce_ivec2 coords, uint32_t globalBoolsQuantity)
 {
    struct Map2DElementDev element = {coords.x, coords.y, 2, 2, {0.0f, 0.0f, 1.0f, 1.0f, 0}, {1, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, 0, 1};
-   cceCreateMap2DElementDynamicMap2D(&element, CCE_ELEMENT_WITH_COLLIDER, 1);
+   cceCreateMap2DElementDynamicMap2D(&element, CCE_ELEMENT_WITHOUT_COLLIDER, 1);
 
    uint_fast16_t *aandb = cceParseStringToLogicOperations("a & b", NULL);
    uint16_t logicIDs[5];
@@ -115,14 +114,14 @@ static void createAdditionalDynamicElement (struct cce_ivec2 coords, uint32_t gl
    free(aandb);
    uint32_t moveAndSetBoolAction[2] = {0, 5};
    struct setBoolActionStruct setBoolSt = {globalBoolsQuantity + 1, CCE_ENABLE_BOOL};
-   struct moveActionStruct moveSt = {0, 1, 1, CCE_SHIFT, CCE_DYNAMIC_MAP2D};
+   struct moveActionStruct moveSt = {{0, 1}, 1, CCE_SHIFT, CCE_DYNAMIC_MAP2D};
    const void *moveVerticallyActionArgs[2] = {&moveSt, &setBoolSt};
    uint32_t moveVerticallyActionArgSizes[2] = {sizeof(struct moveActionStruct), sizeof(struct setBoolActionStruct)};
    cceUpdateLogicActionsDynamicMap2D(logicIDs[0], 2, moveAndSetBoolAction, moveVerticallyActionArgs, moveVerticallyActionArgSizes);
-   moveSt.y = -1;
+   moveSt.coords.y = -1;
    cceUpdateLogicActionsDynamicMap2D(logicIDs[1], 2, moveAndSetBoolAction, moveVerticallyActionArgs, moveVerticallyActionArgSizes);
-   moveSt.x = -1;
-   moveSt.y = 0;
+   moveSt.coords.x = -1;
+   moveSt.coords.y = 0;
    setBoolSt.action = CCE_DISABLE_BOOL;
    struct startTimerActionStruct startTimerSt = {timerID, CCE_DYNAMIC_MAP2D};
    const void *moveHorizontallyActionArgs[3] = {&moveSt, &setBoolSt, &startTimerSt};
@@ -130,7 +129,7 @@ static void createAdditionalDynamicElement (struct cce_ivec2 coords, uint32_t gl
 
    uint32_t moveAndSetBoolAndTimerAction[3] = {0, 5, 7};
    cceUpdateLogicActionsDynamicMap2D(logicIDs[2], 3, moveAndSetBoolAndTimerAction, moveHorizontallyActionArgs, moveHorizontallyActionArgSizes);
-   moveSt.x = 1;
+   moveSt.coords.x = 1;
    cceUpdateLogicActionsDynamicMap2D(logicIDs[3], 3, moveAndSetBoolAndTimerAction, moveHorizontallyActionArgs, moveHorizontallyActionArgSizes);
    uint32_t setBoolAndTimerAction[2] = {5, 7};
    const void *timerAndBool[2] = {&setBoolSt, &startTimerSt};

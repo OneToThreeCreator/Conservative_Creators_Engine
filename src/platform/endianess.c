@@ -83,10 +83,10 @@ CCE_PUBLIC_OPTIONS uint64_t cceSwapEndianInt64 (uint64_t value)
    return value;
 }
 
-CCE_PUBLIC_OPTIONS void* cceSwapEndianArrayIntN (void *array, size_t size, size_t n)
+CCE_PUBLIC_OPTIONS void* cceSwapEndianArrayIntN (void *array, size_t arraySize, size_t n)
 {
    register uint8_t buffer;
-   for (uint8_t *iterator = (uint8_t*) array, *end = ((uint8_t*) array) + size * n; iterator < end; iterator += n)
+   for (uint8_t *iterator = (uint8_t*) array, *end = ((uint8_t*) array) + arraySize * n; iterator < end; iterator += n)
    {
       for (size_t i = 0; i < (n / 2); ++i)
       {
@@ -98,9 +98,9 @@ CCE_PUBLIC_OPTIONS void* cceSwapEndianArrayIntN (void *array, size_t size, size_
    return array;
 }
 
-CCE_PUBLIC_OPTIONS void* cceSwapEndianNewArrayIntN (void *newArray, const void *array, size_t size, size_t n)
+CCE_PUBLIC_OPTIONS void* cceSwapEndianNewArrayIntN (void *newArray, const void *array, size_t arraySize, size_t n)
 {
-   for (uint8_t *iterator = (uint8_t*) array, *jiterator = (uint8_t*) newArray, *end = ((uint8_t*) array) + size * n;
+   for (uint8_t *iterator = (uint8_t*) array, *jiterator = (uint8_t*) newArray, *end = ((uint8_t*) array) + arraySize * n;
         iterator < end; iterator += n)
    {
       for (size_t i = 0; i < (n / 2); ++i)
@@ -127,14 +127,14 @@ static uint64_t ccePreserveEndianInt64 (uint64_t value)
    return value;
 }
 
-CCE_PUBLIC_OPTIONS void* ccePreserveEndianArrayIntN (void *array, size_t size, size_t n)
+CCE_PUBLIC_OPTIONS void* ccePreserveEndianArrayIntN (void *array, size_t arraySize, size_t n)
 {
    return array;
 }
 
-CCE_PUBLIC_OPTIONS void* ccePreserveEndianNewArrayIntN (void *newArray, const void *array, size_t size, size_t n)
+CCE_PUBLIC_OPTIONS void* ccePreserveEndianNewArrayIntN (void *newArray, const void *array, size_t arraySize, size_t n)
 {
-   memcpy(newArray, array, size * n);
+   memcpy(newArray, array, arraySize * n);
    return newArray;
 }
 

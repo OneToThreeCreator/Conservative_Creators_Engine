@@ -48,32 +48,32 @@ cce_void *g_dynamicMapBuffer = NULL;
 static void (*g_setUniformBufferToDefault)(GLuint, GLint);
 static uint32_t actionsQuantity;
 static GLint uniformOffset;
-static const cce_flag *map2Dflags;
+static cce_flag *map2Dflags;
 
 #define PI 3.14159265f
 
 static void moveAction (void *data)
 {
    struct moveActionStruct *params = (struct moveActionStruct*) data;
-   cceMoveGroupMap2D(params->groupID, params->x, params->y, params->action, params->mapType);
+   cceMoveGroupMap2D(params->groupID, params->coords.x, params->coords.y, params->action, params->mapType);
 }
 
 static void extendAction (void *data)
 {
    struct extendActionStruct *params = (struct extendActionStruct*) data;
-   cceExtendGroupMap2D(params->groupID, params->x, params->y, params->action, params->mapType);
+   cceExtendGroupMap2D(params->groupID, params->change.x, params->change.y, params->action, params->mapType);
 }
 
 static void rotateAction (void *data)
 {
    struct rotateActionStruct *params = (struct rotateActionStruct*) data;
-   cceRotateGroupMap2D(params->groupID, params->angle, params->xOffset, params->yOffset, params->action, params->mapType);
+   cceRotateGroupMap2D(params->groupID, params->angle, params->offset.x, params->offset.y, params->action, params->mapType);
 }
 
 static void offsetTextureAction (void *data)
 {
    struct offsetTextureActionStruct *params = (struct offsetTextureActionStruct*) data;
-   cceOffsetTextureGroupMap2D(params->groupID, params->offsetX, params->offsetY, params->mapType);
+   cceOffsetTextureGroupMap2D(params->groupID, params->offset.x, params->offset.y, params->mapType);
 }
 
 static void changeColorAction (void *data)
@@ -146,10 +146,10 @@ static void loadMap2Daction (void *data)
    switch (params->action)
    {
       case CCE_SHIFT:
-         cceLoadedMap2Dnumber += params->ID;
+         cceSetLoadedMap2D(*cceLoadedMap2Dnumber + params->ID, params->offset);
          break;
       case CCE_SET:
-         cceLoadedMap2Dnumber =  params->ID;
+         cceSetLoadedMap2D(params->ID, params->offset);
          break;
    }
 }
@@ -165,27 +165,27 @@ static void delayActionAction (void *data)
 static void moveActionSwapEndian (void *data)
 {
    struct moveActionStruct *params = (struct moveActionStruct*) data;
-   cceSwapEndianArrayIntN(&(params->x), 2, 4);
+   cceSwapEndianArrayIntN(&(params->coords), 2, 4);
    params->groupID = cceSwapEndianInt16(params->groupID);
 }
 
 static void extendActionSwapEndian (void *data)
 {
    struct extendActionStruct *params = (struct extendActionStruct*) data;
-   cceSwapEndianArrayIntN(&(params->x), 2, 4);
+   cceSwapEndianArrayIntN(&(params->change), 2, 4);
    params->groupID = cceSwapEndianInt16(params->groupID);
 }
 
 static void rotateActionSwapEndian (void *data)
 {
    struct rotateActionStruct *params = (struct rotateActionStruct*) data;
-   cceSwapEndianArrayIntN(&(params->angle), 3, 4); // Assuming float endianess is the same as int's
+   cceSwapEndianArrayIntN(&(params->offset), 3, 4); // Assuming float endianess is the same as int's
 }
 
 static void offsetTextureActionSwapEndian (void *data)
 {
    struct offsetTextureActionStruct *params = (struct offsetTextureActionStruct*) data;
-   cceSwapEndianArrayIntN(&(params->offsetX), 2, 4);
+   cceSwapEndianArrayIntN(&(params->offset), 2, 4);
 }
 
 static void changeColorActionSwapEndian (void *data)
@@ -228,6 +228,7 @@ static void loadMap2DActionSwapEndian (void *data)
 {
    struct loadMap2DactionStruct *params = (struct loadMap2DactionStruct*) data;
    params->ID = cceSwapEndianInt16(params->ID);
+   cceSwapEndianArrayIntN((int32_t*) &(params->offset), 2, 4);
 }
 
 static void delayActionActionSwapEndian (void *data)
@@ -335,6 +336,12 @@ void cce__endBaseActionsDynamicMap2D (void)
    runDelayedActions(&g_dynamicMap->delayedActions);
    endBaseActionsCommon(g_dynamicMap->UBO_ID);
    g_dynamicMapBuffer = NULL;
+   if (*map2Dflags & CCE_PROCESS_GLOBALOFFSET)
+   {
+      glUniform2iv(*(g_uniformLocations + CCE_GLOBALOFFSET_OFFSET), 1u, (GLint*) &cce__globalOffset);
+      GL_CHECK_ERRORS;
+      *map2Dflags &= ~CCE_PROCESS_GLOBALOFFSET;
+   }
 }
 
 void cce__setCurrentArrayOfMaps (const struct Map2Darray *maps)
@@ -344,7 +351,7 @@ void cce__setCurrentArrayOfMaps (const struct Map2Darray *maps)
 
 void cce__baseActionsInit (struct DynamicMap2D *dynamic_map, struct UsedUBO *UBOs, const GLint *bufferUniformsOffsets, 
                            const GLint *uniformLocations, GLuint shaderProgram, void (*setUniformBufferToDefault)(GLuint, GLint),
-                           const GLint *uniformBufferSize, const cce_flag *flags)
+                           const GLint *uniformBufferSize, cce_flag *flags)
 {
    map2Dflags = flags;
    g_dynamicMap = dynamic_map;
@@ -390,9 +397,9 @@ CCE_PUBLIC_OPTIONS uint8_t cceRegisterAction (uint32_t ID, void (*action)(void*)
    return 0u;
 }
 
-static inline void moveElements (int32_t *firstElementX, int32_t *firstElementY, ptrdiff_t step, struct ElementGroup *group, int32_t x, int32_t y)
+static inline void moveElements (int32_t *firstElementX, int32_t *firstElementY, size_t step, struct ElementGroup *group, int32_t x, int32_t y)
 {
-   step = step / sizeof(int32_t); // requires alignment, most likely provided anyway
+   step = step / sizeof(int32_t); // requires proper alignment, most likely provided anyway
    for (uint32_t *iterator = group->elementIDs, *end = group->elementIDs + group->elementsQuantity; iterator < end; ++iterator)
    {
       *(firstElementX + step * (*iterator)) += x;
@@ -406,27 +413,20 @@ CCE_PUBLIC_OPTIONS void cceMoveGlobalOffsetGroupMap2D (int32_t x, int32_t y, cce
    {
       case CCE_SHIFT:
       {
-         int32_t coords[2];
-         glGetUniformiv(g_shaderProgram, *(g_uniformLocations + 1u), coords);
-         GL_CHECK_ERRORS;
-         coords[0] += x;
-         coords[1] += y;
-         glUniform2iv(*(g_uniformLocations + 1u), 1u, coords);
+         cce__globalOffset.x += x;
+         cce__globalOffset.y += y;
          break;
       }
       case CCE_SET:
       {
-         glUniform2i(*(g_uniformLocations + 1u), x, y);
-         int32_t offset[2];
-         glGetUniformiv(g_shaderProgram, *(g_uniformLocations + 1u), offset);
-         GL_CHECK_ERRORS;
-         x -= offset[0];
-         y -= offset[1];
+         struct cce_ivec2 offset = cce__globalOffset;
+         cce__globalOffset = (struct cce_ivec2) {x, y};
+         x -= offset.x;
+         y -= offset.y;
          break;
       }
       default: return;
    }
-   GL_CHECK_ERRORS;
    struct Map2D *map = allMaps->main;
    if (map->moveGroupsQuantity > 0)
       moveElements(&(map->colliders->x), &(map->colliders->y), sizeof(struct Map2DCollider), map->moveGroups, -x, -y);
@@ -437,6 +437,8 @@ CCE_PUBLIC_OPTIONS void cceMoveGlobalOffsetGroupMap2D (int32_t x, int32_t y, cce
    }
    if (g_dynamicMap->moveGroupsQuantity > 0)
       moveElements(&(g_dynamicMap->elements->x), &(g_dynamicMap->elements->y), sizeof(struct DynamicMap2DElement), (struct ElementGroup*) g_dynamicMap->moveGroups, -x, -y);
+   
+   *map2Dflags |= CCE_GLOBAL_OFFSET_CHANGED;
 }
 
 CCE_PUBLIC_OPTIONS void cceMoveGroupMap2D (uint16_t groupID, int32_t x, int32_t y, cce_enum actionType, cce_enum mapType)

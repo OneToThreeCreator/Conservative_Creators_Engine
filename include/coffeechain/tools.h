@@ -37,7 +37,7 @@ sizeType name ## QuantityAllocated = 0
 
 #define CCE__MACRO_TO_STR(x) #x 
 #define CCE_MACRO_TO_STR(x) CCE__MACRO_TO_STR(x)
-#define CCE_CEIL_SIZE_TO_ALLOCATION_STEP(s) ((s & ~(CCE_ALLOCATION_STEP - 1u)) + CCE_ALLOCATION_STEP * ((s & (CCE_ALLOCATION_STEP - 1u)) > 0))
+#define CCE_CEIL_SIZE_TO_ALLOCATION_STEP(s) (((s) & ~(CCE_ALLOCATION_STEP - 1u)) + CCE_ALLOCATION_STEP * (((s) & (CCE_ALLOCATION_STEP - 1u)) > 0))
 
 #define CCE__REALLOC_ARRAY(name, newQuantity) \
 size_t oldQuantityAllocated = name ## QuantityAllocated; \
