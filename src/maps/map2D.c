@@ -210,9 +210,9 @@ static void processLogicMap2Dall (struct Map2Darray *maps)
 static void (*drawMap2Dcommon) (struct Map2Darray*);
 static void (*processLogicMap2Dcommon) (struct Map2Darray*);
 
-#define CCE_RENDER_MAP_FLAGS (CCE_RENDER_ONLY_CURRENT_MAP | CCE_RENDER_CLOSEST_MAP | CCE_RENDER_ALL_LOADED_MAPS)
+#define CCE_RENDER_MAP_FLAGS (CCE_RENDER_ONLY_CURRENT_MAP | CCE_RENDER_VISIBLE_MAPS | CCE_RENDER_ALL_LOADED_MAPS)
 #define CCE_PROCESS_LOGIC_FLAGS (CCE_PROCESS_LOGIC_ONLY_FOR_CURRENT_MAP | CCE_DONT_PROCESS_LOGIC | \
-CCE_PROCESS_LOGIC_FOR_CLOSEST_MAP | CCE_PROCESS_LOGIC_FOR_ALL_MAPS)
+CCE_PROCESS_LOGIC_FOR_VISIBLE_MAPS | CCE_PROCESS_LOGIC_FOR_ALL_MAPS)
 #define CCE_AVAILABLE_FLAGS (CCE_RENDER_MAP_FLAGS | CCE_PROCESS_LOGIC_FLAGS | CCE_FORCE_INITIALIZE_MAP_ONLOAD)
 
 static void cceSetFlags2D (cce_flag flags)
@@ -226,7 +226,7 @@ static void cceSetFlags2D (cce_flag flags)
          drawMap2Dcommon = drawMap2Dmain;
          break;
       }
-      case CCE_RENDER_CLOSEST_MAPS:
+      case CCE_RENDER_VISIBLE_MAPS:
       {
          drawMap2Dcommon = drawMap2Dnearest;
          break;
@@ -239,7 +239,7 @@ static void cceSetFlags2D (cce_flag flags)
       default:
       {
          drawMap2Dcommon = drawMap2Dnearest;
-         flags |= CCE_RENDER_CLOSEST_MAPS;
+         flags |= CCE_RENDER_VISIBLE_MAPS;
       }
    }
    
@@ -1035,7 +1035,7 @@ static struct Map2Darray* loadMap2DwithDependies (struct Map2Darray *maps, uint1
       uint8_t oldExitMapsQuantity = maps->main->exitMapsQuantity;
       if (maps->main->ID == number)
          return maps;
-      if ((((map2Dflags & CCE_PROCESS_LOGIC_FLAGS) == CCE_PROCESS_LOGIC_ONLY_FOR_CURRENT_MAP) ||
+      if ((((map2Dflags & CCE_PROCESS_LOGIC_FLAGS) == CCE_PROCESS_LOGIC_FOR_VISIBLE_MAPS) ||
            ((map2Dflags & CCE_PROCESS_LOGIC_FLAGS) == CCE_DONT_PROCESS_LOGIC)) &&
            ((map2Dflags & CCE_FORCE_INITIALIZE_MAP_ONLOAD) == 0))
       {

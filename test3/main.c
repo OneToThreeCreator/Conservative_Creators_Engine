@@ -195,7 +195,7 @@ int main (int argc, char **argv)
       }
    }
    const uint32_t globalBoolsQuantity = 32768;
-   if (cceInitEngine2D(globalBoolsQuantity, 16, 16, "CoffeeChain TEST", path, CCE_RENDER_CLOSEST_MAP | CCE_PROCESS_LOGIC_FOR_CLOSEST_MAP) != 0)
+   if (cceInitEngine2D(globalBoolsQuantity, 16, 16, "CoffeeChain TEST", path, CCE_RENDER_VISIBLE_MAPS | CCE_PROCESS_LOGIC_FOR_VISIBLE_MAPS) != 0)
    {
       free(path);
       return -1;
