@@ -1,6 +1,6 @@
 #[[
     CoffeeChain - open source engine for making games.
-    Copyright (C) 2020-2021 Andrey Givoronsky
+    Copyright (C) 2020-2022 Andrey Givoronsky
 
     This library is free software; you can redistribute it and/or
     modify it under the terms of the GNU Lesser General Public
@@ -94,7 +94,12 @@ endif()
 
 
 configure_file(src/config.h.in include/coffeechain/config.h)
-target_include_directories(coffeechain PUBLIC ${CoffeeChain_BINARY_DIR}/include/coffeechain)
+configure_file(coffeechain.pc.in coffeechain.pc @ONLY)
+target_include_directories(coffeechain INTERFACE
+                            $<BUILD_INTERFACE:${CoffeeChain_SOURCE_DIR}/include>
+                            $<INSTALL_INTERFACE:include>)
+target_include_directories(coffeechain PUBLIC
+                            $<BUILD_INTERFACE:${CoffeeChain_BINARY_DIR}/include/coffeechain>)
 
 if(WIN32)
    include(GenerateExportHeader)
@@ -149,16 +154,38 @@ if(CoffeeChain_BUILD_TESTING)
             COMMAND coffeechain-test2)
    add_test(NAME coffeechain-test3
             COMMAND coffeechain-test3 ${CoffeeChain_SOURCE_DIR})
-   
-   if(NOT WIN32)
-      target_link_options(coffeechain-test1 PRIVATE -Wl,-rpath=${CoffeeChain_BINARY_DIR})
-      target_link_options(coffeechain-test2 PRIVATE -Wl,-rpath=${CoffeeChain_BINARY_DIR})
-   endif()
 endif()
 
 install(TARGETS coffeechain
+   EXPORT  CoffeeChainTargets
    LIBRARY DESTINATION lib
 )
+
+include(CMakePackageConfigHelpers)
+
+configure_package_config_file(Config.cmake.in
+  "${CoffeeChain_BINARY_DIR}/CoffeeChainConfig.cmake"
+  INSTALL_DESTINATION "lib/cmake/CoffeeChain"
+  NO_SET_AND_CHECK_MACRO
+  NO_CHECK_REQUIRED_COMPONENTS_MACRO
+)
+
+write_basic_package_version_file(
+  "${CoffeeChain_BINARY_DIR}/CoffeeChainConfigVersion.cmake"
+  VERSION "${CoffeeChain_VERSION_MAJOR}.${CoffeeChain_VERSION_MINOR}"
+  COMPATIBILITY AnyNewerVersion
+)
+
 install(DIRECTORY shaders DESTINATION share/coffeechain)
 install(DIRECTORY include/coffeechain DESTINATION include)
 install(FILES ${CoffeeChain_BINARY_DIR}/include/coffeechain/config.h DESTINATION include/coffeechain)
+install(FILES ${CoffeeChain_BINARY_DIR}/coffeechain.pc DESTINATION lib/pkgconfig)
+install(EXPORT CoffeeChainTargets
+   FILE CoffeeChainTargets.cmake
+   DESTINATION lib/cmake/CoffeeChain
+)
+install(FILES
+   ${CoffeeChain_BINARY_DIR}/CoffeeChainConfig.cmake
+   ${CoffeeChain_BINARY_DIR}/CoffeeChainConfigVersion.cmake
+   DESTINATION lib/cmake/CoffeeChain
+)
