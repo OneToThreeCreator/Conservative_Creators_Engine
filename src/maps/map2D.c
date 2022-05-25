@@ -316,14 +316,15 @@ CCE_PUBLIC_OPTIONS void cceSetGridMultiplierMap2D (float multiplier)
 CCE_PUBLIC_OPTIONS int cceInitEngine2D (uint16_t globalBoolsQuantity, uint32_t textureMaxWidth, uint32_t textureMaxHeight,
                                         const char *windowLabel, const char *resourcePath, cce_flag flags)
 {
-   if (!resourcePath)
    {
-      resourcePath = getenv("CCE_RESOURCE_PATH");
-      if (!resourcePath || *resourcePath == '\0')
-      {
-         fputs("ENGINE::INIT::NO_RESOURCE_PATH:\nEngine could not load the game without knowing where it is", stderr);
-         return -1;
-      }
+      char *path = getenv("CCE_RESOURCE_PATH");
+      if (path != NULL && *path != '\0')
+         resourcePath = path;
+   }
+   if (resourcePath == NULL || *resourcePath == '\0')
+   {
+      fputs("ENGINE::INIT::NO_RESOURCE_PATH:\nEngine could not load the game without knowing where it is", stderr);
+      return -1;
    }
    size_t pathLength = strlen(resourcePath) + 1u;
    char *pathBuffer = malloc((pathLength + 11u) * sizeof(char));
