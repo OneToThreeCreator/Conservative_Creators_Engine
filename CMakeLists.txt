@@ -18,20 +18,35 @@
     USA
 ]]
 
-cmake_minimum_required(VERSION 3.13)
+cmake_minimum_required(VERSION 3.0)
 
-project(CoffeeChain VERSION 0.4 DESCRIPTION "open 2D engine for creating games - shared library" LANGUAGES C)
+project(CoffeeChain VERSION 0.4.3 DESCRIPTION "open 2D engine for creating games - shared library" LANGUAGES C)
 
-option(CoffeeChain_BUILD_SHARED_LIBS     "Build CoffeeChain as shared library" ON)
-option(CoffeeChain_BUILD_TESTING         "Build CoffeeChain test program" ON)
+if (NOT DEFINED CoffeeChain_BUILD_TESTING)
+   option(CoffeeChain_BUILD_TESTING "Build CoffeeChain test program" ON)
+endif()
+
+if (NOT DEFINED CoffeeChain_LIB_TYPE)
+   set(CoffeeChain_LIB_TYPE SHARED CACHE STRING "Type of library (shared or static) to build CoffeeChain as")
+   set_property(CACHE CoffeeChain_LIB_TYPE PROPERTY STRINGS SHARED STATIC)
+endif()
+
+if (NOT DEFINED CoffeeChain_INSTALL AND NOT (CoffeeChain_LIB_TYPE MATCHES STATIC))
+   option(CoffeeChain_INSTALL "Install CoffeeChain" ON) 
+endif()
 
 set(CMAKE_C_STANDARD 99)
 set(CMAKE_C_STANDARD_REQUIRED True)
 find_package(glfw3 3.3 REQUIRED)
+
+find_package(ListLib 1.0)
+if (NOT ListLib_FOUND)
+   set(ListLib_LIB_TYPE STATIC)
+   add_subdirectory(external/listlib)
+endif()
 #find_package(OpenAL    REQUIRED)
 
-set(BUILD_SHARED_LIBS CoffeeChain_BUILD_SHARED_LIBS)
-add_library(coffeechain
+add_library(coffeechain ${CoffeeChain_LIB_TYPE}
    #src/audio.c
    #src/audio.h
    src/shader.c
@@ -73,13 +88,14 @@ add_library(coffeechain
 )
 
 set_target_properties(coffeechain PROPERTIES 
-	VERSION ${CoffeeChain_VERSION}
-   SOVERSION 3
+   VERSION ${CoffeeChain_VERSION}
+   SOVERSION ${CoffeeChain_VERSION_MAJOR}
 )
 
-add_subdirectory(external/listlib)
-target_include_directories(coffeechain PRIVATE external/listlib/src)
-target_link_libraries(coffeechain PRIVATE listlib)
+if (NOT LibList_FOUND)
+   target_include_directories(coffeechain PRIVATE external/listlib/include)
+endif()
+target_link_libraries(coffeechain PRIVATE list glfw)
 
 if(CMAKE_BUILD_TYPE MATCHES "Debug" OR CMAKE_BUILD_TYPE MATCHES "DEBUG" OR CMAKE_BUILD_TYPE MATCHES "debug")
    if(NOT MSVC)
@@ -109,11 +125,11 @@ if(WIN32)
       INCLUDE_GUARD_NAME CCE_EXPORTS_H
    )
    install(FILES ${CoffeeChain_BINARY_DIR}/include/coffeechain/cce_exports.h DESTINATION include/coffeechain)
-   target_link_libraries(coffeechain PRIVATE glfw shell32 kernel32)
+   target_link_libraries(coffeechain PRIVATE shell32 kernel32)
    # Windows don't have standartized path for storing shared data (or libraries, or anything that isn't self-contained)
 else()
    target_compile_definitions(coffeechain PRIVATE SYSTEM_SHADER_PATH=\"${CMAKE_INSTALL_PREFIX}/share/coffeechain/shaders\")
-   target_link_libraries(coffeechain PRIVATE glfw m)
+   target_link_libraries(coffeechain PRIVATE m)
 endif()
 
 if(CoffeeChain_BUILD_TESTING)
@@ -149,43 +165,45 @@ if(CoffeeChain_BUILD_TESTING)
    target_link_libraries(coffeechain-test2 coffeechain)
    target_link_libraries(coffeechain-test3 coffeechain)
    add_test(NAME coffeechain-test1
-            COMMAND coffeechain-test1)
+      COMMAND coffeechain-test1)
    add_test(NAME coffeechain-test2
-            COMMAND coffeechain-test2)
+      COMMAND coffeechain-test2)
    add_test(NAME coffeechain-test3
-            COMMAND coffeechain-test3 ${CoffeeChain_SOURCE_DIR})
+      COMMAND coffeechain-test3 ${CoffeeChain_SOURCE_DIR})
 endif()
 
-install(TARGETS coffeechain
-   EXPORT  CoffeeChainTargets
-   LIBRARY DESTINATION lib
-)
-
-include(CMakePackageConfigHelpers)
-
-configure_package_config_file(Config.cmake.in
-  "${CoffeeChain_BINARY_DIR}/CoffeeChainConfig.cmake"
-  INSTALL_DESTINATION "lib/cmake/CoffeeChain"
-  NO_SET_AND_CHECK_MACRO
-  NO_CHECK_REQUIRED_COMPONENTS_MACRO
-)
-
-write_basic_package_version_file(
-  "${CoffeeChain_BINARY_DIR}/CoffeeChainConfigVersion.cmake"
-  VERSION "${CoffeeChain_VERSION_MAJOR}.${CoffeeChain_VERSION_MINOR}"
-  COMPATIBILITY AnyNewerVersion
-)
-
-install(DIRECTORY shaders DESTINATION share/coffeechain)
-install(DIRECTORY include/coffeechain DESTINATION include)
-install(FILES ${CoffeeChain_BINARY_DIR}/include/coffeechain/config.h DESTINATION include/coffeechain)
-install(FILES ${CoffeeChain_BINARY_DIR}/coffeechain.pc DESTINATION lib/pkgconfig)
-install(EXPORT CoffeeChainTargets
-   FILE CoffeeChainTargets.cmake
-   DESTINATION lib/cmake/CoffeeChain
-)
-install(FILES
-   ${CoffeeChain_BINARY_DIR}/CoffeeChainConfig.cmake
-   ${CoffeeChain_BINARY_DIR}/CoffeeChainConfigVersion.cmake
-   DESTINATION lib/cmake/CoffeeChain
-)
+if (NOT (CoffeeChain_LIB_TYPE MATCHES STATIC) AND CoffeeChain_INSTALL)
+   install(TARGETS coffeechain
+      EXPORT  CoffeeChainTargets
+      LIBRARY DESTINATION lib
+   )
+   
+   include(CMakePackageConfigHelpers)
+   
+   configure_package_config_file(${CoffeeChain_SOURCE_DIR}/Config.cmake.in
+      "${CoffeeChain_BINARY_DIR}/CoffeeChainConfig.cmake"
+      INSTALL_DESTINATION "lib/cmake/CoffeeChain"
+      NO_SET_AND_CHECK_MACRO
+      NO_CHECK_REQUIRED_COMPONENTS_MACRO
+   )
+   
+   write_basic_package_version_file(
+      "${CoffeeChain_BINARY_DIR}/CoffeeChainConfigVersion.cmake"
+      VERSION "${CoffeeChain_VERSION_MAJOR}.${CoffeeChain_VERSION_MINOR}"
+      COMPATIBILITY AnyNewerVersion
+   )
+   
+   install(DIRECTORY ${CoffeeChain_SOURCE_DIR}/shaders DESTINATION share/coffeechain)
+   install(DIRECTORY ${CoffeeChain_SOURCE_DIR}/include/coffeechain DESTINATION include)
+   install(FILES ${CoffeeChain_BINARY_DIR}/include/coffeechain/config.h DESTINATION include/coffeechain)
+   install(FILES ${CoffeeChain_BINARY_DIR}/coffeechain.pc DESTINATION lib/pkgconfig)
+   install(EXPORT CoffeeChainTargets
+      FILE CoffeeChainTargets.cmake
+      DESTINATION lib/cmake/CoffeeChain
+   )
+   install(FILES
+      ${CoffeeChain_BINARY_DIR}/CoffeeChainConfig.cmake
+      ${CoffeeChain_BINARY_DIR}/CoffeeChainConfigVersion.cmake
+      DESTINATION lib/cmake/CoffeeChain
+   )
+endif()

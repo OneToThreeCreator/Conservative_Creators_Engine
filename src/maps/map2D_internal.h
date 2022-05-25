@@ -24,7 +24,7 @@
 #include "map2D.h"
 #include "../engine_common_internal.h"
 #include "log.h"
-#include <list.h>
+#include <listlib.h>
 
 #define CCE_GLOBAL_OFFSET_MASK 0x10
 

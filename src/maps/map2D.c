@@ -306,7 +306,7 @@ static GLuint createTextureArray (uint16_t newSize)
    return texture;
 }
 
-CCE_PUBLIC_OPTIONS void cceSetGridMultiplier (float multiplier)
+CCE_PUBLIC_OPTIONS void cceSetGridMultiplierMap2D (float multiplier)
 {
    struct cce_uvec2 aspectRatio = cce__getCurrentStep();
    glUniform2f(*uniformLocations, 1.0f / (aspectRatio.x * multiplier), 1.0f / (aspectRatio.y * multiplier));
@@ -455,7 +455,7 @@ CCE_PUBLIC_OPTIONS int cceInitEngine2D (uint16_t globalBoolsQuantity, uint32_t t
    map2Dflags &= ~CCE_INIT;
    free(pathBuffer);
    glUseProgram(shaderProgram);
-   cceSetGridMultiplier(1.0f);
+   cceSetGridMultiplierMap2D(1.0f);
    return 0;
 }
 

@@ -136,7 +136,7 @@ struct Map2Ddev
 
 struct Map2D;
 
-CCE_PUBLIC_OPTIONS void cceSetGridMultiplier (float multiplier);
+CCE_PUBLIC_OPTIONS void cceSetGridMultiplierMap2D (float multiplier);
 CCE_PUBLIC_OPTIONS void cceSetMap2Dpath (const char *path);
 CCE_PUBLIC_OPTIONS void cceFreeMap2D (struct Map2D *map);
 CCE_PUBLIC_OPTIONS struct Map2D* cceLoadMap2D (uint16_t number);
@@ -168,6 +168,7 @@ CCE_PUBLIC_OPTIONS uint8_t cceDeleteElementFromGroupDynamicMap2D (cce_enum group
 CCE_PUBLIC_OPTIONS void cceDeleteMap2DElementDynamicMap2D (uint32_t ID);
 CCE_PUBLIC_OPTIONS uint8_t cceDeleteGroupDynamicMap2D (cce_enum group_type, uint16_t ID);
 //CCE_PUBLIC_OPTIONS void cceUpdateColliderDynamicMap2D (struct Map2DCollider *collider, uint32_t ID);
+
 CCE_PUBLIC_OPTIONS void cceReplaceColliderDynamicMap2D (struct Map2DCollider *collider, uint32_t ID);
 CCE_PUBLIC_OPTIONS void cceUpdateCollisionDynamicMap2D (uint16_t ID, uint16_t group1ID, cce_ubyte isGroup1BelongsToCurrentMap2D,
                                                uint16_t group2ID, cce_ubyte isGroup2BelongsToCurrentMap2D);

@@ -137,7 +137,7 @@ static void setDynamicTimerDelayAction (void *data)
 
 static void setGridSizeAction (void *data)
 {
-   cceSetGridMultiplier(*((float*) data));
+   cceSetGridMultiplierMap2D(*((float*) data));
 }
 
 static void loadMap2Daction (void *data)

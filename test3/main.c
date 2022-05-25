@@ -221,7 +221,7 @@ int main (int argc, char **argv)
    }
    initPlayer(globalBoolsQuantity);
    createAdditionalDynamicElement((struct cce_ivec2) {2, 2}, globalBoolsQuantity);
-   cceSetGridMultiplier(1.0f);
+   cceSetGridMultiplierMap2D(1.0f);
    // Add delayed actions
    {
       struct moveActionStruct actionSt = {-1, 0, 1, CCE_SHIFT, CCE_DYNAMIC_MAP2D};
