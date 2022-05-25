@@ -38,12 +38,6 @@ endif()
 set(CMAKE_C_STANDARD 99)
 set(CMAKE_C_STANDARD_REQUIRED True)
 find_package(glfw3 3.3 REQUIRED)
-
-find_package(ListLib 1.0)
-if (NOT ListLib_FOUND)
-   set(ListLib_LIB_TYPE STATIC)
-   add_subdirectory(external/listlib)
-endif()
 #find_package(OpenAL    REQUIRED)
 
 add_library(coffeechain ${CoffeeChain_LIB_TYPE}
@@ -79,6 +73,7 @@ add_library(coffeechain ${CoffeeChain_LIB_TYPE}
    src/maps/map2D_file_IO.c
    src/maps/log.c
    src/maps/log.h
+   src/plugins/text_rendering.c
    src/external/glad.c
    src/external/glad.h
    src/external/khrplatform.h
@@ -92,10 +87,43 @@ set_target_properties(coffeechain PROPERTIES
    SOVERSION ${CoffeeChain_VERSION_MAJOR}
 )
 
-if (NOT LibList_FOUND)
+find_package(PkgConfig)
+if (PkgConfig_FOUND)
+   pkg_check_modules(INIH inih)
+else()
+   set(INIH_FOUND NO)
+endif()
+
+if (NOT INIH_FOUND)
+   if ("${CMAKE_BUILD_TYPE}" MATCHES "")
+      set(INIH_BUILD_TYPE plain)
+   else()
+      set(INIH_BUILD_TYPE CMAKE_BUILD_TYPE)
+      string(TOLOWER ${INIH_BUILD_TYPE} INIH_BUILD_TYPE)
+   endif()
+   include(ExternalProject)
+   ExternalProject_Add(inih_external
+      PREFIX "${CoffeeChain_BINARY_DIR}/external/inih"
+      SOURCE_DIR "${CoffeeChain_SOURCE_DIR}/external/inih" 
+      BINARY_DIR "${CoffeeChain_BINARY_DIR}/external/inih"
+      CONFIGURE_COMMAND meson setup -Ddefault_library=static -Ddistro_install=false -Dwith_INIReader=false --buildtype ${INIH_BUILD_TYPE} ${CoffeeChain_SOURCE_DIR}/external/inih
+      BUILD_COMMAND meson compile
+      INSTALL_COMMAND "" 
+   )
+   add_library(inih STATIC IMPORTED)
+   add_dependencies(inih inih_external)
+   set_target_properties(inih PROPERTIES IMPORTED_LOCATION ${CMAKE_BINARY_DIR}/external/inih/libinih.a)
+   set(INIH_LIBRARIES inih)
+   target_include_directories(coffeechain PRIVATE external/inih)
+endif()
+
+find_package(ListLib 1.0)
+if (NOT ListLib_FOUND)
+   set(ListLib_LIB_TYPE STATIC)
+   add_subdirectory(external/listlib)
    target_include_directories(coffeechain PRIVATE external/listlib/include)
 endif()
-target_link_libraries(coffeechain PRIVATE list glfw)
+target_link_libraries(coffeechain PRIVATE list ${INIH_LIBRARIES} glfw)
 
 if(CMAKE_BUILD_TYPE MATCHES "Debug" OR CMAKE_BUILD_TYPE MATCHES "DEBUG" OR CMAKE_BUILD_TYPE MATCHES "debug")
    if(NOT MSVC)

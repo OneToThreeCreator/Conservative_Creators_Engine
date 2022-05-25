@@ -1,3 +1,6 @@
 [submodule "external/listlib"]
 	path = external/listlib
 	url = https://github.com/OneToThreeCreator/ListLib
+[submodule "external/inih"]
+	path = external/inih
+	url = https://github.com/benhoyt/inih
