@@ -772,7 +772,6 @@ void cce__processDynamicMap2DElements (void)
          }
          if (iterator->textureElementReliesOn == 0)
          {
-            printf("DYNAMICMAP2D::Loading textures for element %lu\n", iterator - g_dynamicMap->elements);
             iterator->textureElementReliesOn = cce__loadTexture(iterator->textureInfo.ID);
          }
          if (iterator->flags & 0x20)

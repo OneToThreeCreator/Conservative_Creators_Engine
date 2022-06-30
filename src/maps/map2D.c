@@ -576,7 +576,6 @@ static int loadTexture (char *path, uint16_t position)
 {
    int width, height, nrChannels;
    void *data;
-   printf("Loading image %s at position %u\n", path, position);
    data = stbi_load(path, &width, &height, &nrChannels, 4);
    if (!data)
    {

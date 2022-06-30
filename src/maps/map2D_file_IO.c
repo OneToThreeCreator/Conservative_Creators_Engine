@@ -458,7 +458,6 @@ static void cce__writeExitMap2Ds (struct ExitMap2D *exitMaps, uint8_t exitMapsQu
 
 struct Map2D* cceLoadMap2D (uint16_t number)
 {
-   printf("cceLoadMap2D is called\n");
    cce__shortToString(mapPath, number, ".c2m");
    FILE *mapFile = fopen(mapPath, "rb");
    if (!mapFile)
