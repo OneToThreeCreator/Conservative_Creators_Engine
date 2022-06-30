@@ -133,21 +133,11 @@ static uint8_t test2 (void)
 
 int main (int argc, char **argv)
 {
-   unsigned long iterationsQuantity = 16u;
-   if (argc > 2 || (argc == 2 && (!strcmp(argv[1], "-h") || !strcmp(argv[1], "--help"))))
+   if (argc > 1)
    {
-      printf("Usage: %s [EACH TEST PASSES QUANTITY]", argv[0]);
-      exit(argc > 2);
+      printf("Usage: %s", argv[0]);
+      exit(1);
    }
-   else if (argc == 2)
-   {
-      if (!sscanf(argv[1], "%lu", &iterationsQuantity))
-      {
-         printf("Usage: %s [EACH TEST PASSES QUANTITY]", argv[0]);
-         exit(-1);
-      }
-   }
-   printf("Testing path functions...\n");
    size_t testsPassed = 0u;
    testsPassed += test1();
    testsPassed += test2();

@@ -48,7 +48,7 @@ extern C:
 
 struct moveActionStruct
 {
-   struct cce_ivec2 coords;
+   struct cce_i32vec2 coords;
    uint16_t groupID;
    cce_enum action;
    cce_enum mapType;
@@ -56,7 +56,7 @@ struct moveActionStruct
 
 struct extendActionStruct
 {
-   struct cce_ivec2 change;
+   struct cce_i32vec2 change;
    uint16_t groupID;
    cce_enum action;
    cce_enum mapType;
@@ -64,7 +64,7 @@ struct extendActionStruct
 
 struct rotateActionStruct
 {
-   struct cce_ivec2 offset;
+   struct cce_i32vec2 offset;
    float angle;
    uint8_t groupID;
    cce_enum action;
@@ -74,7 +74,7 @@ struct rotateActionStruct
 
 struct offsetTextureActionStruct
 {
-   struct cce_ivec2 offset;
+   struct cce_i32vec2 offset;
    uint8_t groupID;
    cce_enum mapType;
    uint16_t __pad;
@@ -122,7 +122,7 @@ struct setDynamicTimerDelayActionStruct
 
 struct loadMap2DactionStruct
 {
-   struct cce_ivec2 offset;
+   struct cce_i32vec2 offset;
    uint16_t ID;
    cce_enum action;
    uint8_t __pad;

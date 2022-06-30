@@ -26,7 +26,7 @@
 
 #include "../engine_common.h"
 #include "../shader.h"
-#include "../tools.h"
+#include "../utils.h"
 #include "../platform/endianess.h"
 #include "../platform/path_getters.h"
 #include "map2D.h"
@@ -304,20 +304,16 @@ static void endBaseActionsCommon (uint16_t uboID)
    GL_CHECK_ERRORS;
    if (ubo->moveGroupValuesQuantity == 0 && ubo->extensionGroupValuesQuantity == 0)
       return;
-   struct cce_ivec2 *buffer = glMapBufferRange(GL_UNIFORM_BUFFER, *(g_uniformsOffsets + CCE_MOVEGROUP_OFFSET), 2 * sizeof(struct cce_ivec2) * 255,
+   struct cce_i32vec2 *buffer = glMapBufferRange(GL_UNIFORM_BUFFER, *(g_uniformsOffsets + CCE_MOVEGROUP_OFFSET), 2 * sizeof(struct cce_i32vec2) * 255,
                                                GL_MAP_WRITE_BIT | (GL_MAP_INVALIDATE_RANGE_BIT * (((ubo->moveGroupValuesQuantity)      >= 255) &&
                                                                                                   ((ubo->extensionGroupValuesQuantity) >= 255))));
    GL_CHECK_ERRORS;
-   memcpy(buffer, ubo->moveGroupValues, MIN(ubo->moveGroupValuesQuantity, 255) * sizeof(struct cce_ivec2));
+   memcpy(buffer, ubo->moveGroupValues, MIN(ubo->moveGroupValuesQuantity, 255) * sizeof(struct cce_i32vec2));
    buffer += 255;
-   struct
+   struct cce_i16vec2 *extensionValues = ubo->extensionGroupValues;
+   for (struct cce_i32vec2 *end = buffer + MIN(ubo->extensionGroupValuesQuantity, 255); buffer < end; ++buffer, ++extensionValues)
    {
-      int16_t x;
-      int16_t y;
-   } *extensionValues = (void*) (ubo->extensionGroupValues);
-   for (struct cce_ivec2 *end = buffer + MIN(ubo->extensionGroupValuesQuantity, 255); buffer < end; ++buffer, ++extensionValues)
-   {
-      *buffer = (struct cce_ivec2) {extensionValues->x, extensionValues->y};
+      *buffer = (struct cce_i32vec2) {extensionValues->x, extensionValues->y};
    }
    glUnmapBuffer(GL_UNIFORM_BUFFER);
    GL_CHECK_ERRORS;
@@ -419,8 +415,8 @@ CCE_PUBLIC_OPTIONS void cceMoveGlobalOffsetGroupMap2D (int32_t x, int32_t y, cce
       }
       case CCE_SET:
       {
-         struct cce_ivec2 offset = cce__globalOffset;
-         cce__globalOffset = (struct cce_ivec2) {x, y};
+         struct cce_i32vec2 offset = cce__globalOffset;
+         cce__globalOffset = (struct cce_i32vec2) {x, y};
          x -= offset.x;
          y -= offset.y;
          break;
@@ -605,10 +601,10 @@ CCE_PUBLIC_OPTIONS void cceRotateGroupMap2D (uint8_t groupID, float normalizedAn
    float sin = sinf(normalizedAngle * PI);
    float cos = cosf(normalizedAngle * PI);
 
-   (((struct cce_vec2*)  (glBuffer + *(g_uniformsOffsets + CCE_ROTATEANGLESINCOS_OFFSET) - uniformOffset)) + (groupID - 1u))->x = sin;
-   (((struct cce_vec2*)  (glBuffer + *(g_uniformsOffsets + CCE_ROTATEANGLESINCOS_OFFSET) - uniformOffset)) + (groupID - 1u))->y = cos;
-   (((struct cce_ivec2*) (glBuffer + *(g_uniformsOffsets + CCE_ROTATIONOFFSET_OFFSET)    - uniformOffset)) + (groupID - 1u))->x = xOffset;
-   (((struct cce_ivec2*) (glBuffer + *(g_uniformsOffsets + CCE_ROTATIONOFFSET_OFFSET)    - uniformOffset)) + (groupID - 1u))->y = yOffset;
+   (((struct cce_f32vec2*)  (glBuffer + *(g_uniformsOffsets + CCE_ROTATEANGLESINCOS_OFFSET) - uniformOffset)) + (groupID - 1u))->x = sin;
+   (((struct cce_f32vec2*)  (glBuffer + *(g_uniformsOffsets + CCE_ROTATEANGLESINCOS_OFFSET) - uniformOffset)) + (groupID - 1u))->y = cos;
+   (((struct cce_i32vec2*) (glBuffer + *(g_uniformsOffsets + CCE_ROTATIONOFFSET_OFFSET)    - uniformOffset)) + (groupID - 1u))->x = xOffset;
+   (((struct cce_i32vec2*) (glBuffer + *(g_uniformsOffsets + CCE_ROTATIONOFFSET_OFFSET)    - uniformOffset)) + (groupID - 1u))->y = yOffset;
 }
 
 /* Group iteration is from 1, not 0 */
@@ -650,8 +646,8 @@ CCE_PUBLIC_OPTIONS void cceOffsetTextureGroupMap2D (uint8_t groupID, int32_t off
       default: return;
    }
 
-   (((struct cce_ivec2*) (glBuffer + *(g_uniformsOffsets + CCE_TEXTUREOFFSET_OFFSET) - uniformOffset)) + (groupID - 1u))->x = offsetX;
-   (((struct cce_ivec2*) (glBuffer + *(g_uniformsOffsets + CCE_TEXTUREOFFSET_OFFSET) - uniformOffset)) + (groupID - 1u))->y = offsetY;
+   (((struct cce_i32vec2*) (glBuffer + *(g_uniformsOffsets + CCE_TEXTUREOFFSET_OFFSET) - uniformOffset)) + (groupID - 1u))->x = offsetX;
+   (((struct cce_i32vec2*) (glBuffer + *(g_uniformsOffsets + CCE_TEXTUREOFFSET_OFFSET) - uniformOffset)) + (groupID - 1u))->y = offsetY;
 }
 
 CCE_PUBLIC_OPTIONS void cceDelayActionMap2D (uint32_t actionID, uint32_t actionStructSize, void *actionStruct,

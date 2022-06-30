@@ -28,30 +28,30 @@
 #include "../engine_common.h"
 #include "../engine_common_internal.h"
 #include "../shader.h"
-#include "../tools.h"
+#include "../utils.h"
 #include "../platform/endianess.h"
 #include "../platform/path_getters.h"
 #include "../external/stb_image.h"
 #include "map2D.h"
 #include "map2D_internal.h"
 
-struct cce_ivec2                  cce__globalOffset;
-static float                      g_stepMultiplier;
-uint16_t                          cce__loadedMap2Dnumber;
-CCE_PUBLIC_OPTIONS const uint16_t *const cceLoadedMap2Dnumber = &cce__loadedMap2Dnumber;
-static uint8_t                    g_nearestMapsQuantity;
-static uint8_t                    g_nearestMaps[16];
-
-static uint32_t                   g_texturesWidth;
-static uint32_t                   g_texturesHeight;
+struct cce_i32vec2                           cce__globalOffset;
+static float                                 g_stepMultiplier;
+uint16_t                                     cce__loadedMap2Dnumber;
+static char                                 *cce__resourcePath;
+CCE_PUBLIC_OPTIONS const uint16_t     *const cceLoadedMap2Dnumber = &cce__loadedMap2Dnumber;
+static uint8_t                               g_nearestMapsQuantity;
+static uint8_t                               g_nearestMaps[16];
+static struct cce_u32vec2                    g_textureSize;
+CCE_PUBLIC_OPTIONS const struct cce_u32vec2 *cceTextureSize = &g_textureSize;
 CCE_ARRAY(g_textures, static struct LoadedTextures, static uint16_t);
-static GLint                      g_uniformBufferSize;
+static GLint                                 g_uniformBufferSize;
 CCE_ARRAY(g_UBOs, static struct UsedUBO, static uint16_t);
-static GLuint                     g_cleanUBO;
-static uint16_t                   glTexturesArraySize;
-static GLuint                     glTexturesArray;
-static GLuint                     g_EBO;
-static uint32_t                   g_elementBufferSize = 0;
+static GLuint                                g_cleanUBO;
+static uint16_t                              glTexturesArraySize;
+static GLuint                                glTexturesArray;
+static GLuint                                g_EBO;
+static uint32_t                              g_elementBufferSize = 0;
 
 static struct DynamicMap2D *g_dynamicMap;
 
@@ -73,8 +73,8 @@ static void setUniformBufferToDefault_withCBOext (GLuint UBO, GLint RotateAngleS
    GL_CHECK_ERRORS;
    glClearBufferSubData(GL_UNIFORM_BUFFER, GL_R32F, 0u, g_uniformBufferSize, GL_RED, GL_FLOAT, NULL);
    GL_CHECK_ERRORS;
-   struct cce_vec2 zeroOne = {0.0f, 1.0f};
-   glClearBufferSubData(GL_UNIFORM_BUFFER, GL_RG32F, RotateAngleSinCosOffset, 255 * sizeof(struct cce_vec2) , GL_RG, GL_FLOAT, &zeroOne);
+   struct cce_f32vec2 zeroOne = {0.0f, 1.0f};
+   glClearBufferSubData(GL_UNIFORM_BUFFER, GL_RG32F, RotateAngleSinCosOffset, 255 * sizeof(struct cce_f32vec2) , GL_RG, GL_FLOAT, &zeroOne);
    GL_CHECK_ERRORS;
 }
 
@@ -85,8 +85,8 @@ static void setUniformBufferToDefault_withoutCBOext (GLuint UBO, GLint RotateAng
    void *uboData = glMapBuffer(GL_UNIFORM_BUFFER, GL_WRITE_ONLY);
    GL_CHECK_ERRORS;
    memset(uboData, 0, g_uniformBufferSize);
-   struct cce_vec2 *sinCos = (struct cce_vec2*) (((cce_void*) uboData) + RotateAngleSinCosOffset);
-   for (struct cce_vec2 *end = sinCos + 255; sinCos < end; ++sinCos)
+   struct cce_f32vec2 *sinCos = (struct cce_f32vec2*) (((cce_void*) uboData) + RotateAngleSinCosOffset);
+   for (struct cce_f32vec2 *end = sinCos + 255; sinCos < end; ++sinCos)
    {
       sinCos->y = 1.0f;
    }
@@ -148,15 +148,15 @@ static cce_ubyte cce__fourthLogicTypeFuncDynamicMap2Dnearest (uint16_t ID, va_li
    struct Map2D *map = va_arg(argp, struct Map2D*);
    struct Map2D **nearestMaps = va_arg(argp, struct Map2D**);
    size_t nearestMapsQuantity = va_arg(argp, size_t);
-   struct cce_ivec2 *offsets = va_arg(argp, struct cce_ivec2*);
-   return cce__checkCollisionDynamicMap2DmultipleMaps(ID, map, nearestMaps, nearestMapsQuantity, offsets, sizeof(struct cce_ivec2));
+   struct cce_i32vec2 *offsets = va_arg(argp, struct cce_i32vec2*);
+   return cce__checkCollisionDynamicMap2DmultipleMaps(ID, map, nearestMaps, nearestMapsQuantity, offsets, sizeof(struct cce_i32vec2));
 
 }
 
 static cce_ubyte cce__fourthLogicTypeFuncDynamicMap2Dall (uint16_t ID, va_list argp)
 {
    struct Map2Darray *maps = va_arg(argp, struct Map2Darray*);
-   return cce__checkCollisionDynamicMap2DmultipleMaps(ID, maps->main, maps->dependies, maps->main->exitMapsQuantity, (struct cce_ivec2*) &(maps->main->exitMaps->xOffset), sizeof(struct ExitMap2D));
+   return cce__checkCollisionDynamicMap2DmultipleMaps(ID, maps->main, maps->dependies, maps->main->exitMapsQuantity, (struct cce_i32vec2*) &(maps->main->exitMaps->xOffset), sizeof(struct ExitMap2D));
 }
 
 static void dontProcessLogicMap2D (struct Map2Darray *maps)
@@ -180,15 +180,15 @@ static void processLogicMap2Dmain (struct Map2Darray *maps)
 static void processLogicMap2Dnearest (struct Map2Darray *maps)
 {
    cce__processLogicMap2D(maps->main);
-   struct cce_ivec2 offsets[16];
+   struct cce_i32vec2 offsets[16];
    struct Map2D *nearestMaps[16];
    {
       uint8_t *iterator = g_nearestMaps, *end = g_nearestMaps + g_nearestMapsQuantity;
-      struct cce_ivec2 *jiterator = offsets;
+      struct cce_i32vec2 *jiterator = offsets;
       struct Map2D **kiterator = nearestMaps;
       while (iterator < end)
       {
-         *jiterator = (struct cce_ivec2) {(maps->main->exitMaps + *iterator)->xOffset, (maps->main->exitMaps + *iterator)->yOffset};
+         *jiterator = (struct cce_i32vec2) {(maps->main->exitMaps + *iterator)->xOffset, (maps->main->exitMaps + *iterator)->yOffset};
          *kiterator = *(maps->dependies + *iterator);
          cce__processLogicMap2D(*kiterator);
           ++iterator, ++jiterator, ++kiterator;
@@ -295,7 +295,7 @@ static GLuint createTextureArray (uint16_t newSize)
    GLuint texture;
    glGenTextures(1, &texture);
    glBindTexture(GL_TEXTURE_2D_ARRAY, texture);
-   glTexImage3D(GL_TEXTURE_2D_ARRAY, 0, GL_RGBA, g_texturesWidth, g_texturesHeight, newSize, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+   glTexImage3D(GL_TEXTURE_2D_ARRAY, 0, GL_RGBA8, g_textureSize.x, g_textureSize.y, newSize, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
    GL_CHECK_ERRORS;   
    
    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_REPEAT);
@@ -308,7 +308,7 @@ static GLuint createTextureArray (uint16_t newSize)
 
 CCE_PUBLIC_OPTIONS void cceSetGridMultiplierMap2D (float multiplier)
 {
-   struct cce_uvec2 aspectRatio = cce__getCurrentStep();
+   struct cce_u32vec2 aspectRatio = cce__getCurrentStep();
    glUniform2f(*uniformLocations, 1.0f / (aspectRatio.x * multiplier), 1.0f / (aspectRatio.y * multiplier));
    g_stepMultiplier = multiplier;
 }
@@ -327,37 +327,37 @@ CCE_PUBLIC_OPTIONS int cceInitEngine2D (uint16_t globalBoolsQuantity, uint32_t t
       return -1;
    }
    size_t pathLength = strlen(resourcePath) + 1u;
-   char *pathBuffer = malloc((pathLength + 11u) * sizeof(char));
-   memcpy(pathBuffer, resourcePath, pathLength);
-   *(pathBuffer + pathLength) = '\0';
+   cce__resourcePath = malloc((pathLength + 11u) * sizeof(char));
+   memcpy(cce__resourcePath, resourcePath, pathLength);
+   *(cce__resourcePath + pathLength) = '\0';
    
    map2Dflags = CCE_INIT;
    if (cce__initEngine(windowLabel, globalBoolsQuantity) != 0)
    {
-      free(pathBuffer);
+      free(cce__resourcePath);
       return -1;
    }
    
    {
-      #ifdef SYSTEM_SHADER_PATH
-      shaderProgram = makeVFshaderProgram(SYSTEM_SHADER_PATH "/vertex_shader.glsl", SYSTEM_SHADER_PATH "/fragment_shader.glsl", 330u, "", "");
+      #ifdef SYSTEM_RESOURCE_PATH
+      shaderProgram = makeVFshaderProgram(SYSTEM_RESOURCE_PATH "shaders/vertex_shader.glsl", SYSTEM_RESOURCE_PATH "shaders/fragment_shader.glsl", 330u, "", "");
       if (shaderProgram == 0u)
-      #endif // SYSTEM_SHADER_PATH
+      #endif // SYSTEM_RESOURCE_PATH
       {
-         cceAppendPath(pathBuffer, pathLength + 11u, "shaders");
-         char *vertexPath   = cce__createNewPathFromOldPath(pathBuffer, "vertex_shader.glsl",   0u);
-         char *fragmentPath = cce__createNewPathFromOldPath(pathBuffer, "fragment_shader.glsl", 0u);
+         cceAppendPath(cce__resourcePath, pathLength + 11u, "shaders");
+         char *vertexPath   = cceCreateNewPathFromOldPath(cce__resourcePath, "vertex_shader.glsl",   0u);
+         char *fragmentPath = cceCreateNewPathFromOldPath(cce__resourcePath, "fragment_shader.glsl", 0u);
          shaderProgram = makeVFshaderProgram(vertexPath, fragmentPath, 330u, "", "");
          free(vertexPath);
          free(fragmentPath);
-         *(pathBuffer + pathLength) = '\0';
+         *(cce__resourcePath + pathLength) = '\0';
       }
    }
    if (!shaderProgram)
    {
       fputs("ENGINE::INIT::SHADERS_CANNOT_BE_LOADED", stderr);
       cce__terminateEngine();
-      free(pathBuffer);
+      free(cce__resourcePath);
       return -1;
    }
    
@@ -435,35 +435,39 @@ CCE_PUBLIC_OPTIONS int cceInitEngine2D (uint16_t globalBoolsQuantity, uint32_t t
    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
    glGenBuffers(1, &g_EBO);
    cce__initMap2DLoaders(&g_EBO, &map2Dflags);
-   cceAppendPath(pathBuffer, pathLength + 11, "maps");
-   cceSetMap2Dpath(pathBuffer);
-   *(pathBuffer + pathLength) = '\0';
+   cceAppendPath(cce__resourcePath, pathLength + 11, "maps");
+   cceSetMap2Dpath(cce__resourcePath);
+   *(cce__resourcePath + pathLength) = '\0';
    
-   cce__globalOffset = (struct cce_ivec2) {0, 0};
-   g_texturesWidth = textureMaxWidth;
-   g_texturesHeight = textureMaxHeight;
+   cce__globalOffset = (struct cce_i32vec2) {0, 0};
+   g_textureSize.x = textureMaxWidth;
+   g_textureSize.y = textureMaxHeight;
    CCE_CALLOC_ARRAY(g_textures);
    glTexturesArray = createTextureArray(CCE_ALLOCATION_STEP);
    glTexturesArraySize = CCE_ALLOCATION_STEP;
    g_elementBufferSize = 0;
    stbi_set_flip_vertically_on_load(1);
-   cceAppendPath(pathBuffer, pathLength + 11, "textures");
+   cceAppendPath(cce__resourcePath, pathLength + 11, "textures");
    cceSetTexturesPath(resourcePath);
-   *(pathBuffer + pathLength) = '\0';
+   *(cce__resourcePath + pathLength) = '\0';
    g_dynamicMap = cce__initDynamicMap2D(g_EBO);
    cce__baseActionsInit(g_dynamicMap, g_UBOs, bufferUniformsOffsets, uniformLocations, shaderProgram, cce_setUniformBufferToDefault, &g_uniformBufferSize, &map2Dflags);
    cceSetFlags2D(flags);
    map2Dflags &= ~CCE_INIT;
-   free(pathBuffer);
    glUseProgram(shaderProgram);
    cceSetGridMultiplierMap2D(1.0f);
    return 0;
 }
 
+CCE_PUBLIC_OPTIONS const char* cceGetResourcePath (void)
+{
+   return cce__resourcePath;
+}
+
 CCE_PUBLIC_OPTIONS void cceSetTexturesPath (const char *path)
 {
    free(texturesPath);
-   texturesPath = cce__createNewPathFromOldPath(path, "img_", 10u);
+   texturesPath = cceCreateNewPathFromOldPath(path, "img_", 10u);
    texturesPathLength = strlen(texturesPath);
 }
 
@@ -509,39 +513,48 @@ void cce__extendElementBufferIfNecessary (uint32_t minimalSize)
    GL_CHECK_ERRORS;
    glBufferData(GL_COPY_WRITE_BUFFER, g_elementBufferSize * 6 * sizeof(uint32_t), NULL, GL_STATIC_DRAW); // There are 6 indexes per one rectangle
    GL_CHECK_ERRORS;
-
+   
    uint32_t values[6] = {0, 1, 2, 1, 3, 2};
    uint32_t *buffer = glMapBuffer(GL_COPY_WRITE_BUFFER, GL_WRITE_ONLY);
    GL_CHECK_ERRORS;
    memcpy(buffer, values, 6 * sizeof(uint32_t));
+   uint32_t *bufferend = buffer + (g_elementBufferSize * 6);
    buffer += 6;
-   for (uint32_t *bufferend = buffer + (g_elementBufferSize * 6); buffer < bufferend; buffer += 6)
+   while (buffer < bufferend)
    {
       for (uint32_t *iterator = values, *end = values + 6; iterator < end; ++iterator)
       {
          *iterator += 4; // One rectangle has 4 vertices
       }
       memcpy(buffer, values, 6 * sizeof(uint32_t));
+      buffer += 6;
    }
    glUnmapBuffer(GL_COPY_WRITE_BUFFER);
    GL_CHECK_ERRORS;
 }
+
+#define GET_SIGN_FROM_BIT(n, bit)(1-((((n)&(1<<(bit)))>>(bit))*2))
 
 void cce__elementToMap2DElementVertices (struct Map2DElementVertices *buffer, int32_t x, int32_t y, uint16_t width, uint16_t height,
                                          uint8_t *moveGroups, uint8_t moveGroupsQuantity, uint8_t *extensionGroups, uint8_t extensionGroupsQuantity,
                                          uint8_t globalOffset, uint8_t rotationGroup, struct Texture *textureInfo, uint16_t textureID,
                                          uint8_t *textureOffsetGroups, uint8_t textureOffsetGroupsQuantity, uint8_t *colorGroups, uint8_t colorGroupsQuantity)
 {
-   uint8_t i = 3;
-   float textureInfoX[2] = {textureInfo->endX, textureInfo->startX};
-   float textureInfoY[2] = {textureInfo->endY, textureInfo->startY};
-   #define GET_SIGN_FROM_BIT(n, bit)(1-((((n)&(1<<(bit)))>>(bit))*2))
-   for (struct Map2DElementVertices *vend = buffer + 4; buffer < vend; ++buffer, --i)
+   uint8_t i = 0;
+   float textureInfoX[2] ;//= {0, 1};
+   struct cce_u16vec2 textureSize = g_textures[textureID - (textureID > 0)].size;
+   textureInfoX[0] = ((float)(textureInfo->position.x + (g_textureSize.x - textureSize.x)))/g_textureSize.x;
+   textureInfoX[1] = ((float)(textureInfo->position.x + textureInfo->size.x + (g_textureSize.x - textureSize.x)))/g_textureSize.x;
+   float textureInfoY[2] ;//= {0, 1};
+   textureInfoY[1] = ((float)(g_textureSize.y - textureInfo->position.y - (g_textureSize.y - textureSize.y)))/g_textureSize.y;
+   textureInfoY[0] = ((float)(((int)g_textureSize.y) - ((int)textureInfo->position.y) - ((int)textureInfo->size.y) - ((int)(g_textureSize.y - textureSize.y))))/g_textureSize.y;
+   struct cce_f32vec2 textureFragmentSize = {(float) textureInfo->size.x / g_textureSize.x, (float) textureInfo->size.y / g_textureSize.y};
+   for (struct Map2DElementVertices *vend = buffer + 4; buffer < vend; ++buffer, ++i)
    {
-      buffer->vertexCoords.x  = width  * GET_SIGN_FROM_BIT(i, 0);
-      buffer->vertexCoords.y  = height * GET_SIGN_FROM_BIT(i, 1);
-      buffer->textureCoords.x = textureInfoX[i & 1];
-      buffer->textureCoords.y = textureInfoY[(i & 2) >> 1];
+      buffer->vertexCoords.x  = width  * -GET_SIGN_FROM_BIT(i, 1);
+      buffer->vertexCoords.y  = height * -GET_SIGN_FROM_BIT(i, 0);
+      buffer->textureCoords.x = textureInfoX[(i & 2) >> 1];
+      buffer->textureCoords.y = textureInfoY[i & 1];
       buffer->position.x      = x;
       buffer->position.y      = y;
       buffer->transformGroups.rotateGroupID  = rotationGroup;
@@ -550,14 +563,49 @@ void cce__elementToMap2DElementVertices (struct Map2DElementVertices *buffer, in
       memset(buffer->moveIDs + moveGroupsQuantity, 0, 4 - MIN(moveGroupsQuantity, 4));
       memcpy(buffer->extendIDs, extensionGroups, MIN(extensionGroupsQuantity, 4));
       memset(buffer->extendIDs + extensionGroupsQuantity, 0, 4 - MIN(extensionGroupsQuantity, 4));
-      buffer->textureFragmentSize.x          = textureInfo->endX - textureInfo->startX;
-      buffer->textureFragmentSize.y          = textureInfo->endY - textureInfo->startY;
-      buffer->textureID                      = textureID;
+      buffer->textureFragmentSize = textureFragmentSize;
+      buffer->textureID           = textureID;
       memcpy(buffer->textureOffsetIDs, textureOffsetGroups, MIN(textureOffsetGroupsQuantity, 4));
       memset(buffer->textureOffsetIDs + textureOffsetGroupsQuantity, 0, 4 - MIN(textureOffsetGroupsQuantity, 4));
       memcpy(buffer->colorIDs, colorGroups, MIN(colorGroupsQuantity, 4));
       memset(buffer->colorIDs + colorGroupsQuantity, 0, 4 - MIN(colorGroupsQuantity, 4));
    }
+}
+
+static int loadTexture (char *path, uint16_t position)
+{
+   int width, height, nrChannels;
+   void *data;
+   printf("Loading image %s at position %u\n", path, position);
+   data = stbi_load(path, &width, &height, &nrChannels, 4);
+   if (!data)
+   {
+      fprintf(stderr, "ENGINE::TEXTURE::DECODING_ERROR:\nCannot decode %s (does it even exist?)\n", path);
+      return -1;
+   }
+   if (width > g_textureSize.x || height > g_textureSize.y)
+   {
+      fprintf(stderr, "ENGINE::TEXTURE::APPLYING_ERROR:\n%s is bigger than texture buffer allocated for it. Increase textureMaxWidth and textureMaxHeight to fix this error\n", path);
+      return -1;
+   }
+   glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, g_textureSize.x - width, 0, position, width, height, 1, GL_RGBA, GL_UNSIGNED_BYTE, data);
+   GL_CHECK_ERRORS;
+   stbi_image_free(data);
+   (g_textures + position)->size.x = width;
+   (g_textures + position)->size.y = height;
+   return 0;
+}
+
+static int setTextureAttributes (uint16_t ID)
+{
+   if (g_textures[ID].size.x != 0 && g_textures[ID].size.y != 0)
+      return 0;
+   int width = 0, height = 0, channels, result;
+   cce__shortToString(texturesPath, g_textures[ID].ID, ".png");
+   result = stbi_info(texturesPath, &width, &height, &channels);
+   *(texturesPath + texturesPathLength) = '\0';
+   g_textures[ID].size = (struct cce_u16vec2){width, height};
+   return result;
 }
 
 void cce__updateTexturesArray (void)
@@ -568,9 +616,7 @@ void cce__updateTexturesArray (void)
 
    g_texturesQuantity -= freeTexturesQuantityFromEnd;
    CCE_FIT_ARRAY_TO_SIZE(g_textures);
-   int width, height, nrChannels;
    uint8_t arrayResized = 0u;
-   cce_ubyte *data;
    GLuint textureArray;
 
    if (glTexturesArraySize != g_texturesQuantityAllocated)
@@ -592,28 +638,23 @@ void cce__updateTexturesArray (void)
       {
          if ((iterator->flags & CCE_LOADEDTEXTURES_TOBELOADED))
          {
-            shortToString(texturesPath, iterator->ID, ".png");
-            data = stbi_load(texturesPath, &width, &height, &nrChannels, 4);
-            *(texturesPath + texturesPathLength) = '\0';
-            if (!data)
+            cce__shortToString(texturesPath, iterator->ID, ".png");
+            if (loadTexture(texturesPath, iterator - g_textures) != 0)
             {
                memcpy((texturesPath + texturesPathLength), "dummy.png", 10u);
-               data = stbi_load(texturesPath, &width, &height, &nrChannels, 4);
-               *(texturesPath + texturesPathLength) = '\0';
-               if (!data)
+               if (loadTexture(texturesPath, iterator - g_textures) != 0)
                {
-                  shortToString(texturesPath, iterator->ID, ".png");
+                  *(texturesPath + texturesPathLength) = '\0';
+                  cce__shortToString(texturesPath, iterator->ID, ".png");
                   cce__criticalErrorPrint("ENGINE::TEXTURE::DUMMY::FAILED_TO_LOAD:\nFailed to load dummy texture requested because %s was not found.", texturesPath);
                }
             }
-            glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, g_texturesWidth - width, g_texturesHeight - height, (iterator - g_textures), width, height, 1, GL_RGBA, GL_UNSIGNED_BYTE, data);
-            GL_CHECK_ERRORS;
-            stbi_image_free(data);
+            *(texturesPath + texturesPathLength) = '\0';
             iterator->flags &= ~CCE_LOADEDTEXTURES_TOBELOADED;
          }
          else if (arrayResized)
          {
-            glCopyTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, 0, 0, 0, 0, 0, g_texturesWidth, g_texturesHeight);
+            glCopyTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, 0, 0, 0, 0, 0, g_textureSize.x, g_textureSize.y);
             GL_CHECK_ERRORS;
          }
       }
@@ -716,8 +757,8 @@ void cce__allocateUBObuffers (uint16_t uboID, uint16_t moveGroupsQuantity, uint1
    struct UsedUBO *ubo = (g_UBOs + uboID);
    if (moveGroupsQuantity > 0)
    {
-      ubo->moveGroupValues      = realloc(ubo->moveGroupValues, moveGroupsQuantity           * sizeof(struct cce_ivec2));
-      memset(ubo->moveGroupValues, 0, moveGroupsQuantity      * sizeof(struct cce_ivec2));
+      ubo->moveGroupValues      = realloc(ubo->moveGroupValues, moveGroupsQuantity           * sizeof(struct cce_i32vec2));
+      memset(ubo->moveGroupValues, 0, moveGroupsQuantity      * sizeof(struct cce_i32vec2));
    }
    else
    {
@@ -727,8 +768,8 @@ void cce__allocateUBObuffers (uint16_t uboID, uint16_t moveGroupsQuantity, uint1
    ubo->moveGroupValuesQuantity = moveGroupsQuantity;
    if (extensionGroupsQuantity > 0)
    {
-      ubo->extensionGroupValues = realloc(ubo->extensionGroupValues, extensionGroupsQuantity * sizeof(*(ubo->extensionGroupValues)));
-      memset(ubo->extensionGroupValues, 0, extensionGroupsQuantity * sizeof(*(ubo->extensionGroupValues)));
+      ubo->extensionGroupValues = realloc(ubo->extensionGroupValues, extensionGroupsQuantity * sizeof(struct cce_i16vec2));
+      memset(ubo->extensionGroupValues, 0, extensionGroupsQuantity * sizeof(struct cce_i16vec2));
    }
    else
    {
@@ -781,7 +822,7 @@ uint16_t cce__loadTexture (uint32_t textureID)
    uint16_t current_g_texture = 0u;
    for (;;)
    {
-      if (current_g_texture < g_texturesQuantity)
+      if (current_g_texture >= g_texturesQuantity)
       {
          current_g_texture = g_texturesQuantity;
          ++g_texturesQuantity;
@@ -815,6 +856,38 @@ uint16_t cce__loadTexture (uint32_t textureID)
    (g_textures + current_g_texture)->ID = (textureID - 1u);
    (g_textures + current_g_texture)->flags = CCE_LOADEDTEXTURES_TOBELOADED;
    (g_textures + current_g_texture)->dependantMapsQuantity = 1u;
+   setTextureAttributes(current_g_texture);
+   return current_g_texture + 1u;
+}
+
+CCE_PUBLIC_OPTIONS uint16_t cceLoadTexture (char *path)
+{
+   uint16_t current_g_texture = 0u;
+   for (;;)
+   {
+      if (current_g_texture >= g_texturesQuantity)
+      {
+         current_g_texture = g_texturesQuantity;
+         ++g_texturesQuantity;
+         if (g_texturesQuantity > g_texturesQuantityAllocated)
+         {
+            CCE_REALLOC_ARRAY(g_textures, (g_texturesQuantityAllocated + CCE_ALLOCATION_STEP));
+         }
+         break;
+      }
+      if ((g_textures + current_g_texture)->dependantMapsQuantity == 0u)
+      {
+         break;
+      }
+      ++current_g_texture;
+   }
+   if (loadTexture(path, current_g_texture) != 0)
+   {
+      --g_texturesQuantity;
+      return 0;
+   }
+   (g_textures + current_g_texture)->ID = UINT32_MAX;
+   (g_textures + current_g_texture)->dependantMapsQuantity = 1u;
    return current_g_texture + 1u;
 }
 
@@ -824,7 +897,19 @@ uint16_t* cce__loadTexturesMap2D (struct Map2DElement *elements, uint32_t elemen
    uint32_t *texturesMapReliesOn = NULL;
    uint16_t  texturesMapReliesOnQuantity = 0u, texturesMapReliesOnAllocated = 0u;
    cce_ubyte isLoaded = 0u;
-   for (struct Map2DElement *iterator = elements, *end = elements + elementsQuantity - 1u; iterator < end; ++iterator)
+   struct ElementsArray
+   {
+      struct Map2DElement **elements;
+      uint32_t elementsQuantity;
+      uint32_t elementsQuantityAllocated;
+   } *elementsWithTexture = NULL;
+   #define SET_TEXTUREID_FOR_ELEMENTS_AND_FREE(x, id) \
+   for (struct Map2DElement **ITERATOR = (x)->elements, **END = (x)->elements + (x)->elementsQuantity; ITERATOR < END; ++ITERATOR) \
+   { \
+      (**ITERATOR).textureInfo.ID = (id); \
+   } \
+   free(x->elements)
+   for (struct Map2DElement *iterator = elements, *end = elements + elementsQuantity; iterator < end; ++iterator)
    {
       uint32_t ID = iterator->textureInfo.ID;
       if (ID == 0u) continue;
@@ -833,6 +918,13 @@ uint16_t* cce__loadTexturesMap2D (struct Map2DElement *elements, uint32_t elemen
          if ((*jiterator) == (ID - 1u))
          {
             isLoaded = 1u;
+            struct ElementsArray *current = (elementsWithTexture + (jiterator - texturesMapReliesOn));
+            if (current->elementsQuantity >= current->elementsQuantityAllocated)
+            {
+               CCE_REALLOC_ARRAY(current->elements, current->elementsQuantity + 1);
+            }
+            current->elements[current->elementsQuantity] = iterator;
+            ++current->elementsQuantity;
             break;
          }
       }
@@ -841,8 +933,12 @@ uint16_t* cce__loadTexturesMap2D (struct Map2DElement *elements, uint32_t elemen
          if (texturesMapReliesOnQuantity == texturesMapReliesOnAllocated)
          {
             texturesMapReliesOnAllocated += CCE_ALLOCATION_STEP;
-            texturesMapReliesOn = (uint32_t*) realloc(texturesMapReliesOn, texturesMapReliesOnAllocated * sizeof(uint32_t));
+            texturesMapReliesOn = realloc(texturesMapReliesOn, texturesMapReliesOnAllocated * sizeof(uint32_t));
+            elementsWithTexture = realloc(elementsWithTexture, texturesMapReliesOnAllocated * sizeof(struct ElementsArray));
          }
+         CCE_ALLOC_ARRAY(elementsWithTexture[texturesMapReliesOnQuantity].elements);
+         elementsWithTexture[texturesMapReliesOnQuantity].elementsQuantity = 1;
+         elementsWithTexture[texturesMapReliesOnQuantity].elements[0] = iterator;
          (*(texturesMapReliesOn + texturesMapReliesOnQuantity)) = (ID - 1u); // 0u is invalid for openGL shaders, but perfectly fine here
          ++texturesMapReliesOnQuantity;
       }
@@ -854,6 +950,7 @@ uint16_t* cce__loadTexturesMap2D (struct Map2DElement *elements, uint32_t elemen
    uint32_t tmp;
    uint16_t *freeLoadedTextures = NULL;
    uint16_t freeLoadedTexturesQuantity = 0u, freeLoadedTexturesAllocated = 0u;
+   struct ElementsArray *elementsWithTextureIterator = elementsWithTexture;
    isLoaded = 0u;
    for (uint16_t current_g_texture = 0u; current_g_texture < g_texturesQuantity; ++current_g_texture)
    {
@@ -868,11 +965,11 @@ uint16_t* cce__loadTexturesMap2D (struct Map2DElement *elements, uint32_t elemen
                (*jiterator) = (*kiterator);
                (*kiterator) = tmp;
                (*literator) = current_g_texture + 1u;
-               elements->textureInfo.ID = current_g_texture + 1u;
+               SET_TEXTUREID_FOR_ELEMENTS_AND_FREE(elementsWithTextureIterator, current_g_texture + 1u);
                ++((g_textures + current_g_texture)->dependantMapsQuantity);
                ++literator;
                ++kiterator;
-               ++elements;
+               ++elementsWithTextureIterator;
                isLoaded = 1u;
                break;
             }
@@ -904,10 +1001,11 @@ uint16_t* cce__loadTexturesMap2D (struct Map2DElement *elements, uint32_t elemen
    {
       ((g_textures + (*iterator))->ID) = *kiterator;
       (*literator) = (*iterator) + 1u;
-      elements->textureInfo.ID = (*iterator) + 1u;
+      SET_TEXTUREID_FOR_ELEMENTS_AND_FREE(elementsWithTextureIterator, (*iterator) + 1u);
       ((g_textures + (*iterator))->dependantMapsQuantity) = 1;
       ((g_textures + (*iterator))->flags) = CCE_LOADEDTEXTURES_TOBELOADED;
-      ++literator, ++kiterator, ++iterator, ++elements;
+      setTextureAttributes(*iterator);
+      ++literator, ++kiterator, ++iterator, ++elementsWithTextureIterator;
    }
    free(freeLoadedTextures);
    uint16_t current_g_texture = g_texturesQuantity;
@@ -922,13 +1020,15 @@ uint16_t* cce__loadTexturesMap2D (struct Map2DElement *elements, uint32_t elemen
          }
       }
       ((g_textures + current_g_texture)->ID) = (*kiterator);
-      (*literator) = current_g_texture + 1u; // 0u is invalid for openGL shaders (it's the way to say "We don't need texture here"), but perfectly fine here
-      elements->textureInfo.ID = current_g_texture + 1u;
+      (*literator) = current_g_texture + 1u; // 0u is invalid for openGL shaders (it's the way to say "We don't need texture there"), but perfectly fine here
+      SET_TEXTUREID_FOR_ELEMENTS_AND_FREE(elementsWithTextureIterator, current_g_texture + 1u);
       ((g_textures + current_g_texture)->dependantMapsQuantity) = 1;
       ((g_textures + current_g_texture)->flags) = CCE_LOADEDTEXTURES_TOBELOADED;
-      ++literator, ++kiterator, ++current_g_texture, ++elements;
+      setTextureAttributes(current_g_texture);
+      ++literator, ++kiterator, ++current_g_texture, ++elementsWithTextureIterator;
    }
    *texturesLoadedMapReliesOnQuantity = texturesMapReliesOnQuantity;
+   free(elementsWithTexture);
    if (texturesMapReliesOnQuantity > 0)
       return (uint16_t*) realloc(texturesMapReliesOn, texturesMapReliesOnQuantity * sizeof(uint16_t));
    free(texturesMapReliesOn);
@@ -977,8 +1077,8 @@ cce_ubyte cce__checkCollision (const uint32_t *group1firstID, uint16_t groups1qu
 }
 
 cce_ubyte cce__checkCollisionWithOffset (const uint32_t *group1firstID, uint16_t groups1quantity, const uint32_t *group2firstID, uint16_t groups2quantity,
-                                         const cce_void *elements1, size_t element1size, const struct cce_ivec2 *elements1offset,
-                                         const cce_void *elements2, size_t element2size, const struct cce_ivec2 *elements2offset)
+                                         const cce_void *elements1, size_t element1size, const struct cce_i32vec2 *elements1offset,
+                                         const cce_void *elements2, size_t element2size, const struct cce_i32vec2 *elements2offset)
 {
    cce_ubyte isDifferent = (elements1 != elements2);
    const uint32_t *group1IDs = group1firstID, *group2IDs, *groups1end = group1firstID + groups1quantity, *groups2end = group2firstID + groups2quantity;
@@ -987,7 +1087,7 @@ cce_ubyte cce__checkCollisionWithOffset (const uint32_t *group1firstID, uint16_t
       group2IDs = group2firstID;
       while (group2IDs < groups2end)
       {
-         struct cce_ivec2 offset = {elements2offset->x - elements1offset->x, elements2offset->y - elements1offset->y};
+         struct cce_i32vec2 offset = {elements2offset->x - elements1offset->x, elements2offset->y - elements1offset->y};
          if (((*group1IDs != *group2IDs) || isDifferent) &&
          cceCheckCollisionMap2DWithOffset((struct Map2DCollider*) (elements1 + (*group1IDs * element1size)), (struct Map2DCollider*) (elements2 + (*group2IDs * element2size)), &offset))
          {
@@ -1016,9 +1116,9 @@ static void swapMap2D (struct Map2D **a, struct Map2D **b)
 }
 
 uint16_t g_mapToLoad;
-struct cce_ivec2 g_newOffset;
+struct cce_i32vec2 g_newOffset;
 
-CCE_PUBLIC_OPTIONS void cceSetLoadedMap2D (uint16_t number, struct cce_ivec2 globalPosition)
+CCE_PUBLIC_OPTIONS void cceSetLoadedMap2D (uint16_t number, struct cce_i32vec2 globalPosition)
 {
    g_mapToLoad = number;
    g_newOffset = globalPosition;
@@ -1112,7 +1212,7 @@ static struct Map2Darray* loadMap2DwithDependies (struct Map2Darray *maps, uint1
       maps->main = cceLoadMap2D(number);
       if (maps->dependies)
       {
-         cce__errorPrint("ENGINE::MAP2DARRAY_LOADER::DEPENDENCY_OF_NOTHING:\nMaps->dependies initialized without maps->main. Impossible to free maps->dependies. Possible memory leak", NULL);
+         cce__errorPrint("ENGINE::MAP2DARRAY_LOADER::DEPENDENCY_OF_NOTHING:\nMaps->dependies initialized without maps->main. Cannot free maps->dependies. Possible memory leak", NULL);
       }
       maps->dependies = (struct Map2D**) malloc(maps->main->exitMapsQuantity * sizeof(struct Map2D*));
       struct ExitMap2D *exitmap = maps->main->exitMaps;
@@ -1132,7 +1232,7 @@ static struct Map2Darray* loadMap2DwithDependies (struct Map2Darray *maps, uint1
 
 static inline uint8_t isMapVisiblePlusExited (struct ExitMap2D *borderInfo)
 {
-   struct cce_uvec2 step = cce__getCurrentStep();
+   struct cce_u32vec2 step = cce__getCurrentStep();
    float stepA, stepB;
    int32_t globalOffsetA, nglobalOffsetB;
    if (borderInfo->flags & 0x1)
@@ -1168,14 +1268,14 @@ static void cce__processNearestMap2D (struct ExitMap2D *info, uint8_t quantity)
       g_nearestMaps[g_nearestMapsQuantity++] = iterator - info;
       
       if (state == 2)
-         cceSetLoadedMap2D(iterator->ID, (struct cce_ivec2) {cce__globalOffset.x + iterator->xOffset, cce__globalOffset.y + iterator->yOffset});
+         cceSetLoadedMap2D(iterator->ID, (struct cce_i32vec2) {cce__globalOffset.x + iterator->xOffset, cce__globalOffset.y + iterator->yOffset});
    }
 }
 
 static void cce__loadMapsAndSetState (struct Map2Darray *maps)
 {
-   struct cce_ivec2 offset = (struct cce_ivec2) {g_newOffset.x - cce__globalOffset.x, g_newOffset.y - cce__globalOffset.y};
-   cce__globalOffset = (struct cce_ivec2) {g_newOffset.x, g_newOffset.y};
+   struct cce_i32vec2 offset = (struct cce_i32vec2) {g_newOffset.x - cce__globalOffset.x, g_newOffset.y - cce__globalOffset.y};
+   cce__globalOffset = (struct cce_i32vec2) {g_newOffset.x, g_newOffset.y};
    glUniform2iv(*(uniformLocations + CCE_GLOBALOFFSET_OFFSET), 1, (GLint*) &cce__globalOffset);
    uint32_t i = 0;
    while (i < g_dynamicMap->elementsQuantity)

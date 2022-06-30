@@ -38,7 +38,7 @@ typedef uint_fast32_t cce_uint;
 static char *tmpPath = NULL;
 static size_t tmpPathLength;
 
-char* cce__createNewPathFromOldPath (const char *const oldPath, const char *const appendPath, size_t freeSpaceToLeave)
+CCE_PUBLIC_OPTIONS char* cceCreateNewPathFromOldPath (const char *const oldPath, const char *const appendPath, size_t freeSpaceToLeave)
 {
    char *newPath;
    size_t oldPathSize = strlen(oldPath);
@@ -86,18 +86,52 @@ CCE_PUBLIC_OPTIONS char* cceAppendPath (char *const buffer, size_t bufferSize, c
    return buffer;
 }
 
+void cce__shortToString (char *str, const unsigned short number, const char *strEnd)
+{
+   size_t lengthEnd = strlen(strEnd);
+   str += strlen(str);
+   if (number > 9)
+   {
+      if (number > 99)
+      {
+         if (number > 999)
+         {
+            if (number > 9999)
+            {
+               *(str++) = number / 10000 + '0';
+            }
+            *(str++) = number % 10000 / 1000 + '0';
+         }
+         *(str++) = number % 1000 / 100 + '0';
+      }
+      *(str++) = number % 100 / 10 + '0';
+   }
+   *(str++) = number % 10 + '0';
+   memcpy(str, strEnd, lengthEnd + 1u);
+}
+
 CCE_PUBLIC_OPTIONS char* cceConvertIntToBase64String (size_t number, char *restrict buffer, uint8_t symbolsQuantity)
 {
    static const char
-   dictionary[64] = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 
-                     'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
+   dictionary[64] = {'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
                      'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z',
-                     '-', '_'};
+                     '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '-', '_'};
    for (uint8_t i = 0u; i < symbolsQuantity; ++i)
    {
       *(buffer + symbolsQuantity - i - 1u) = *(dictionary + ((number >> (i * 6)) & 63));
    }
    return buffer;
+}
+
+CCE_PUBLIC_OPTIONS void cceTerminateTemporaryDirectory (void)
+{
+   if (!tmpPath)
+   {
+      return;
+   }
+   cceDeleteDirectory(tmpPath);
+   free(tmpPath);
+   tmpPath = NULL;
 }
 
 #if defined(POSIX_SYSTEM)
@@ -356,17 +390,6 @@ CCE_PUBLIC_OPTIONS void cceDeleteDirectory (const char *path)
    {
       fprintf(stderr, "DIRECTORY::FAILED_TO_REMOVE:\n%s path cannot be removed - %s", path, strerror(errno));
    }
-}
-
-CCE_PUBLIC_OPTIONS void cceTerminateTemporaryDirectory (void)
-{
-   if (!tmpPath)
-   {
-      return;
-   }
-   cceDeleteDirectory(tmpPath);
-   free(tmpPath);
-   tmpPath = NULL;
 }
 
 #elif defined(WINDOWS_SYSTEM)
@@ -644,14 +667,4 @@ CCE_PUBLIC_OPTIONS void cceDeleteDirectory (const char *aPath)
    }
 }
 
-CCE_PUBLIC_OPTIONS void cceTerminateTemporaryDirectory (void)
-{
-   if (!tmpPath)
-   {
-      return;
-   }
-   cceDeleteDirectory(tmpPath);
-   free(tmpPath);
-   tmpPath = NULL;
-}
 #endif

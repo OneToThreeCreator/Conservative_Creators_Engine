@@ -44,7 +44,7 @@ extern C:
 #define CCE_DONT_PROCESS_LOGIC                 0x004
 #define CCE_PROCESS_LOGIC_FOR_VISIBLE_MAPS     0x008
 #define CCE_PROCESS_LOGIC_FOR_ALL_MAPS         0x00C
-#define CCE_FORCE_INITIALIZE_MAP_ONLOAD        0x040
+#define CCE_FORCE_INITIALIZE_MAP_ONLOAD        0x010
 
 #define CCE_DEFAULT 0
 
@@ -60,6 +60,9 @@ typedef uint_fast32_t cce_flag;
 #define CCE_ELEMENT_WITHOUT_COLLIDER 0x40
 #define CCE_ELEMENT_WITH_COLLIDER (CCE_COLLIDER | CCE_ELEMENT_WITHOUT_COLLIDER)
 
+#define CCE_POSITION_IS_NOT_CURRENT 0x1
+#define CCE_TEXTUREID_IS_NOT_IMAGEID 0x2
+
 struct ExitMap2D
 {
    uint32_t ID;
@@ -68,7 +71,7 @@ struct ExitMap2D
    int32_t aBorder;
    int32_t b1Border;
    int32_t b2Border;
-   uint8_t flags; // 0x1 - a is x (otherwise a is y), 0x2 - b is to the south/west from globalOffset
+   uint8_t flags; // 0x1 - a is x (otherwise a is y), 0x2 - b is to the south/west from globalOffset 0
 };
 
 struct Map2DCollider
@@ -149,12 +152,15 @@ CCE_PUBLIC_OPTIONS int cceInitEngine2D (uint16_t globalBoolsQuantity, uint32_t t
 CCE_PUBLIC_OPTIONS uint8_t cceRegisterAction (uint32_t ID, void (*action)(void*), void (*endianSwap)(void*));
 CCE_PUBLIC_OPTIONS void cceSetTexturesPath (const char *path);
 CCE_PUBLIC_OPTIONS int cceEngine2D (void);
-CCE_PUBLIC_OPTIONS void cceSetLoadedMap2D (uint16_t number, struct cce_ivec2 globalPosition);
+CCE_PUBLIC_OPTIONS void cceSetLoadedMap2D (uint16_t number, struct cce_i32vec2 globalPosition);
 CCE_PUBLIC_OPTIONS extern const uint16_t *const cceLoadedMap2Dnumber;
+CCE_PUBLIC_OPTIONS extern const struct cce_u32vec2 *cceTextureSize;
+CCE_PUBLIC_OPTIONS const char* cceGetResourcePath (void);
+CCE_PUBLIC_OPTIONS uint16_t cceLoadTexture (char *path);
 
 // dynamicMap2D
 
-CCE_PUBLIC_OPTIONS uint8_t cceGetGroupValueDynamicMap2D (cce_enum group_type, uint16_t ID, struct cce_ivec2 *variable);
+CCE_PUBLIC_OPTIONS uint8_t cceGetGroupValueDynamicMap2D (cce_enum group_type, uint16_t ID, struct cce_i32vec2 *variable);
 CCE_PUBLIC_OPTIONS struct ElementGroup cceGetGroupDataDynamicMap2D (cce_enum group_type, uint16_t ID);
 CCE_PUBLIC_OPTIONS struct Map2DCollider cceGetColliderDataDynamicMap2D (uint32_t ID);
 CCE_PUBLIC_OPTIONS struct CollisionGroup cceGetCollisionDataDynamicMap2D (uint16_t ID);
@@ -163,6 +169,7 @@ CCE_PUBLIC_OPTIONS uint8_t cceAddElementInGroupDynamicMap2D (cce_enum group_type
 CCE_PUBLIC_OPTIONS uint8_t cceAddElementInGroupVisibleDynamicMap2D (cce_enum group_type, uint16_t ID, uint32_t elementID);
 CCE_PUBLIC_OPTIONS void cceReplaceMap2DElementDynamicMap2D (struct Map2DElementDev *element, uint32_t ID, uint8_t hasCollider, uint8_t isCurrentPosition);
 CCE_PUBLIC_OPTIONS uint32_t cceCreateMap2DElementDynamicMap2D (struct Map2DElementDev *element, cce_enum elementType, uint8_t isCurrentPosition);
+CCE_PUBLIC_OPTIONS uint32_t* cceCreateMap2DElementsDynamicMap2D (struct Map2DElementDev *elements, uint32_t elementsQuantity, cce_enum elementType, uint8_t isCurrentPosition);
 CCE_PUBLIC_OPTIONS uint8_t cceDeleteGroupVisibilityFromElementDynamicMap2D (cce_enum group_type, uint16_t ID, uint32_t elementID);
 CCE_PUBLIC_OPTIONS uint8_t cceDeleteElementFromGroupDynamicMap2D (cce_enum group_type, uint16_t ID, uint32_t elementID);
 CCE_PUBLIC_OPTIONS void cceDeleteMap2DElementDynamicMap2D (uint32_t ID);

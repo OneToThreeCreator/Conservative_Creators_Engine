@@ -27,11 +27,11 @@ extern C:
 #include <stdint.h>
 #include <stdarg.h>
 #include <stdlib.h>
-#include "config.h"
+#include <coffeechain/config.h>
 
 #if defined(_WIN32) || defined(__WIN32__) || defined(_WIN64) || defined(__TOS_WIN__) || defined(__WINDOWS__) || \
     defined(__MINGW32__) || defined(__MINGW64__) || defined(__CYGWIN__)
-#include "cce_exports.h"
+#include <coffeechain/cce_exports.h>
 #define CCE_PUBLIC_OPTIONS CCE_EXPORTS
 #else
 #define CCE_PUBLIC_OPTIONS
@@ -63,19 +63,31 @@ typedef uint_fast8_t cce_enum;
 #define CCE_PLOT_NUMBER_LOGIC_ELEMENT 0x9
 #define CCE_TIMER_LOGIC_ELEMENT       0xA
 
-struct cce_uvec2
+struct cce_u16vec2
+{
+   uint16_t x;
+   uint16_t y;
+};
+
+struct cce_i16vec2
+{
+   int16_t x;
+   int16_t y;
+};
+
+struct cce_u32vec2
 {
    uint32_t x;
    uint32_t y;
 };
 
-struct cce_ivec2
+struct cce_i32vec2
 {
    int32_t x;
    int32_t y;
 };
 
-struct cce_vec2
+struct cce_f32vec2
 {
    float x;
    float y;
@@ -83,10 +95,8 @@ struct cce_vec2
 
 struct Texture
 {
-   float    startX;
-   float    startY;
-   float    endX;
-   float    endY;
+   struct cce_u16vec2 position;
+   struct cce_u16vec2 size;
    uint32_t ID; /* 0 is no texture */
 };
 

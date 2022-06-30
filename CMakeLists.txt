@@ -20,7 +20,7 @@
 
 cmake_minimum_required(VERSION 3.0)
 
-project(CoffeeChain VERSION 0.4.3 DESCRIPTION "open 2D engine for creating games - shared library" LANGUAGES C)
+project(CoffeeChain VERSION 0.5.0 DESCRIPTION "open 2D engine for creating games - shared library" LANGUAGES C)
 
 if (NOT DEFINED CoffeeChain_BUILD_TESTING)
    option(CoffeeChain_BUILD_TESTING "Build CoffeeChain test program" ON)
@@ -31,8 +31,12 @@ if (NOT DEFINED CoffeeChain_LIB_TYPE)
    set_property(CACHE CoffeeChain_LIB_TYPE PROPERTY STRINGS SHARED STATIC)
 endif()
 
-if (NOT DEFINED CoffeeChain_INSTALL AND NOT (CoffeeChain_LIB_TYPE MATCHES STATIC))
+if (NOT DEFINED CoffeeChain_INSTALL AND NOT ("${CoffeeChain_LIB_TYPE}" MATCHES STATIC))
    option(CoffeeChain_INSTALL "Install CoffeeChain" ON) 
+endif()
+
+if ("${CoffeeChain_LIB_TYPE}" MATCHES STATIC)
+   set(CoffeeChain_INSTALL OFF) 
 endif()
 
 set(CMAKE_C_STANDARD 99)
@@ -50,9 +54,9 @@ add_library(coffeechain ${CoffeeChain_LIB_TYPE}
    src/engine_common.h
    include/coffeechain/engine_common.h
    src/engine_common_internal.h
-   src/tools.c
-   src/tools.h
-   include/coffeechain/tools.h
+   src/utils.c
+   src/utils.h
+   include/coffeechain/utils.h
    src/platform/engine_common_glfw.c
    src/platform/engine_common_glfw.h
    src/platform/path_getters.c
@@ -106,18 +110,19 @@ if (NOT INIH_FOUND)
       PREFIX "${CoffeeChain_BINARY_DIR}/external/inih"
       SOURCE_DIR "${CoffeeChain_SOURCE_DIR}/external/inih" 
       BINARY_DIR "${CoffeeChain_BINARY_DIR}/external/inih"
-      CONFIGURE_COMMAND meson setup -Ddefault_library=static -Ddistro_install=false -Dwith_INIReader=false --buildtype ${INIH_BUILD_TYPE} ${CoffeeChain_SOURCE_DIR}/external/inih
+      CONFIGURE_COMMAND meson setup -Ddefault_library=static -Ddistro_install=false -Dwith_INIReader=false -DINI_STOP_ON_FIRST_ERROR=1 --buildtype ${INIH_BUILD_TYPE} ${CoffeeChain_SOURCE_DIR}/external/inih
       BUILD_COMMAND meson compile
       INSTALL_COMMAND "" 
    )
    add_library(inih STATIC IMPORTED)
    add_dependencies(inih inih_external)
-   set_target_properties(inih PROPERTIES IMPORTED_LOCATION ${CMAKE_BINARY_DIR}/external/inih/libinih.a)
+   set_target_properties(inih PROPERTIES IMPORTED_LOCATION ${CoffeeChain_BINARY_DIR}/external/inih/libinih.a)
    set(INIH_LIBRARIES inih)
    target_include_directories(coffeechain PRIVATE external/inih)
+   target_compile_definitions(coffeechain PRIVATE INIH_LOCAL)
 endif()
 
-find_package(ListLib 1.0)
+find_package(ListLib 1.0 QUIET)
 if (NOT ListLib_FOUND)
    set(ListLib_LIB_TYPE STATIC)
    add_subdirectory(external/listlib)
@@ -139,11 +144,11 @@ endif()
 
 configure_file(src/config.h.in include/coffeechain/config.h)
 configure_file(coffeechain.pc.in coffeechain.pc @ONLY)
-target_include_directories(coffeechain INTERFACE
+target_include_directories(coffeechain PUBLIC
                             $<BUILD_INTERFACE:${CoffeeChain_SOURCE_DIR}/include>
                             $<INSTALL_INTERFACE:include>)
 target_include_directories(coffeechain PUBLIC
-                            $<BUILD_INTERFACE:${CoffeeChain_BINARY_DIR}/include/coffeechain>)
+                            $<BUILD_INTERFACE:${CoffeeChain_BINARY_DIR}/include>)
 
 if(WIN32)
    include(GenerateExportHeader)
@@ -156,7 +161,7 @@ if(WIN32)
    target_link_libraries(coffeechain PRIVATE shell32 kernel32)
    # Windows don't have standartized path for storing shared data (or libraries, or anything that isn't self-contained)
 else()
-   target_compile_definitions(coffeechain PRIVATE SYSTEM_SHADER_PATH=\"${CMAKE_INSTALL_PREFIX}/share/coffeechain/shaders\")
+   target_compile_definitions(coffeechain PRIVATE SYSTEM_RESOURCE_PATH=\"${CMAKE_INSTALL_PREFIX}/share/coffeechain/\")
    target_link_libraries(coffeechain PRIVATE m)
 endif()
 
@@ -171,24 +176,7 @@ if(CoffeeChain_BUILD_TESTING)
    )
    add_executable(coffeechain-test3
       test3/main.c
-      test3/printMap2D.c
-      test3/printMap2D.h
    )
-   target_include_directories(coffeechain-test1
-      PRIVATE include
-      PRIVATE ${CoffeeChain_BINARY_DIR}/include
-   )
-   target_include_directories(coffeechain-test2
-      PRIVATE include
-      PRIVATE ${CoffeeChain_BINARY_DIR}/include
-   )
-   target_include_directories(coffeechain-test3
-      PRIVATE include
-      PRIVATE ${CoffeeChain_BINARY_DIR}/include
-   )
-   target_link_directories(coffeechain-test1 PRIVATE ${CoffeeChain_BINARY_DIR})
-   target_link_directories(coffeechain-test2 PRIVATE ${CoffeeChain_BINARY_DIR})
-   target_link_directories(coffeechain-test3 PRIVATE ${CoffeeChain_BINARY_DIR})
    target_link_libraries(coffeechain-test1 coffeechain)
    target_link_libraries(coffeechain-test2 coffeechain)
    target_link_libraries(coffeechain-test3 coffeechain)

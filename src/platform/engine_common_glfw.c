@@ -22,7 +22,7 @@
 #include <stdlib.h>
 #include "../engine_common.h"
 #include "../engine_common_internal.h"
-#include "../tools.h"
+#include "../utils.h"
 #include <GLFW/glfw3.h>
 
 #define CCE_FULLSCREEN 0x10
@@ -37,7 +37,7 @@ static struct
    const GLFWvidmode *vidMode;
    unsigned int windowWidth;
    unsigned int windowHeight;
-   struct cce_uvec2 monitorAspectRatio;
+   struct cce_u32vec2 monitorAspectRatio;
    int windowPositionX;
    int windowPositionY;
    uint8_t flags;
@@ -224,11 +224,11 @@ static void keyCallback (GLFWwindow *window, int key, int scancode, int action, 
    }
 }
 
-static struct cce_uvec2 getAspectRatio (uint32_t width, uint32_t height)
+static struct cce_u32vec2 getAspectRatio (uint32_t width, uint32_t height)
 {
    if (!width || !height)
    {
-      return (struct cce_uvec2) {0u, 0u};
+      return (struct cce_u32vec2) {0u, 0u};
    }
    uint32_t ratio = (width * 100u) / height;
    if (ratio < 800u/5u)
@@ -236,22 +236,22 @@ static struct cce_uvec2 getAspectRatio (uint32_t width, uint32_t height)
       if (ratio < 400u/3u)
       {
          if (ratio < 500u/4u)
-            return (struct cce_uvec2) {1u, 1u};
+            return (struct cce_u32vec2) {1u, 1u};
          else
-            return (struct cce_uvec2) {5u, 4u};
+            return (struct cce_u32vec2) {5u, 4u};
       }
       else
       {
          if (ratio < 300u/2u)
          {
-            return (struct cce_uvec2) {4u, 3u};
+            return (struct cce_u32vec2) {4u, 3u};
          }
          else
          {
             if (ratio < 1400u/9u)
-               return (struct cce_uvec2) {3u, 2u};
+               return (struct cce_u32vec2) {3u, 2u};
             else
-               return (struct cce_uvec2) {14u, 9u};
+               return (struct cce_u32vec2) {14u, 9u};
          }
       }
    }
@@ -260,54 +260,54 @@ static struct cce_uvec2 getAspectRatio (uint32_t width, uint32_t height)
       if (ratio < 1600u/9u)
       {
          if (ratio < 500u/3u)
-            return (struct cce_uvec2) {8u, 5u};
+            return (struct cce_u32vec2) {8u, 5u};
          else
-            return (struct cce_uvec2) {5u, 3u};
+            return (struct cce_u32vec2) {5u, 3u};
       }
       else
       {
          if (ratio < 200u/1u)
          {
-            return (struct cce_uvec2) {16u, 9u};
+            return (struct cce_u32vec2) {16u, 9u};
          }
          else
          {
             if (ratio < 700u/3u)
-               return (struct cce_uvec2) {2u, 1u};
+               return (struct cce_u32vec2) {2u, 1u};
             else
-               return (struct cce_uvec2) {7u, 3u};
+               return (struct cce_u32vec2) {7u, 3u};
          }
       }
    }
 }
 
-struct cce_uvec2 getCurrentStep__glfw (void)
+struct cce_u32vec2 getCurrentStep__glfw (void)
 {
    switch (g_GLFWstate.monitorAspectRatio.x)
    {
       case 1u:
       {
-         return (struct cce_uvec2) {12u, 12u};
+         return (struct cce_u32vec2) {12u, 12u};
       }
       case 3u:
       {
-         return (struct cce_uvec2) {15u, 10u};
+         return (struct cce_u32vec2) {15u, 10u};
       }
       case 5u:
       {
-         return (struct cce_uvec2) {15u, 9u};
+         return (struct cce_u32vec2) {15u, 9u};
       }
       case 7u:
       {
-         return (struct cce_uvec2) {19u, 8u};
+         return (struct cce_u32vec2) {19u, 8u};
       }
       case 14u:
       {
-         return (struct cce_uvec2) {14u, 9u};
+         return (struct cce_u32vec2) {14u, 9u};
       }
       default:
       {
-         return (struct cce_uvec2) {16u, (uint32_t) (16.0f / g_GLFWstate.monitorAspectRatio.x * g_GLFWstate.monitorAspectRatio.y)};
+         return (struct cce_u32vec2) {16u, (uint32_t) (16.0f / g_GLFWstate.monitorAspectRatio.x * g_GLFWstate.monitorAspectRatio.y)};
       }
    }
 }

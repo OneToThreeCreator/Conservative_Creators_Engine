@@ -26,23 +26,22 @@
 #include <coffeechain/engine_common.h>
 #include <coffeechain/map2D/map2D.h>
 #include <coffeechain/path_getters.h>
-
-#include "printMap2D.h"
+#include <coffeechain/plugins/text_rendering.h>
 
 static void initPlayer (uint32_t globalBoolsQuantity)
 {
-   struct Map2DElementDev player = {-1, -1, 1, 2, {0.5625f, 0.0f, 1.0f, 1.0f, 1}, {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, 0, 0};
-   cceCreateMap2DElementDynamicMap2D(&player, CCE_ELEMENT_WITHOUT_COLLIDER, 1);
-   struct Map2DElementDev playerTrigger = {-1, 0, 1, 1, {0.0f, 0.0f, 0.0f, 0.0f, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, 0, 0};
+   struct Map2DElementDev player = {0, -1, 1, 2, {0, 0, 7, 16, 1}, {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, 0, 0};
+   cceCreateMap2DElementDynamicMap2D(&player, CCE_ELEMENT_WITHOUT_COLLIDER, CCE_DEFAULT);
+   struct Map2DElementDev playerTrigger = {0, 0, 1, 1, {0, 0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, 0, 0};
    uint32_t colliders[4];
-   colliders[0] = cceCreateMap2DElementDynamicMap2D(&playerTrigger, CCE_COLLIDER, 1);
+   colliders[0] = cceCreateMap2DElementDynamicMap2D(&playerTrigger, CCE_COLLIDER, CCE_DEFAULT);
    playerTrigger.y = -2;
-   colliders[1] = cceCreateMap2DElementDynamicMap2D(&playerTrigger, CCE_COLLIDER, 1);
-   playerTrigger.x = -2;
+   colliders[1] = cceCreateMap2DElementDynamicMap2D(&playerTrigger, CCE_COLLIDER, CCE_DEFAULT);
+   playerTrigger.x = -1;
    playerTrigger.y = -1;
-   colliders[2] = cceCreateMap2DElementDynamicMap2D(&playerTrigger, CCE_COLLIDER, 1);
-   playerTrigger.x = 0;
-   colliders[3] = cceCreateMap2DElementDynamicMap2D(&playerTrigger, CCE_COLLIDER, 1);
+   colliders[2] = cceCreateMap2DElementDynamicMap2D(&playerTrigger, CCE_COLLIDER, CCE_DEFAULT);
+   playerTrigger.x = 1;
+   colliders[3] = cceCreateMap2DElementDynamicMap2D(&playerTrigger, CCE_COLLIDER, CCE_DEFAULT);
    uint16_t collisions[4];
    for (uint8_t i = 0; i < 4; ++i)
    {
@@ -94,10 +93,10 @@ static void initPlayer (uint32_t globalBoolsQuantity)
    return;
 }
 
-static void createAdditionalDynamicElement (struct cce_ivec2 coords, uint32_t globalBoolsQuantity)
+static void createAdditionalDynamicElement (struct cce_i32vec2 coords, uint32_t globalBoolsQuantity)
 {
-   struct Map2DElementDev element = {coords.x, coords.y, 2, 2, {0.0f, 0.0f, 1.0f, 1.0f, 0}, {1, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, 0, 1};
-   cceCreateMap2DElementDynamicMap2D(&element, CCE_ELEMENT_WITHOUT_COLLIDER, 1);
+   struct Map2DElementDev element = {coords.x, coords.y, 2, 2, {0, 0, 16, 16, 0}, {1, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, 0, 1};
+   cceCreateMap2DElementDynamicMap2D(&element, CCE_ELEMENT_WITHOUT_COLLIDER, CCE_DEFAULT);
 
    uint_fast16_t *aandb = cceParseStringToLogicOperations("a & b", NULL);
    uint16_t logicIDs[5];
@@ -140,13 +139,23 @@ static void createAdditionalDynamicElement (struct cce_ivec2 coords, uint32_t gl
 
 static void createMap2D (uint16_t ID, uint16_t exitMapsQuantity, struct ExitMap2D *exitMaps)
 {
-   struct Map2DElement elements[] = {
-      {  3,   3, 10, 10, {0.0f, 0.0f, 5.0f, 5.0f, 2}, {0, 0, 0, 0}, {0, 0, 0, 0}, 0},
-      {-11, -11, 10, 24, {0.0f, 0.0f, 1.0f, 1.0f, 0}, {0, 0, 0, 0}, {1, 0, 0, 0}, 0},
-      {  3, -11, 10, 10, {0.0f, 0.0f, 1.0f, 1.0f, 0}, {0, 0, 0, 0}, {2, 0, 0, 0}, 0},
-      {  0, -11,  2, 24, {0.0f, 0.0f, 1.0f, 1.0f, 0}, {0, 0, 0, 0}, {3, 0, 0, 0}, 0},
-      {  2,   0, 11,  2, {0.0f, 0.0f, 1.0f, 1.0f, 0}, {0, 0, 0, 0}, {3, 0, 0, 0}, 0},
+   struct Map2DElement elements[29] = {
+      {  0, -11,  2, 24, {0, 0, 16, 16, 0}, {0, 0, 0, 0}, {3, 0, 0, 0}, 0},
+      {  2,   0, 11,  2, {0, 0, 16, 16, 0}, {0, 0, 0, 0}, {3, 0, 0, 0}, 0},
+      {-11, -11, 10, 24, {0, 0, 16, 16, 0}, {0, 0, 0, 0}, {1, 0, 0, 0}, 0},
+      {  3, -11, 10, 10, {0, 0, 16, 16, 0}, {0, 0, 0, 0}, {2, 0, 0, 0}, 0},
    };
+   uint32_t walls[27] = {2, 3};
+   uint32_t *witerator = walls + 2;
+   for (uint32_t j = 0; j < 5; ++j)
+   {
+      for (uint32_t i = 0; i < 5; ++i)
+      {
+         elements[j*5 + i + 4] = (struct Map2DElement) {3 + i*2, 3 + j*2, 2, 2, {0, 0, 16, 16, 2}, {0, 0, 0, 0}, {0, 0, 0, 0}, 0};
+         *witerator = j*5 + i + 4;
+         ++witerator;
+      }
+   }
    struct changeColorActionStruct colors[4] = {{0.711f, 0.64f,  0.453f, 1.0f, 1, CCE_CURRENT_MAP2D},
                                                {0.001f, 0.487f, 0.0f,   1.0f, 2, CCE_CURRENT_MAP2D},
                                                {0.69f,  0.645f, 0.042f, 1.0f, 3, CCE_CURRENT_MAP2D},
@@ -154,9 +163,9 @@ static void createMap2D (uint16_t ID, uint16_t exitMapsQuantity, struct ExitMap2
    uint32_t colorActions[4] = {4, 4, 4, 4};
    uint32_t colorsOffsets[5] = {0,  sizeof(struct changeColorActionStruct), 2 * sizeof(struct changeColorActionStruct),
                                 3 * sizeof(struct changeColorActionStruct), 4 * sizeof(struct changeColorActionStruct)};
-   uint32_t walls[3] = {0, 1, 2};
-   struct ElementGroup collisionGroup = {walls, 3};
-   struct Map2Ddev map = {ID, 5, 0, elements, 0, NULL, 0, NULL, 0, NULL, 1, &collisionGroup, 0, NULL, 0, NULL, 0, NULL,
+   
+   struct ElementGroup collisionGroup = {walls, 27};
+   struct Map2Ddev map = {ID, 29, 0, elements, 0, NULL, 0, NULL, 0, NULL, 1, &collisionGroup, 0, NULL, 0, NULL, 0, NULL,
                           4, colorActions, colorsOffsets, (cce_void*) colors, exitMapsQuantity, exitMaps};
    cceWriteMap2Ddev(&map, NULL);
 }
@@ -195,9 +204,10 @@ int main (int argc, char **argv)
       }
    }
    const uint32_t globalBoolsQuantity = 32768;
-   if (cceInitEngine2D(globalBoolsQuantity, 16, 16, "CoffeeChain TEST", path, CCE_RENDER_VISIBLE_MAPS | CCE_PROCESS_LOGIC_FOR_VISIBLE_MAPS) != 0)
+   if (cceInitEngine2D(globalBoolsQuantity, 48, 48, "CoffeeChain TEST", path, CCE_RENDER_VISIBLE_MAPS | CCE_PROCESS_LOGIC_FOR_VISIBLE_MAPS) != 0)
    {
       free(path);
+      printf("Initialization failure\n");
       return -1;
    }
    cceAppendPath(path, pathLength + 16, "test3/textures");
@@ -208,19 +218,13 @@ int main (int argc, char **argv)
       cceSetMap2Dpath(path);
       free(path);
       struct ExitMap2D exitMaps[2] = {
-         {1, 0,  24,  13, -11, 13, 0x0},
-         {2, 0, -24, -11, -11, 13, 0x2},
+         {0, 0,  24,  13, -11, 13, 0x0},
+         {0, 0, -24, -11, -11, 13, 0x2},
       };
-      struct ExitMap2D exitMap0[2] = {
-      {0, 0,  24,  13, -11, 13, 0x0},
-      {0, 0, -24, -11, -11, 13, 0x2},
-   };
       createMap2D(0, 2, exitMaps);
-      createMap2D(1, 1, exitMap0 + 1);
-      createMap2D(2, 1, exitMap0);
    }
    initPlayer(globalBoolsQuantity);
-   createAdditionalDynamicElement((struct cce_ivec2) {2, 2}, globalBoolsQuantity);
+   createAdditionalDynamicElement((struct cce_i32vec2) {2, 2}, globalBoolsQuantity);
    cceSetGridMultiplierMap2D(1.0f);
    // Add delayed actions
    {
@@ -228,6 +232,22 @@ int main (int argc, char **argv)
       cceDelayActionMap2D(CCE_MOVE_ACTION, sizeof(struct moveActionStruct), &actionSt, 10, 0.2, CCE_DYNAMIC_MAP2D);
       actionSt = (struct moveActionStruct) {0, 1, 0, CCE_SHIFT, CCE_DYNAMIC_MAP2D};
       cceDelayActionMap2D(CCE_MOVE_ACTION, sizeof(struct moveActionStruct), &actionSt, 5, 0.4, CCE_DYNAMIC_MAP2D);
+   }
+   // Render some text
+   {
+      if (cceInitTextRendering(CCE_UTF8_ENCODING) != 0)
+      {
+         printf("Initialization failure\n");
+         return -1;
+      }
+      if (cceLoadBitmapFont("ascii_48x48_l5x8") != 0)
+      {
+         printf("Font loading failure\n");
+         return -1;
+      }
+      struct Map2DElementDev textTemplate = {-16, 9, 0, 0, {0}, {0}, {0}, {0}, {0}, 0, 0};
+      char string[] = "axj%";
+      ccePrintString(string, &textTemplate, CCE_ELEMENT_WITHOUT_COLLIDER, CCE_DEFAULT);
    }
    printf("Initialization complete\n");
    return cceEngine2D();

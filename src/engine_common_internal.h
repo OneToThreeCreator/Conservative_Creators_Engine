@@ -84,11 +84,14 @@ void cce__setCurrentTemporaryBools (uint16_t temporaryBoolsID);
 void cce__engineUpdate (void);
 void cce__doNothing (void);
 void cce__initEndianConversion (void);
+void cce__shortToString (char *str, const unsigned short number, const char *strEnd);
 
 extern void (*cce__toFullscreen) (void);
 extern void (*cce__toWindow) (void);
 extern void (*cce__showWindow) (void);
 extern void (*cce__swapBuffers) (void);
-extern struct cce_uvec2 (*cce__getCurrentStep) (void);
+extern struct cce_u32vec2 (*cce__getCurrentStep) (void);
+
+
 
 #endif // ENGINE_COMMON_INTERNAL_H

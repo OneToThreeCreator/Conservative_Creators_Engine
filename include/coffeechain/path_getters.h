@@ -35,6 +35,7 @@ extern C:
 #define CCE_PUBLIC_OPTIONS
 #endif // Windows
 
+CCE_PUBLIC_OPTIONS char* cceCreateNewPathFromOldPath (const char *const oldPath, const char *const appendPath, size_t freeSpaceToLeave);
 CCE_PUBLIC_OPTIONS char* cceGetDirectory (char *path, size_t bufferSize);
 CCE_PUBLIC_OPTIONS char* cceGetCurrentPath (size_t spaceToLeave);
 CCE_PUBLIC_OPTIONS void  cceDeleteDirectory (const char *path);
@@ -44,29 +45,7 @@ CCE_PUBLIC_OPTIONS char* cceGetTemporaryDirectory (size_t spaceToLeave);
 CCE_PUBLIC_OPTIONS void  cceTerminateTemporaryDirectory (void);
 CCE_PUBLIC_OPTIONS char* cceConvertIntToBase64String (size_t number, char *restrict buffer, uint8_t symbolsQuantity);
 
-static inline void shortToString (char *str, const unsigned short number, const char *strEnd)
-{
-   size_t lengthEnd = strlen(strEnd);
-   str += strlen(str);
-   if (number > 9)
-   {
-      if (number > 99)
-      {
-         if (number > 999)
-         {
-            if (number > 9999)
-            {
-               *(str++) = number / 10000 + '0';
-            }
-            *(str++) = number % 10000 / 1000 + '0';
-         }
-         *(str++) = number % 1000 / 100 + '0';
-      }
-      *(str++) = number % 100 / 10 + '0';
-   }
-   *(str++) = number % 10 + '0';
-   memcpy(str, strEnd, lengthEnd + 1u);
-}
+
 #ifdef __cplusplus
 }
 #endif // __cplusplus

@@ -27,7 +27,7 @@
 #include "engine_common.h"
 #include "engine_common_internal.h"
 #include "shader.h"
-#include "tools.h"
+#include "utils.h"
 #include "platform/path_getters.h"
 #include "external/stb_image.h"
 
@@ -50,7 +50,7 @@ static uint8_t g_flags;
 
 void (*cce__engineUpdate__api) (void);
 void (*cce__terminateEngine__api) (void);
-struct cce_uvec2 (*cce__getCurrentStep) (void);
+struct cce_u32vec2 (*cce__getCurrentStep) (void);
 void (*cce__toFullscreen) (void);
 void (*cce__toWindow) (void);
 void (*cce__showWindow) (void);

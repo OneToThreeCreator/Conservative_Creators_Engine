@@ -53,7 +53,7 @@ CCE_PUBLIC_OPTIONS void cceSetMap2Dpath (const char *path)
    if (!path || *path == '\0')
       return;
    free(mapPath);
-   mapPath = cce__createNewPathFromOldPath(path, "map_", 9u);
+   mapPath = cceCreateNewPathFromOldPath(path, "map_", 9u);
    mapPathLength = strlen(mapPath);
 }
 
@@ -329,7 +329,7 @@ static void offsetCCEgroupsFromElementsToColliders (uint16_t groupsQuantity, str
 
 // Just in case of file corruption to avoid underflow (define because string is too long)
 #define ELEMENTSCOLLIDERSQUANTITY(elementsQuantity, elementsWithoutColliderQuantity) (((elementsQuantity) > (elementsWithoutColliderQuantity)) ? \
-                                                                                       (elementsQuantity) - (elementsWithoutColliderQuantity)  :  \
+                                                                                       (elementsQuantity) - (elementsWithoutColliderQuantity)  : \
                                                                                         0u)
 
 static struct Map2DCollider* elementsToColliders (uint32_t  elementsQuantity, uint32_t elementsWithoutColliderQuantity, struct Map2DElement *elements,
@@ -396,7 +396,8 @@ static struct Map2DElement* cce__loadMap2DElements (uint32_t elementsQuantity, F
       fread(&(iterator->width), sizeof(uint16_t), 2, file);
       cceLittleEndianToHostEndianArrayInt16(&(elements->width), 2);
       fread(&(iterator->textureInfo), sizeof(struct Texture), 1, file);
-      cceLittleEndianToHostEndianArrayInt32(&(iterator->textureInfo), 5); // Assuming float endianess is the same as int
+      cceLittleEndianToHostEndianArrayInt16(&(iterator->textureInfo), 4);
+      iterator->textureInfo.ID = cceLittleEndianToHostEndianInt32(iterator->textureInfo.ID);
       fread(iterator->textureOffsetGroups, sizeof(uint8_t), 9, file);
    }
    return elements;
@@ -425,7 +426,8 @@ static void cce__writeMap2DElements (struct Map2DElement* elements, uint32_t ele
       fwrite(&(temporary.i32.x), sizeof(int32_t), 2, file);
       cceHostEndianToLittleEndianNewArrayInt16(&(temporary.u16.x), &(iterator->width), 2);
       fwrite(&(temporary.u16.x), sizeof(uint16_t), 2, file);
-      cceHostEndianToLittleEndianNewArrayInt32(&(temporary.tInfo), &(iterator->textureInfo), 5);
+      cceHostEndianToLittleEndianNewArrayInt16(&(temporary.tInfo), &(iterator->textureInfo), 4);
+      temporary.tInfo.ID = cceHostEndianToLittleEndianInt32(iterator->textureInfo.ID);
       fwrite(&(temporary.tInfo), sizeof(struct Texture), 1, file);
       fwrite(iterator->textureOffsetGroups, sizeof(uint8_t), 9, file);
    }
@@ -456,7 +458,8 @@ static void cce__writeExitMap2Ds (struct ExitMap2D *exitMaps, uint8_t exitMapsQu
 
 struct Map2D* cceLoadMap2D (uint16_t number)
 {
-   shortToString(mapPath, number, ".c2m");
+   printf("cceLoadMap2D is called\n");
+   cce__shortToString(mapPath, number, ".c2m");
    FILE *mapFile = fopen(mapPath, "rb");
    if (!mapFile)
    {
@@ -751,7 +754,7 @@ struct Map2D* cceMap2DdevToMap2D (struct Map2Ddev *mapdev)
 
 struct Map2Ddev* cceLoadMap2Ddev (uint16_t number)
 {
-   shortToString(mapPath, number, ".c2m");
+   cce__shortToString(mapPath, number, ".c2m");
    FILE *mapFile = fopen(mapPath, "rb");
    if (!mapFile)
    {
@@ -854,7 +857,7 @@ int cceWriteMap2Ddev (struct Map2Ddev *map, void (*writeFunc)(FILE*))
       uint16_t u16;
       uint16_t arr16[2];
    } temporary;
-   shortToString(mapPath, map->ID, ".c2m");
+   cce__shortToString(mapPath, map->ID, ".c2m");
    FILE *mapFile = fopen(mapPath, "wb");
    if (!mapFile)
    {

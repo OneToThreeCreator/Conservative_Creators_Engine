@@ -22,6 +22,7 @@
 #ifndef CCE_TOOLS_H
 #define CCE_TOOLS_H
 
+#include <stdint.h>
 #include "engine_common.h"
 
 #define CCE_ARRAY(name, type, sizeType) \
@@ -66,6 +67,17 @@ while(0)
 
 #define CCE_FIT_ARRAY_TO_SIZE(name) CCE_REALLOC_ARRAY(name, name ## Quantity)
 
+struct UnicodeCharWithSize
+{
+   uint32_t ch;
+   uint32_t size;
+};
+
 CCE_PUBLIC_OPTIONS size_t cceBinarySearch (const void *const array, const size_t arraySize, const size_t typeSize, const size_t step, const size_t value);
+CCE_PUBLIC_OPTIONS char*  cceReverseMemory (char *memory, size_t size);
+CCE_PUBLIC_OPTIONS uint32_t cceGetCharSizeUTF8 (const unsigned char *ch);
+CCE_PUBLIC_OPTIONS uint32_t cceGetCharUTF8 (const unsigned char *ch);
+CCE_PUBLIC_OPTIONS struct UnicodeCharWithSize cceGetCharWithSizeUTF8 (const unsigned char *ch);
+CCE_PUBLIC_OPTIONS uint32_t cceGetCharFromStringUTF8 (const char *string, size_t position);
 
 #endif // CCE_TOOLS_H

@@ -54,6 +54,7 @@ struct DelayedAction
 struct LoadedTextures
 {
    uint32_t ID; /* 0 is invalid */
+   struct cce_u16vec2 size;
    uint8_t  dependantMapsQuantity;
    uint8_t  flags; /* 0x80 - to be loaded, 0x40 - after that point there's no busy LoadedTextures */
 };
@@ -68,15 +69,11 @@ struct Map2Darray
 
 struct UsedUBO
 {
-   struct cce_ivec2 *moveGroupValues; // Cache, allows for removing reads from GPU (and using this data in parsing logic)
+   struct cce_i32vec2 *moveGroupValues; // Cache, allows for removing reads from GPU (and using this data in parsing logic)
    uint16_t moveGroupValuesQuantity;
-   struct
-   {
-      int16_t x;
-      int16_t y;
-   } *extensionGroupValues;
+   struct cce_i16vec2 *extensionGroupValues;
    uint16_t extensionGroupValuesQuantity;
-   float   *rotationAngles;  // Allows rotation not only to a hard-coded angle
+   float   *rotationAngles;  // Allows incremental rotation
    uint32_t UBO;
    uint8_t  flags; /* 0x1 - used, 0x2 - to be cleared; */
 };
@@ -159,9 +156,9 @@ struct DynamicMap2D
 
 struct Map2DElementVertices
 {
-   struct cce_ivec2 vertexCoords;
-   struct cce_ivec2 position;
-   struct cce_vec2  textureCoords;
+   struct cce_i32vec2 vertexCoords;
+   struct cce_i32vec2 position;
+   struct cce_f32vec2  textureCoords;
    uint8_t moveIDs  [4];
    uint8_t extendIDs[4];
    struct
@@ -170,7 +167,7 @@ struct Map2DElementVertices
       uint8_t isGlobalOffset;
    } transformGroups;
    uint16_t textureID;
-   struct cce_vec2 textureFragmentSize;
+   struct cce_f32vec2 textureFragmentSize;
    uint8_t textureOffsetIDs[4];
    uint8_t colorIDs[4];
 }; // 52 bytes
@@ -212,9 +209,7 @@ struct Map2D
 
 extern void (**cce_actions)(void*);
 extern void (**cce_endianSwapActions)(void*);
-extern struct cce_ivec2 cce__globalOffset;
-
-char* cce__createNewPathFromOldPath (const char *const oldPath, const char *const appendPath, size_t freeSpaceToLeave);
+extern struct cce_i32vec2 cce__globalOffset;
 
 void cce__baseActionsInit (struct DynamicMap2D *dynamic_map, struct UsedUBO *UBOs, const GLint *bufferUniformsOffsets,
                            const GLint *uniformLocations, GLuint shaderProgram, void (*setUniformBufferToDefault)(GLuint, GLint),
@@ -248,11 +243,11 @@ cce_ubyte cce__checkCollision (const uint32_t *group1firstID, uint16_t groups1qu
                                const cce_void *elements1, size_t element1size, const cce_void *elements2, size_t element2size);
 
 cce_ubyte cce__checkCollisionWithOffset (const uint32_t *group1firstID, uint16_t groups1quantity, const uint32_t *group2firstID, uint16_t groups2quantity,
-                                         const cce_void *elements1, size_t element1size, const struct cce_ivec2 *elements1offset,
-                                         const cce_void *elements2, size_t element2size, const struct cce_ivec2 *elements2offset);
+                                         const cce_void *elements1, size_t element1size, const struct cce_i32vec2 *elements1offset,
+                                         const cce_void *elements2, size_t element2size, const struct cce_i32vec2 *elements2offset);
 cce_ubyte cce__fourthLogicTypeFuncMap2D(uint16_t ID, va_list argp);
 cce_ubyte cce__fourthLogicTypeFuncDynamicMap2D(uint16_t ID, va_list argp);
-cce_ubyte cce__checkCollisionDynamicMap2DmultipleMaps (uint16_t ID, struct Map2D *map, struct Map2D **maps, size_t mapsQuantity, const struct cce_ivec2 *mapOffsets, size_t mapOffsetsSize);
+cce_ubyte cce__checkCollisionDynamicMap2DmultipleMaps (uint16_t ID, struct Map2D *map, struct Map2D **maps, size_t mapsQuantity, const struct cce_i32vec2 *mapOffsets, size_t mapOffsetsSize);
 uint16_t cce__loadTexture (uint32_t ID);
 void cce__processDynamicMap2DElements (void);
 uint16_t* cce__loadTexturesMap2D (struct Map2DElement *elements, uint32_t elementsQuantity, uint16_t *texturesLoadedMapReliesOnQuantity);

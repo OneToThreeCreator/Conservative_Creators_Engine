@@ -24,6 +24,7 @@
 
 #include "shader.h"
 #include "platform/path_getters.h"
+#include "engine_common_internal.h"
 
 #undef NDEBUG
 /* There is EPIC workaround to set defines in GLSL at runtime */
@@ -144,7 +145,7 @@ char* addStringsInShader (uint16_t shaderVersion, const char *const shaderAdditi
    size_t additionalStringLength = strlen(shaderAdditionalString);
    char *shaderModifiedSrc = (char*) malloc((shaderSrcLength + additionalStringLength + 20 + 1/*\0*/) * sizeof(char));
    memcpy(shaderModifiedSrc, "#version ", 10);
-   shortToString(shaderModifiedSrc, shaderVersion, " core\n");
+   cce__shortToString(shaderModifiedSrc, shaderVersion, " core\n");
    size_t versionStringLength = strlen(shaderModifiedSrc);
    memcpy(shaderModifiedSrc + versionStringLength, shaderAdditionalString, additionalStringLength);
    memcpy(shaderModifiedSrc + versionStringLength + additionalStringLength, shaderSrc, shaderSrcLength + 1); // +\0
