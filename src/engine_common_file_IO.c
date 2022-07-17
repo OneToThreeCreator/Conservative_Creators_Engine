@@ -23,9 +23,11 @@
 #include <stdint.h>
 #include <string.h>
 
-#include "engine_common.h"
+#include "../include/coffeechain/engine_common.h"
+#include "../include/coffeechain/endianess.h"
+
 #include "engine_common_internal.h"
-#include "platform/endianess.h"
+
 
 struct ElementGroup* cce__loadGroups (uint16_t groupsQuantity, FILE *map_f)
 {

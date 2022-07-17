@@ -25,14 +25,15 @@
 #include <string.h>
 #include <stdarg.h>
 
-#include "../engine_common.h"
+#include "../../include/coffeechain/engine_common.h"
+#include "../../include/coffeechain/utils.h"
+#include "../../include/coffeechain/endianess.h"
+#include "../../include/coffeechain/path_getters.h"
+
 #include "../engine_common_internal.h"
 #include "../shader.h"
-#include "../utils.h"
-#include "../platform/endianess.h"
-#include "../platform/path_getters.h"
 #include "../external/stb_image.h"
-#include "map2D.h"
+#include "../../include/coffeechain/map2D/map2D.h"
 #include "map2D_internal.h"
 
 struct cce_i32vec2                           cce__globalOffset;

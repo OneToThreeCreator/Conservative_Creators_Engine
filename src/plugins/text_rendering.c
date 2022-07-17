@@ -22,12 +22,13 @@
 #include <string.h>
 
 #include <ini.h>
-#include <coffeechain/engine_common.h>
-#include <coffeechain/map2D/map2D.h>
-#include <coffeechain/map2D/base_actions.h>
-#include <coffeechain/path_getters.h>
-#include <coffeechain/plugins/text_rendering.h>
-#include <coffeechain/utils.h>
+
+#include "../../include/coffeechain/engine_common.h"
+#include "../../include/coffeechain/map2D/map2D.h"
+#include "../../include/coffeechain/map2D/base_actions.h"
+#include "../../include/coffeechain/path_getters.h"
+#include "../../include/coffeechain/plugins/text_rendering.h"
+#include "../../include/coffeechain/utils.h"
 
 #define UNK 1
 

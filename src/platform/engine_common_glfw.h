@@ -18,6 +18,6 @@
     USA
 */
 
-#include "../engine_common.h"
+#include "../../include/coffeechain/engine_common.h"
 
 int cce__initEngine__glfw (const char *label, uint16_t globalBoolsQuantity);

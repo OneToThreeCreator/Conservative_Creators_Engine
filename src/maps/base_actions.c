@@ -24,14 +24,15 @@
 #include <string.h>
 #include <math.h>
 
-#include "../engine_common.h"
+#include "../../include/coffeechain/engine_common.h"
+#include "../../include/coffeechain/utils.h"
+#include "../../include/coffeechain/endianess.h"
+#include "../../include/coffeechain/path_getters.h"
+#include "../../include/coffeechain/map2D/base_actions.h"
+#include "../../include/coffeechain/map2D/map2D.h"
+
 #include "../shader.h"
-#include "../utils.h"
-#include "../platform/endianess.h"
-#include "../platform/path_getters.h"
-#include "map2D.h"
 #include "map2D_internal.h"
-#include "base_actions.h"
 
 void (**cce_actions)(void*);
 void (**cce_endianSwapActions)(void*);

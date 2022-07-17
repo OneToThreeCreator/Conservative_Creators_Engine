@@ -51,27 +51,21 @@ add_library(coffeechain ${CoffeeChain_LIB_TYPE}
    src/shader.h
    src/engine_common.c
    src/engine_common_file_IO.c
-   src/engine_common.h
    include/coffeechain/engine_common.h
    src/engine_common_internal.h
    src/utils.c
-   src/utils.h
    include/coffeechain/utils.h
    src/platform/engine_common_glfw.c
    src/platform/engine_common_glfw.h
    src/platform/path_getters.c
-   src/platform/path_getters.h
    include/coffeechain/path_getters.h
    src/platform/platforms.h
    src/platform/endianess.c
-   src/platform/endianess.h
    include/coffeechain/endianess.h
    src/maps/base_actions.c
-   src/maps/base_actions.h
    include/coffeechain/map2D/base_actions.h
    src/maps/dynamic_map2D.c
    src/maps/map2D.c
-   src/maps/map2D.h
    include/coffeechain/map2D/map2D.h
    src/maps/map2D_internal.h
    src/maps/map2D_file_IO.c

@@ -21,7 +21,8 @@
 #ifndef MAP2D_INTERNAL_H
 #define MAP2D_INTERNAL_H
 
-#include "map2D.h"
+#include "../../include/coffeechain/map2D/map2D.h"
+
 #include "../engine_common_internal.h"
 #include "log.h"
 #include <listlib.h>

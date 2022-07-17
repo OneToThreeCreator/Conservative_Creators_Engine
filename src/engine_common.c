@@ -24,13 +24,14 @@
 #include <stdarg.h>
 #include <string.h>
 
-#include "engine_common.h"
-#include "engine_common_internal.h"
-#include "shader.h"
-#include "utils.h"
-#include "platform/path_getters.h"
 #include "external/stb_image.h"
 
+#include "../include/coffeechain/engine_common.h"
+#include "../include/coffeechain/utils.h"
+#include "../include/coffeechain/path_getters.h"
+
+#include "engine_common_internal.h"
+#include "shader.h"
 #include "platform/engine_common_glfw.h"
 
 struct GlobalVariables

@@ -22,8 +22,9 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "../include/coffeechain/path_getters.h"
+
 #include "shader.h"
-#include "platform/path_getters.h"
 #include "engine_common_internal.h"
 
 #undef NDEBUG

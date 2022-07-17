@@ -23,16 +23,16 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stddef.h>
-
 #include <string.h>
 
-#include "../engine_common.h"
+#include "../../include/coffeechain/engine_common.h"
+#include "../../include/coffeechain/path_getters.h"
+#include "../../include/coffeechain/endianess.h"
+#include "../../include/coffeechain/map2D/map2D.h"
+#include "../../include/coffeechain/map2D/base_actions.h"
+
 #include "../engine_common_internal.h"
-#include "../platform/path_getters.h"
-#include "map2D.h"
 #include "map2D_internal.h"
-#include "base_actions.h"
-#include "../platform/endianess.h"
 
 static char *mapPath = NULL;
 size_t mapPathLength;

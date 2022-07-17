@@ -20,10 +20,14 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include "../engine_common.h"
-#include "../engine_common_internal.h"
-#include "../utils.h"
+
+#include "../external/glad.h"
 #include <GLFW/glfw3.h>
+
+#include "../../include/coffeechain/engine_common.h"
+#include "../../include/coffeechain/utils.h"
+
+#include "../engine_common_internal.h"
 
 #define CCE_FULLSCREEN 0x10
 #define CCE_WAYLAND 0x1

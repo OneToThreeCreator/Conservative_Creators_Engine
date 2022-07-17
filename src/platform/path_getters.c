@@ -24,7 +24,8 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdio.h>
-#include "path_getters.h"
+
+#include "../../include/coffeechain/path_getters.h"
 
 #ifdef __OPTIMIZE_SIZE__
 typedef uint32_t cce_uint;

@@ -22,9 +22,8 @@
 #include <stdlib.h>
 #include <stdint.h>
 
-#include "../engine_common.h"
-#include "endianess.h"
-#include <stdio.h>
+#include "../../include/coffeechain/engine_common.h"
+#include "../../include/coffeechain/endianess.h"
 
 CCE_PUBLIC_OPTIONS uint16_t (*cceLittleEndianConversionInt16) (uint16_t) = NULL;
 CCE_PUBLIC_OPTIONS uint32_t (*cceLittleEndianConversionInt32) (uint32_t) = NULL;

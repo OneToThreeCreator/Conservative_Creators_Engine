@@ -19,9 +19,10 @@
 */
 
 #include <string.h>
+#include <stdint.h>
 
-#include "engine_common.h"
-#include "platform/endianess.h"
+#include "../include/coffeechain/engine_common.h"
+#include "../include/coffeechain/endianess.h"
 
 struct UnicodeCharWithSize
 {

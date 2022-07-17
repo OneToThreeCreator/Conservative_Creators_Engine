@@ -20,10 +20,11 @@
 
 #ifndef ENGINE_COMMON_INTERNAL_H
 #define ENGINE_COMMON_INTERNAL_H
-#include "engine_common.h"
 #include <stdio.h>
 //#include "audio.h"
 #include "external/glad.h"
+
+#include "../include/coffeechain/engine_common.h"
 
 // Some default resolutions for different aspect ratios
 #define CCE_DEFAULT_WINDOW_WIDTH        800u
