@@ -21,6 +21,11 @@
 #ifndef ENDIANESS_H
 #define ENDIANESS_H
 
+#ifdef __cplusplus
+extern "C"
+{
+#endif // __cplusplus
+
 #include <stdint.h>
 #include "engine_common.h"
 
@@ -122,5 +127,9 @@ CCE_PUBLIC_OPTIONS void* cceSwapEndianNewArrayIntN (void *newArray, const void *
 #define cceLittleEndianToBigEndianNewArrayInt64(dest, src, size) (uint64_t*) cceSwapEndianNewArrayIntN(dest, src, size, 8)
 #define cceBigEndianToLittleEndianNewArrayIntN(dest, src, size, n) cceSwapEndianNewArrayIntN(dest, src, size, n)
 #define cceLittleEndianToBigEndianNewArrayIntN(dest, src, size, n) cceSwapEndianNewArrayIntN(dest, src, size, n)
+
+#ifdef __cplusplus
+}
+#endif // __cplusplus
 
 #endif // ENDIANESS_H

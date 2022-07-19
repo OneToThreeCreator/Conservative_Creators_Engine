@@ -20,10 +20,12 @@
 
 #ifndef ENGINE_COMMON_H
 #define ENGINE_COMMON_H
+
 #ifdef __cplusplus
-extern C:
+extern "C"
 {
 #endif // __cplusplus
+
 #include <stdint.h>
 #include <stdarg.h>
 #include <stdlib.h>

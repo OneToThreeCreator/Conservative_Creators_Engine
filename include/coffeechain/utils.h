@@ -22,6 +22,11 @@
 #ifndef CCE_TOOLS_H
 #define CCE_TOOLS_H
 
+#ifdef __cplusplus
+extern "C"
+{
+#endif // __cplusplus
+
 #include <stdint.h>
 #include "engine_common.h"
 
@@ -79,5 +84,9 @@ CCE_PUBLIC_OPTIONS uint32_t cceGetCharSizeUTF8 (const unsigned char *ch);
 CCE_PUBLIC_OPTIONS uint32_t cceGetCharUTF8 (const unsigned char *ch);
 CCE_PUBLIC_OPTIONS struct UnicodeCharWithSize cceGetCharWithSizeUTF8 (const unsigned char *ch);
 CCE_PUBLIC_OPTIONS uint32_t cceGetCharFromStringUTF8 (const char *string, size_t position);
+
+#ifdef __cplusplus
+}
+#endif // __cplusplus
 
 #endif // CCE_TOOLS_H

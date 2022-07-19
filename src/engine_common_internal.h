@@ -20,6 +20,12 @@
 
 #ifndef ENGINE_COMMON_INTERNAL_H
 #define ENGINE_COMMON_INTERNAL_H
+
+#ifdef __cplusplus
+extern "C"
+{
+#endif // __cplusplus
+
 #include <stdio.h>
 //#include "audio.h"
 #include "external/glad.h"
@@ -93,6 +99,8 @@ extern void (*cce__showWindow) (void);
 extern void (*cce__swapBuffers) (void);
 extern struct cce_u32vec2 (*cce__getCurrentStep) (void);
 
-
+#ifdef __cplusplus
+}
+#endif // __cplusplus
 
 #endif // ENGINE_COMMON_INTERNAL_H

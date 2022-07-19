@@ -21,6 +21,11 @@
 #ifndef MAP2D_INTERNAL_H
 #define MAP2D_INTERNAL_H
 
+#ifdef __cplusplus
+extern "C"
+{
+#endif // __cplusplus
+
 #include "../../include/coffeechain/map2D/map2D.h"
 
 #include "../engine_common_internal.h"
@@ -284,5 +289,9 @@ cce__endBaseActionsDynamicMap2D()
 #define CCE_ROTATEANGLESINCOS_OFFSET 5u
 
 #define CCE_GLOBALOFFSET_OFFSET 1u
+
+#ifdef __cplusplus
+}
+#endif // __cplusplus
 
 #endif // MAP2D_INTERNAL_H

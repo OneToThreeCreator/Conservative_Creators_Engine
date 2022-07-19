@@ -20,14 +20,15 @@
 
 #ifndef MAP2D_H
 #define MAP2D_H
+
+#ifdef __cplusplus
+extern "C"
+{
+#endif // __cplusplus
+
 #include <stdint.h>
 #include <stdio.h>
 #include "../engine_common.h"
-
-#ifdef __cplusplus
-extern C:
-{
-#endif // __cplusplus
 
 #define CCE_BASIC_ACTIONS_QUANTITY 16u
 

@@ -20,6 +20,12 @@
 
 #ifndef SHADER_H
 #define SHADER_H
+
+#ifdef __cplusplus
+extern "C"
+{
+#endif // __cplusplus
+
 #include <stdint.h>
 
 #include "external/glad.h"
@@ -33,4 +39,9 @@ char* addStringsInShader (uint16_t shadersVersion, const char *const shaderAddit
 unsigned int compileShader (const char *shaderSource, GLenum shaderType);
 unsigned int createVFshaderProgram (unsigned int vertexShader, unsigned int fragmentShader);
 unsigned int createVGFshaderProgram (unsigned int vertexShader, unsigned int geometryShader, unsigned int fragmentShader);
+
+#ifdef __cplusplus
+}
+#endif // __cplusplus
+
 #endif // SHADER_H

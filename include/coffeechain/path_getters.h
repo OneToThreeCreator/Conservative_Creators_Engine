@@ -20,13 +20,16 @@
 
 #ifndef PATH_GETTERS_H
 #define PATH_GETTERS_H
+
+#ifdef __cplusplus
+extern "C"
+{
+#endif // __cplusplus
+
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
-#ifdef __cplusplus
-extern C:
-{
-#endif // __cplusplus
+
 #if defined(_WIN32) || defined(__WIN32__) || defined(_WIN64) || defined(__TOS_WIN__) || defined(__WINDOWS__) || \
     defined(__MINGW32__) || defined(__MINGW64__) || defined(__CYGWIN__)
 #include "cce_exports.h"
@@ -49,4 +52,5 @@ CCE_PUBLIC_OPTIONS char* cceConvertIntToBase64String (size_t number, char *restr
 #ifdef __cplusplus
 }
 #endif // __cplusplus
+
 #endif //PATH_GETTERS_H

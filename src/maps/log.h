@@ -21,6 +21,11 @@
 #ifndef LOG_H
 #define LOG_H
 
+#ifdef __cplusplus
+extern "C"
+{
+#endif // __cplusplus
+
 /* #ifdef __APPLE__
 #include <OpenAL/al.h>
 #include <OpenAL/alc.h>
@@ -37,5 +42,9 @@ void cce__criticalErrorPrint (const char *const msgAndFormat, ...);
 void cce__infoPrint (const char *const msgAndFormat, ...);
 void cce__errorPrint (const char *const msgAndFormat, ...);
 //void cce__openALErrorPrint (ALCenum error);
+
+#ifdef __cplusplus
+}
+#endif // __cplusplus
 
 #endif // LOG_H

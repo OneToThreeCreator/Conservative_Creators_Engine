@@ -20,6 +20,12 @@
 
 #ifndef AUDIO_H
 #define AUDIO_H
+
+#ifdef __cplusplus
+extern "C"
+{
+#endif // __cplusplus
+
 #ifdef __APPLE__
 #include <OpenAL/al.h>
 #include <OpenAL/alc.h>
@@ -41,5 +47,9 @@ struct alObjects
 void loadAudio (const ALuint *buffer, const char *const filepath);
 struct alObjects* initAL ();
 void stopAL (struct alObjects *al);
+
+#ifdef __cplusplus
+}
+#endif // __cplusplus
 
 #endif // AUDIO_H
