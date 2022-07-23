@@ -128,6 +128,8 @@ CCE_PUBLIC_OPTIONS void* cceSwapEndianNewArrayIntN (void *newArray, const void *
 #define cceBigEndianToLittleEndianNewArrayIntN(dest, src, size, n) cceSwapEndianNewArrayIntN(dest, src, size, n)
 #define cceLittleEndianToBigEndianNewArrayIntN(dest, src, size, n) cceSwapEndianNewArrayIntN(dest, src, size, n)
 
+CCE_PUBLIC_OPTIONS void cceInitEndianConversion (void);
+
 #ifdef __cplusplus
 }
 #endif // __cplusplus

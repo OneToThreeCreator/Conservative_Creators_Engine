@@ -144,7 +144,7 @@ static inline uint8_t getEndianess (void)
    return a == *b;
 }
 
-void cce__initEndianConversion (void)
+CCE_PUBLIC_OPTIONS void cceInitEndianConversion (void)
 {
    endianess = getEndianess();
    if (endianess == CCE_BIG_ENDIAN)

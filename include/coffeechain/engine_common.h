@@ -135,7 +135,7 @@ struct Timer
 CCE_PUBLIC_OPTIONS extern const double *const cceDeltaTime;
 CCE_PUBLIC_OPTIONS extern const double *const cceCurrentTime;
 CCE_PUBLIC_OPTIONS void cceStartTimer      (struct Timer *timer);
-CCE_PUBLIC_OPTIONS uint8_t cceIsTimerEnded (struct Timer *timer);
+CCE_PUBLIC_OPTIONS uint8_t cceIsTimerExpired (struct Timer *timer);
 CCE_PUBLIC_OPTIONS void resetTimerDelayCompensation (void);
 CCE_PUBLIC_OPTIONS uint8_t cceGetBool         (uint16_t boolID);
 CCE_PUBLIC_OPTIONS void cceSetBool            (uint16_t boolID, cce_enum action);

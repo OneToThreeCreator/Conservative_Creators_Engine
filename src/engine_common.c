@@ -29,6 +29,7 @@
 #include "../include/coffeechain/engine_common.h"
 #include "../include/coffeechain/utils.h"
 #include "../include/coffeechain/path_getters.h"
+#include "../include/coffeechain/endianess.h"
 
 #include "engine_common_internal.h"
 #include "shader.h"
@@ -69,9 +70,9 @@ void cce__callActions (void (**doAction)(void*), uint8_t actionsQuantity, uint32
 // Workaround for increasing timers precision. Makes chains of timers independent of frametime
 static double maxTimerCheckDelay = 0.0;
 
-CCE_PUBLIC_OPTIONS uint8_t cceIsTimerEnded (struct Timer *timer)
+CCE_PUBLIC_OPTIONS uint8_t cceIsTimerExpired (struct Timer *timer)
 {
-   if (timer->initTime <= 0.0 || timer->delay == 0.0)
+   if (timer->initTime < 0.0 || timer->delay == 0.0)
       return 1;
    double timerCheckDelay = *cceCurrentTime - (timer->initTime + timer->delay);
    if (timerCheckDelay >= 0.0)
@@ -246,7 +247,7 @@ void cce__processLogic (uint32_t logicQuantity, struct ElementLogic *logic, stru
             }
             case 0x2:
             {
-               boolSum += (((uint_fast16_t) cceIsTimerEnded(timers + boolNumber)) << (logic->logicElementsQuantity - 1u - j));
+               boolSum += (((uint_fast16_t) cceIsTimerExpired(timers + boolNumber)) << (logic->logicElementsQuantity - 1u - j));
                break;
             }
             default:
@@ -838,7 +839,7 @@ int cce__initEngine (const char *label, uint16_t globalBoolsQuantity)
    g_temporaryBoolsQuantityAllocated = CCE_ALLOCATION_STEP;
    g_globalBoolsQuantity = globalBoolsQuantity;
    cce_Gvars.globalBools  = (uint_fast16_t*) calloc((globalBoolsQuantity >> SHIFT_OF_FAST_SIZE) + ((globalBoolsQuantity & BITWIZE_AND_OF_FAST_SIZE) > 0u), sizeof(uint_fast16_t));
-   cce__initEndianConversion();
+   cceInitEndianConversion();
    return 0;
 }
 

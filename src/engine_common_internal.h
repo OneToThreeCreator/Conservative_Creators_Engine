@@ -90,7 +90,6 @@ void cce__releaseUnusedTemporaryBools (uint16_t ID);
 void cce__setCurrentTemporaryBools (uint16_t temporaryBoolsID);
 void cce__engineUpdate (void);
 void cce__doNothing (void);
-void cce__initEndianConversion (void);
 void cce__shortToString (char *str, const unsigned short number, const char *strEnd);
 
 extern void (*cce__toFullscreen) (void);

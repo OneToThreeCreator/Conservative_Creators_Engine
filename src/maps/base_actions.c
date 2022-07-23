@@ -272,7 +272,7 @@ static void runDelayedActions (struct list *delayedActions)
    {
       resetTimerDelayCompensation();
       head = (struct DelayedAction*) node;
-      if (!(cceIsTimerEnded(&head->timer)))
+      if (!(cceIsTimerExpired(&head->timer)))
          goto CONTINUE;
       
       cceStartTimer(&head->timer);
@@ -362,18 +362,18 @@ void cce__baseActionsInit (struct DynamicMap2D *dynamic_map, struct UsedUBO *UBO
    actionsQuantity = CCE_BASIC_ACTIONS_QUANTITY + CCE_ALLOCATION_STEP;
    cce_actions = (void (**)(void*)) calloc((actionsQuantity), sizeof(void (*)(void*)));
    cce_endianSwapActions = (void (**)(void*)) calloc((actionsQuantity), sizeof(void (*)(void*)));
-   cceRegisterAction(0,  moveAction, moveActionSwapEndian);
-   cceRegisterAction(1,  extendAction, extendActionSwapEndian);
-   cceRegisterAction(2,  rotateAction, rotateActionSwapEndian);
-   cceRegisterAction(3,  offsetTextureAction, offsetTextureActionSwapEndian);
-   cceRegisterAction(4,  changeColorAction, changeColorActionSwapEndian);
-   cceRegisterAction(5,  setBoolAction, setBoolActionSwapEndian);
-   cceRegisterAction(6,  setPlotNumberAction, setPlotNumberActionSwapEndian);
-   cceRegisterAction(7,  startTimerAction, startTimerActionSwapEndian);
+   cceRegisterAction(0,  moveAction,                 moveActionSwapEndian);
+   cceRegisterAction(1,  extendAction,               extendActionSwapEndian);
+   cceRegisterAction(2,  rotateAction,               rotateActionSwapEndian);
+   cceRegisterAction(3,  offsetTextureAction,        offsetTextureActionSwapEndian);
+   cceRegisterAction(4,  changeColorAction,          changeColorActionSwapEndian);
+   cceRegisterAction(5,  setBoolAction,              setBoolActionSwapEndian);
+   cceRegisterAction(6,  setPlotNumberAction,        setPlotNumberActionSwapEndian);
+   cceRegisterAction(7,  startTimerAction,           startTimerActionSwapEndian);
    cceRegisterAction(8,  setDynamicTimerDelayAction, setDynamicTimerDelayActionSwapEndian);
-   cceRegisterAction(9,  setGridSizeAction, setGridSizeActionSwapEndian);
-   cceRegisterAction(10, loadMap2Daction, loadMap2DActionSwapEndian);
-   cceRegisterAction(11, delayActionAction, delayActionActionSwapEndian);
+   cceRegisterAction(9,  setGridSizeAction,          setGridSizeActionSwapEndian);
+   cceRegisterAction(10, loadMap2Daction,            loadMap2DActionSwapEndian);
+   cceRegisterAction(11, delayActionAction,          delayActionActionSwapEndian);
 }
 
 CCE_PUBLIC_OPTIONS uint8_t cceRegisterAction (uint32_t ID, void (*action)(void*), void (*endianSwap)(void*))
