@@ -164,9 +164,9 @@ static void createMap2D (uint16_t ID, uint16_t exitMapsQuantity, struct ExitMap2
    uint32_t colorsOffsets[5] = {0,  sizeof(struct changeColorActionStruct), 2 * sizeof(struct changeColorActionStruct),
                                 3 * sizeof(struct changeColorActionStruct), 4 * sizeof(struct changeColorActionStruct)};
    
-   struct ElementGroup collisionGroup = {walls, 27};
-   struct Map2Ddev map = {ID, 29, 0, elements, 0, NULL, 0, NULL, 0, NULL, 1, &collisionGroup, 0, NULL, 0, NULL, 0, NULL,
-                          4, colorActions, colorsOffsets, (cce_void*) colors, exitMapsQuantity, exitMaps};
+   struct DynamicElementGroup collisionGroup = {walls, 27, 27};
+   struct Map2Ddev map = {ID, 29, 0, 29, elements, 0, 0, NULL, 0, 0, NULL, 0, 0, NULL, 1, 1, &collisionGroup, 0, 0, NULL, 0, 0, NULL,
+                          0, 0, NULL, 4, colorActions, colorsOffsets, (cce_void*) colors, exitMapsQuantity, exitMapsQuantity, exitMaps};
    cceWriteMap2Ddev(&map, NULL);
 }
 
@@ -195,11 +195,21 @@ int main (int argc, char **argv)
       else
       {
          char *appendString = argv[1];
-         appendString += (appendString[0] == '.') * 2;
+         appendString += (*appendString == '.');
          size_t appendLength = strlen(appendString);
-         path = cceGetCurrentPath(appendLength + 15);
+         path = cceGetCurrentPath(appendLength + 16);
          pathLength = strlen(path);
-         memcpy(path + pathLength, appendString, appendLength + 1);
+         if (*appendString == '.')
+         {
+            appendString += 2;
+            appendLength -= 2;
+            pathLength -= 2 - (pathLength < 2);
+            for (char *iterator = (path + pathLength), *end = path; iterator >= end && *iterator != '/' && *iterator != '\\'; --iterator, --pathLength)
+            {
+               
+            }
+         }
+         memcpy(path + pathLength + 1, appendString, appendLength + 1);
          pathLength += appendLength;
       }
    }
@@ -210,7 +220,7 @@ int main (int argc, char **argv)
       printf("Initialization failure\n");
       return -1;
    }
-   cceAppendPath(path, pathLength + 16, "test3/textures");
+   cceAppendPath(path, pathLength + 17, "test3/textures");
    cceSetTexturesPath(path);
    free(path);
    {

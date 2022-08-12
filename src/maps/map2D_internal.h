@@ -106,13 +106,6 @@ struct DynamicMap2DElement
    uint8_t   flags;                  /* 0x1 - isUsed, 0x2 - hasCollider, 0x4 - toBeProcessed, 0x8 - has2DElement, 0x10 - isGlobalOffset, 0x20 - isCurrentPosition */
 };
 
-struct DynamicElementGroup
-{
-   uint32_t *elementIDs;
-   uint16_t  elementsQuantity;
-   uint16_t  elementsAllocatedQuantity;
-};
-
 struct DynamicCollisionGroup
 {
    uint16_t group1;
@@ -123,31 +116,31 @@ struct DynamicCollisionGroup
 struct DynamicMap2D
 {
    uint32_t elementsQuantity;
-   uint32_t elementsAllocatedQuantity;
+   uint32_t elementsQuantityAllocated;
    struct DynamicMap2DElement   *elements;
    
    uint16_t moveGroupsQuantity;
-   uint16_t moveGroupsAllocatedQuantity;
+   uint16_t moveGroupsQuantityAllocated;
    uint16_t extensionGroupsQuantity;
-   uint16_t extensionGroupsAllocatedQuantity;
+   uint16_t extensionGroupsQuantityAllocated;
    struct DynamicElementGroup   *moveGroups;
    struct DynamicElementGroup   *extensionGroups;
    
    uint16_t collisionGroupsQuantity;
-   uint16_t collisionGroupsAllocatedQuantity;
+   uint16_t collisionGroupsQuantityAllocated;
    uint16_t collisionQuantity;
-   uint16_t collisionAllocatedQuantity;
+   uint16_t collisionQuantityAllocated;
    struct DynamicElementGroup   *collisionGroups; 
    struct DynamicCollisionGroup *collision;
    
    uint16_t timersQuantity;
-   uint16_t timersAllocatedQuantity;
+   uint16_t timersQuantityAllocated;
    
    uint16_t UBO_ID;
    uint16_t temporaryBools;
    
    uint32_t logicQuantity;
-   uint32_t logicAllocatedQuantity;
+   uint32_t logicQuantityAllocated;
    
    struct Timer                 *timers;
    struct ElementLogic          *logic;
@@ -156,7 +149,7 @@ struct DynamicMap2D
    
    uint32_t VAO;
    uint32_t VBO;
-   uint32_t objectBufferAllocatedSpace; /* usually equals to elementsAllocatedQuantity, or lower */
+   uint32_t objectBufferAllocatedSpace; /* usually equals to elementsQuantityAllocated, or lower */
    
 };
 
@@ -293,5 +286,6 @@ cce__endBaseActionsDynamicMap2D()
 #ifdef __cplusplus
 }
 #endif // __cplusplus
+
 
 #endif // MAP2D_INTERNAL_H

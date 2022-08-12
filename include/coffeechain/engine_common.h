@@ -116,7 +116,7 @@ struct ElementLogic
 
 struct ElementGroup
 {   
-   uint32_t *elementIDs;
+   uint32_t *elements;
    uint16_t  elementsQuantity;
 };
 

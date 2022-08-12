@@ -110,32 +110,51 @@ struct Map2DElementDev
    uint8_t isGlobalOffset;
 };
 
+struct DynamicElementGroup
+{
+   uint32_t *elements;
+   uint16_t  elementsQuantity;
+   uint16_t  elementsQuantityAllocated;
+};
+
+/* Map2D intended for editing.
+   All fields with QuantityAllocated can be used as CCE_ARRAY (from utils.h)
+*/
 struct Map2Ddev
 {
-   uint16_t ID;
-   uint32_t               elementsQuantity;
-   uint32_t               elementsWithoutColliderQuantity;
-   struct Map2DElement   *elements;
-   uint16_t               moveGroupsQuantity;
-   struct ElementGroup   *moveGroups;
-   uint16_t               extensionGroupsQuantity;
-   struct ElementGroup   *extensionGroups;
-   uint32_t               collidersQuantity;
-   struct Map2DCollider  *colliders;
-   uint16_t               collisionGroupsQuantity;
-   struct ElementGroup   *collisionGroups;
-   uint16_t               collisionQuantity;
-   struct CollisionGroup *collision;
-   uint16_t               timersQuantity;
-   float                 *delaysOfTimers;
-   uint32_t               logicQuantity;
-   struct ElementLogic   *logic;
-   uint8_t                actionsQuantity;
-   uint32_t              *actionIDs;
-   uint32_t              *actionsArgOffsets;
-   cce_void              *actionsArg;
-   uint8_t                exitMapsQuantity;
-   struct ExitMap2D      *exitMaps;
+   uint16_t                    ID;
+   uint32_t                    elementsQuantity;
+   uint32_t                    elementsWithoutColliderQuantity;
+   uint32_t                    elementsQuantityAllocated;
+   struct Map2DElement        *elements;
+   uint16_t                    moveGroupsQuantity;
+   uint16_t                    moveGroupsQuantityAllocated;
+   struct DynamicElementGroup *moveGroups;
+   uint16_t                    extensionGroupsQuantity;
+   uint16_t                    extensionGroupsQuantityAllocated;
+   struct DynamicElementGroup *extensionGroups;
+   uint32_t                    collidersQuantity;
+   uint32_t                    collidersQuantityAllocated;
+   struct Map2DCollider       *colliders;
+   uint16_t                    collisionGroupsQuantity;
+   uint16_t                    collisionGroupsQuantityAllocated;
+   struct DynamicElementGroup *collisionGroups;
+   uint16_t                    collisionQuantity;
+   uint16_t                    collisionQuantityAllocated;
+   struct CollisionGroup      *collision;
+   uint16_t                    timersQuantity;
+   uint16_t                    timersQuantityAllocated;
+   float                      *delaysOfTimers;
+   uint32_t                    logicQuantity;
+   uint32_t                    logicQuantityAllocated;
+   struct ElementLogic        *logic;
+   uint8_t                     actionsQuantity;
+   uint32_t                   *actionIDs;
+   uint32_t                   *actionsArgOffsets;
+   cce_void                   *actionsArg;
+   uint8_t                     exitMapsQuantity;
+   uint8_t                     exitMapsQuantityAllocated;
+   struct ExitMap2D           *exitMaps;
 };
 
 struct Map2D;
@@ -165,7 +184,7 @@ CCE_PUBLIC_OPTIONS uint8_t cceGetGroupValueDynamicMap2D (cce_enum group_type, ui
 CCE_PUBLIC_OPTIONS struct ElementGroup cceGetGroupDataDynamicMap2D (cce_enum group_type, uint16_t ID);
 CCE_PUBLIC_OPTIONS struct Map2DCollider cceGetColliderDataDynamicMap2D (uint32_t ID);
 CCE_PUBLIC_OPTIONS struct CollisionGroup cceGetCollisionDataDynamicMap2D (uint16_t ID);
-CCE_PUBLIC_OPTIONS uint8_t cceCreateGroupDynamicMap2D (cce_enum group_type, uint16_t elementsQuantity, uint32_t *elementIDs, uint16_t *emptyGroupID);
+CCE_PUBLIC_OPTIONS uint16_t cceCreateGroupDynamicMap2D (cce_enum group_type, uint16_t elementsQuantity, uint32_t *elementIDs);
 CCE_PUBLIC_OPTIONS uint8_t cceAddElementInGroupDynamicMap2D (cce_enum group_type, uint16_t ID, uint32_t elementID);
 CCE_PUBLIC_OPTIONS uint8_t cceAddElementInGroupVisibleDynamicMap2D (cce_enum group_type, uint16_t ID, uint32_t elementID);
 CCE_PUBLIC_OPTIONS void cceReplaceMap2DElementDynamicMap2D (struct Map2DElementDev *element, uint32_t ID, uint8_t hasCollider, uint8_t isCurrentPosition);

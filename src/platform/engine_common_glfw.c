@@ -479,7 +479,7 @@ int cce__initEngine__glfw (const char *label, uint16_t globalBoolsQuantity)
    g_GLFWstate.window = glfwCreateWindow(g_GLFWstate.windowWidth, g_GLFWstate.windowHeight, label, NULL, NULL);
    if (!(g_GLFWstate.window))
    {
-      perror("GLFW::WINDOW::FAILED_TO_CREATE");
+      fprintf(stderr, "GLFW::WINDOW::FAILED_TO_CREATE\n");
       glfwTerminate();
       return -1;
    }
@@ -487,16 +487,15 @@ int cce__initEngine__glfw (const char *label, uint16_t globalBoolsQuantity)
    glfwSetFramebufferSizeCallback(g_GLFWstate.window, framebufferSizeCallback);
    glfwSetWindowSizeCallback(g_GLFWstate.window, windowResizeCallback);
    glfwSetKeyCallback(g_GLFWstate.window, keyCallback);
-   glfwSetWindowAspectRatio(g_GLFWstate.window, g_GLFWstate.windowWidth, g_GLFWstate.windowHeight);
    if (!gladLoadGL((GLADloadfunc)glfwGetProcAddress))
    {
-      perror("GLAD::INITIALIZATION::FAILED:\nOpenGL could not be loaded by GLAD.");
+      fprintf(stderr, "GLAD::INITIALIZATION::FAILED:\nOpenGL could not be loaded by GLAD.\n");
       glfwTerminate();
       return -1;
    }
    if (!GLAD_GL_VERSION_3_3)
    {
-      perror("GLAD::INITIALIZATION::FAILED:\nOpenGL 3.3 could not be loaded by GLAD.");
+      fprintf(stderr, "GLAD::INITIALIZATION::FAILED:\nOpenGL 3.3 could not be loaded by GLAD.\n");
       glfwTerminate();
       return -1;
    }
@@ -522,15 +521,15 @@ int cce__initEngine__glfw (const char *label, uint16_t globalBoolsQuantity)
    glfwSwapInterval(1);
    
    cceSetWindowParameters = setWindowParameters__glfw;
+   cce__toWindow = toWindow__glfw;
    if (internalFlags && CCE_WAYLAND)
    {
-      cce__toWindow = cce__doNothing;
       cce__showWindow = cce__doNothing;
    }
    else
    {
       cce__showWindow = showWindow__glfw;
-      cce__toWindow = toWindow__glfw;
+      glfwSetWindowAspectRatio(g_GLFWstate.window, g_GLFWstate.windowWidth, g_GLFWstate.windowHeight);
    }
    cce__toFullscreen = toFullscreen__glfw;
    cce__swapBuffers = swapBuffers__glfw;

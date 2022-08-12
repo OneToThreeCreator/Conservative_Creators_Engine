@@ -443,7 +443,7 @@ CCE_PUBLIC_OPTIONS int cceInitEngine2D (uint16_t globalBoolsQuantity, uint32_t t
    cce__globalOffset = (struct cce_i32vec2) {0, 0};
    g_textureSize.x = textureMaxWidth;
    g_textureSize.y = textureMaxHeight;
-   CCE_CALLOC_ARRAY(g_textures);
+   CCE_ALLOC_ARRAY_ZEROED(g_textures);
    glTexturesArray = createTextureArray(CCE_ALLOCATION_STEP);
    glTexturesArraySize = CCE_ALLOCATION_STEP;
    g_elementBufferSize = 0;
@@ -1103,8 +1103,8 @@ cce_ubyte cce__checkCollisionWithOffset (const uint32_t *group1firstID, uint16_t
 cce_ubyte cce__fourthLogicTypeFuncMap2D(uint16_t ID, va_list argp)
 {
    struct Map2D *map = (struct Map2D*) va_arg(argp, struct Map2D*);
-   return cce__checkCollision((map->collisionGroups + (map->collision + ID)->group1)->elementIDs, (map->collisionGroups + (map->collision + ID)->group1)->elementsQuantity,
-                              (map->collisionGroups + (map->collision + ID)->group2)->elementIDs, (map->collisionGroups + (map->collision + ID)->group2)->elementsQuantity,
+   return cce__checkCollision((map->collisionGroups + (map->collision + ID)->group1)->elements, (map->collisionGroups + (map->collision + ID)->group1)->elementsQuantity,
+                              (map->collisionGroups + (map->collision + ID)->group2)->elements, (map->collisionGroups + (map->collision + ID)->group2)->elementsQuantity,
                               (cce_void*) map->colliders, sizeof(struct Map2DCollider), (cce_void*) map->colliders, sizeof(struct Map2DCollider));
 }
 

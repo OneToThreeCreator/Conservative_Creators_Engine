@@ -42,13 +42,13 @@ struct ElementGroup* cce__loadGroups (uint16_t groupsQuantity, FILE *map_f)
       iterator->elementsQuantity = cceLittleEndianToHostEndianInt16(iterator->elementsQuantity);
       if (iterator->elementsQuantity)
       {
-         iterator->elementIDs = (uint32_t*) malloc(iterator->elementsQuantity * sizeof(uint32_t));
-         fread(iterator->elementIDs, 4u/*uint32_t*/, iterator->elementsQuantity, map_f);
-         cceLittleEndianToHostEndianArrayInt32(iterator->elementIDs, iterator->elementsQuantity);
+         iterator->elements = (uint32_t*) malloc(iterator->elementsQuantity * sizeof(uint32_t));
+         fread(iterator->elements, 4u/*uint32_t*/, iterator->elementsQuantity, map_f);
+         cceLittleEndianToHostEndianArrayInt32(iterator->elements, iterator->elementsQuantity);
       }
       else
       {
-         iterator->elementIDs = NULL;
+         iterator->elements = NULL;
       }
    }
    return groups;
@@ -66,7 +66,7 @@ void cce__writeGroups (uint16_t groupsQuantity, struct ElementGroup *groups, FIL
       if (*g_endianess == CCE_BIG_ENDIAN)
       {
          uint32_t elementID;
-         for (uint32_t *jiterator = iterator->elementIDs, *jend = iterator->elementIDs + iterator->elementsQuantity; jiterator < jend; ++jiterator)
+         for (uint32_t *jiterator = iterator->elements, *jend = iterator->elements + iterator->elementsQuantity; jiterator < jend; ++jiterator)
          {
             elementID = cceBigEndianToLittleEndianInt32(*jiterator);
             fwrite(&elementID, 4u/*uint32_t*/, 1, map_f);
@@ -74,7 +74,7 @@ void cce__writeGroups (uint16_t groupsQuantity, struct ElementGroup *groups, FIL
       }
       else
       {
-         fwrite(iterator->elementIDs, 4u/*uint32_t*/, iterator->elementsQuantity, map_f);
+         fwrite(iterator->elements, 4u/*uint32_t*/, iterator->elementsQuantity, map_f);
       }
    }
 }

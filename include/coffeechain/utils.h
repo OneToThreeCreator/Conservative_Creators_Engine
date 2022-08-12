@@ -46,14 +46,14 @@ sizeType name ## QuantityAllocated = 0
 #define CCE_CEIL_SIZE_TO_ALLOCATION_STEP(s) (((s) & ~(CCE_ALLOCATION_STEP - 1u)) + CCE_ALLOCATION_STEP * (((s) & (CCE_ALLOCATION_STEP - 1u)) > 0))
 
 #define CCE__REALLOC_ARRAY(name, newQuantity) \
-size_t oldQuantityAllocated = name ## QuantityAllocated; \
-name ## QuantityAllocated = CCE_CEIL_SIZE_TO_ALLOCATION_STEP(newQuantity); \
-if (name ## QuantityAllocated == oldQuantityAllocated) \
+size_t oldQuantityAllocated = (name ## QuantityAllocated); \
+(name ## QuantityAllocated) = CCE_CEIL_SIZE_TO_ALLOCATION_STEP(newQuantity); \
+if ((name ## QuantityAllocated) == oldQuantityAllocated) \
    break; \
-name = realloc(name, name ## QuantityAllocated * sizeof(*name));
+name = realloc(name, (name ## QuantityAllocated) * sizeof(*name));
 
-#define CCE_ALLOC_ARRAY(name) name = malloc((name ## QuantityAllocated = CCE_ALLOCATION_STEP) * sizeof(*name))
-#define CCE_CALLOC_ARRAY(name) name = calloc((name ## QuantityAllocated = CCE_ALLOCATION_STEP), sizeof(*name))
+#define CCE_ALLOC_ARRAY(name)  (name) = malloc(((name ## QuantityAllocated) = CCE_ALLOCATION_STEP) * sizeof(*name))
+#define CCE_ALLOC_ARRAY_ZEROED(name) (name) = calloc(((name ## QuantityAllocated) = CCE_ALLOCATION_STEP),  sizeof(*name))
 
 #define CCE_REALLOC_ARRAY(name, newQuantity) \
 do \
@@ -66,7 +66,7 @@ while(0)
 do \
 { \
    CCE__REALLOC_ARRAY(name, newQuantity) \
-   memset(name + oldQuantityAllocated, 0, (name ## QuantityAllocated - oldQuantityAllocated)); \
+   memset((name) + oldQuantityAllocated, 0, ((name ## QuantityAllocated) - oldQuantityAllocated) * sizeof(*name)); \
 } \
 while(0)
 

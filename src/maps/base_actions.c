@@ -397,7 +397,7 @@ CCE_PUBLIC_OPTIONS uint8_t cceRegisterAction (uint32_t ID, void (*action)(void*)
 static inline void moveElements (int32_t *firstElementX, int32_t *firstElementY, size_t step, struct ElementGroup *group, int32_t x, int32_t y)
 {
    step = step / sizeof(int32_t); // requires proper alignment, most likely provided anyway
-   for (uint32_t *iterator = group->elementIDs, *end = group->elementIDs + group->elementsQuantity; iterator < end; ++iterator)
+   for (uint32_t *iterator = group->elements, *end = group->elements + group->elementsQuantity; iterator < end; ++iterator)
    {
       *(firstElementX + step * (*iterator)) += x;
       *(firstElementY + step * (*iterator)) += y;
@@ -556,7 +556,7 @@ CCE_PUBLIC_OPTIONS void cceExtendGroupMap2D (uint16_t groupID, int32_t x, int32_
    }
    if (group == NULL)
       return;
-   for (uint32_t *iterator = (group + groupID - 1u)->elementIDs, *end = (group + groupID - 1u)->elementIDs + (group + groupID - 1u)->elementsQuantity; iterator < end; ++iterator)
+   for (uint32_t *iterator = (group + groupID - 1u)->elements, *end = (group + groupID - 1u)->elements + (group + groupID - 1u)->elementsQuantity; iterator < end; ++iterator)
    {
       *(firstElementWidth + *iterator * elementSize)  += x;
       *(firstElementHeight + *iterator * elementSize) += y;
