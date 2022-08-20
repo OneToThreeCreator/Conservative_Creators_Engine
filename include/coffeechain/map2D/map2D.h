@@ -26,8 +26,12 @@ extern "C"
 {
 #endif // __cplusplus
 
+#ifndef stdout
+struct __FILE;
+typedef struct __FILE FILE;
+#endif
+
 #include <stdint.h>
-#include <stdio.h>
 #include "../engine_common.h"
 
 #define CCE_BASIC_ACTIONS_QUANTITY 16u
@@ -92,7 +96,7 @@ struct Map2DElement
    struct Texture textureInfo;
    uint8_t textureOffsetGroups[4]; // 0 is texture (more precisely - texture piece) unchangeable
    uint8_t colorGroups[4];         // 0 is color unchangable
-   uint8_t rotateGroup;           // 0 is unrotatable
+   uint8_t rotateGroup;            // 0 is unrotatable
 };
 
 struct Map2DElementDev
@@ -144,7 +148,7 @@ struct Map2Ddev
    struct CollisionGroup      *collision;
    uint16_t                    timersQuantity;
    uint16_t                    timersQuantityAllocated;
-   float                      *delaysOfTimers;
+   float                      *timers;
    uint32_t                    logicQuantity;
    uint32_t                    logicQuantityAllocated;
    struct ElementLogic        *logic;

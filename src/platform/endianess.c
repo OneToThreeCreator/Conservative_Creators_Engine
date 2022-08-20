@@ -25,6 +25,8 @@
 #include "../../include/coffeechain/engine_common.h"
 #include "../../include/coffeechain/endianess.h"
 
+#define CCE_UNUSED(x) (void)(x)
+
 CCE_PUBLIC_OPTIONS uint16_t (*cceLittleEndianConversionInt16) (uint16_t) = NULL;
 CCE_PUBLIC_OPTIONS uint32_t (*cceLittleEndianConversionInt32) (uint32_t) = NULL;
 CCE_PUBLIC_OPTIONS uint64_t (*cceLittleEndianConversionInt64) (uint64_t) = NULL;
@@ -128,6 +130,8 @@ static uint64_t ccePreserveEndianInt64 (uint64_t value)
 
 CCE_PUBLIC_OPTIONS void* ccePreserveEndianArrayIntN (void *array, size_t arraySize, size_t n)
 {
+   CCE_UNUSED(arraySize);
+   CCE_UNUSED(n);
    return array;
 }
 

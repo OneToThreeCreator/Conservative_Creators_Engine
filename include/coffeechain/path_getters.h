@@ -26,9 +26,8 @@ extern "C"
 {
 #endif // __cplusplus
 
-#include <stdlib.h>
+#include <stddef.h>
 #include <stdint.h>
-#include <string.h>
 
 #if defined(_WIN32) || defined(__WIN32__) || defined(_WIN64) || defined(__TOS_WIN__) || defined(__WINDOWS__) || \
     defined(__MINGW32__) || defined(__MINGW64__) || defined(__CYGWIN__)

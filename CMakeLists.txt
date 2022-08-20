@@ -143,6 +143,8 @@ target_include_directories(coffeechain PUBLIC
                             $<INSTALL_INTERFACE:include>)
 target_include_directories(coffeechain PUBLIC
                             $<BUILD_INTERFACE:${CoffeeChain_BINARY_DIR}/include>)
+target_include_directories(coffeechain PUBLIC
+                            $<BUILD_INTERFACE:${CoffeeChain_BINARY_DIR}/include/coffeechain>)
 
 if(WIN32)
    include(GenerateExportHeader)
@@ -151,7 +153,6 @@ if(WIN32)
       EXPORT_FILE_NAME ${CoffeeChain_BINARY_DIR}/include/coffeechain/cce_exports.h
       INCLUDE_GUARD_NAME CCE_EXPORTS_H
    )
-   install(FILES ${CoffeeChain_BINARY_DIR}/include/coffeechain/cce_exports.h DESTINATION include/coffeechain)
    target_link_libraries(coffeechain PRIVATE shell32 kernel32)
    # Windows don't have standartized path for storing shared data (or libraries, or anything that isn't self-contained)
 else()
@@ -207,6 +208,9 @@ if (NOT (CoffeeChain_LIB_TYPE MATCHES STATIC) AND CoffeeChain_INSTALL)
    install(DIRECTORY ${CoffeeChain_SOURCE_DIR}/include/coffeechain DESTINATION include)
    install(FILES ${CoffeeChain_BINARY_DIR}/include/coffeechain/config.h DESTINATION include/coffeechain)
    install(FILES ${CoffeeChain_BINARY_DIR}/coffeechain.pc DESTINATION lib/pkgconfig)
+   if (WIN32)
+      install(FILES ${CoffeeChain_BINARY_DIR}/include/coffeechain/cce_exports.h DESTINATION include/coffeechain)
+   endif()
    install(EXPORT CoffeeChainTargets
       FILE CoffeeChainTargets.cmake
       DESTINATION lib/cmake/CoffeeChain

@@ -26,6 +26,7 @@
 #include <stdio.h>
 
 #include "../../include/coffeechain/path_getters.h"
+#include "../../include/coffeechain/utils.h"
 
 #ifdef __OPTIMIZE_SIZE__
 typedef uint32_t cce_uint;
@@ -188,13 +189,13 @@ CCE_PUBLIC_OPTIONS char* cceGetDirectory (char *path, size_t bufferSize)
                   errno = 0u;
                   break;
                }
-               // Don't write error handling code twice, just use existing one (falthrough)
             }
             else
             {
                return path;
             }
          }
+         // fallthrough
          default:
          {
             fprintf(stderr, "DIRECTORY::FAILED_TO_GET:\n%s - %s\n", path, strerror(errno));
@@ -235,13 +236,13 @@ CCE_PUBLIC_OPTIONS char* cceGetDirectory (char *path, size_t bufferSize)
                         errno = 0u;
                         break;
                      }
-                     // Don't write error handling code twice, just use existing one (no-break)
                   }
                   else
                   {
                      return path;
                   }
                }
+               // fallthrough
                default:
                {
                   *(path + length) = '\0';
@@ -365,6 +366,8 @@ CCE_PUBLIC_OPTIONS char* cceGetTemporaryDirectory (size_t spaceToLeave)
 
 static int removeCallback (const char *path, const struct stat *st, int type, struct FTW *info)
 {
+   CCE_UNUSED(st);
+   CCE_UNUSED(info);
    switch (type)
    {
       case FTW_F:
@@ -448,13 +451,13 @@ CCE_PUBLIC_OPTIONS char* cceGetDirectory (char *path, size_t bufferSize)
             if (CreateDirectoryA(path, NULL) == 0u) // CreateDirectoryA returns zero if failed
             {
                error = GetLastError();
-               // Don't write error handling code twice, just use existing one
             }
             else
             {
                return path;
             }
          }
+         // fallthrough
          default:
          {
             fprintf(stderr, "DIRECTORY::FAILED_TO_GET:\n%s - %s", path, getErrorMessage(error));
@@ -489,13 +492,13 @@ CCE_PUBLIC_OPTIONS char* cceGetDirectory (char *path, size_t bufferSize)
                   if (CreateDirectoryA(path, NULL) == 0u) // CreateDirectoryA returns zero if failed
                   {
                      error = GetLastError();
-                     // Don't write error handling code twice, just use existing one
                   }
                   else
                   {
                      return path;
                   }
                }
+               // fallthrough
                default:
                {
                   *(path + length) = '\0';

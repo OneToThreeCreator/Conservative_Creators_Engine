@@ -27,13 +27,12 @@ extern "C"
 #endif // __cplusplus
 
 #include <stdint.h>
-#include <stdarg.h>
-#include <stdlib.h>
-#include <coffeechain/config.h>
+#include <stddef.h>
+#include "config.h"
 
 #if defined(_WIN32) || defined(__WIN32__) || defined(_WIN64) || defined(__TOS_WIN__) || defined(__WINDOWS__) || \
     defined(__MINGW32__) || defined(__MINGW64__) || defined(__CYGWIN__)
-#include <coffeechain/cce_exports.h>
+#include "cce_exports.h"
 #define CCE_PUBLIC_OPTIONS CCE_EXPORTS
 #else
 #define CCE_PUBLIC_OPTIONS

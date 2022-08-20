@@ -162,6 +162,7 @@ static cce_ubyte cce__fourthLogicTypeFuncDynamicMap2Dall (uint16_t ID, va_list a
 
 static void dontProcessLogicMap2D (struct Map2Darray *maps)
 {
+   CCE_UNUSED(maps);
    return;
 }
 
@@ -575,12 +576,12 @@ void cce__elementToMap2DElementVertices (struct Map2DElementVertices *buffer, in
 
 static int loadTexture (char *path, uint16_t position)
 {
-   int width, height, nrChannels;
+   unsigned int width, height;
    void *data;
-   data = stbi_load(path, &width, &height, &nrChannels, 4);
+   data = stbi_load(path, (int*) &width, (int*) &height, NULL, 4);
    if (!data)
    {
-      fprintf(stderr, "ENGINE::TEXTURE::DECODING_ERROR:\nCannot decode %s (does it even exist?)\n", path);
+      fprintf(stderr, "ENGINE::TEXTURE::DECODING_ERROR:\n%s\n", stbi_failure_reason());
       return -1;
    }
    if (width > g_textureSize.x || height > g_textureSize.y)

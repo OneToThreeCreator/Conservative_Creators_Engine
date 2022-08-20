@@ -55,7 +55,7 @@ static struct RegisteredKeys
    uint16_t number;
 } *cce_keys;
 static size_t keysQuantity = 0u;
-static size_t keysQuantityAllocated = CCE_ALLOCATION_STEP;
+//static size_t keysQuantityAllocated = CCE_ALLOCATION_STEP;
 
 static double deltaTime;
 static double lastTime = 0.0;
@@ -84,11 +84,13 @@ static void engineUpdate__glfw (void)
 
 static void framebufferSizeCallback (GLFWwindow *window, int width, int height)
 {
-    glViewport(0, 0, width, height);
+   CCE_UNUSED(window);
+   glViewport(0, 0, width, height);
 }
 
 static void windowResizeCallback (GLFWwindow *window, int width, int height)
 {
+   CCE_UNUSED(window);
    g_GLFWstate.windowWidth = width;
    g_GLFWstate.windowHeight = height;
 }
@@ -175,6 +177,8 @@ static void showWindow__glfw (void)
 
 static void keyCallback (GLFWwindow *window, int key, int scancode, int action, int modifiers)
 {
+   CCE_UNUSED(window);
+   CCE_UNUSED(scancode);
    struct RegisteredKeys *keyInfo = cce_keys + cceBinarySearch((((uint8_t*) cce_keys) + offsetof(struct RegisteredKeys, key)), keysQuantity, sizeof(int), sizeof(struct RegisteredKeys), key);
    if (keyInfo > cce_keys + keysQuantity)
    {

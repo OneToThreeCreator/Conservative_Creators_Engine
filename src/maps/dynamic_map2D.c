@@ -23,6 +23,7 @@
 #include <stddef.h>
 #include <string.h>
 #include <stdint.h>
+#include <stdarg.h>
 
 #include "../../include/coffeechain/engine_common.h"
 #include "../../include/coffeechain/utils.h"

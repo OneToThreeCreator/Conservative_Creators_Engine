@@ -18,7 +18,7 @@
     USA
 */
 
-#include <string.h>
+ #include <string.h>
 #include <stdint.h>
 
 #include "../include/coffeechain/engine_common.h"
@@ -30,13 +30,13 @@ struct UnicodeCharWithSize
    uint32_t size;
 };
 
-CCE_PUBLIC_OPTIONS size_t cceBinarySearch (const void *const array, const size_t arraySize, const size_t typeSize, const size_t step, const size_t value)
+CCE_PUBLIC_OPTIONS size_t cceBinarySearch (const void *const array, size_t arraySize, size_t typeSize, size_t step, size_t value)
 {
    if (!arraySize)
       return 0;
       
-   const uint8_t *iterator = (uint8_t*) array;
-   const uint8_t *end = ((uint8_t*) array) + arraySize * step;
+   const uint8_t *iterator = (const uint8_t*) array;
+   const uint8_t *end = ((const uint8_t*) array) + arraySize * step;
    size_t remain = arraySize;
    size_t typeRemain;
    size_t typeMask;

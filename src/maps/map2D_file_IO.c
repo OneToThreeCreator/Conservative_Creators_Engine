@@ -18,8 +18,6 @@
     USA
 */
 
-#include "../platform/platforms.h"
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <stddef.h>
@@ -174,7 +172,7 @@ CCE_PUBLIC_OPTIONS void cceFreeMap2Ddev (struct Map2Ddev *map)
    if ((map->collisionQuantity))
       free(map->collision);
    if ((map->timersQuantity))
-      free(map->delaysOfTimers);
+      free(map->timers);
    if ((map->logicQuantity))
    {
       for (struct ElementLogic *iterator = map->logic, *end = map->logic + map->logicQuantity; iterator < end; ++iterator)
@@ -672,7 +670,7 @@ struct Map2D* cceMap2DdevToMap2D (struct Map2Ddev *mapdev)
    if (mapdev->timersQuantity)
    {
       map->timers = (struct Timer*) malloc(mapdev->timersQuantity * sizeof(struct Timer));
-      float *srcDelays = mapdev->delaysOfTimers;
+      float *srcDelays = mapdev->timers;
       for(struct Timer *iterator = map->timers, *end = map->timers + mapdev->timersQuantity; iterator < end; ++iterator, ++srcDelays)
       {
          iterator->delay = *srcDelays;
@@ -803,9 +801,9 @@ struct Map2Ddev* cceLoadMap2Ddev (uint16_t number)
    map->timersQuantity = cceLittleEndianToHostEndianInt16(map->timersQuantity);
    if ((map->timersQuantity))
    {
-      (map->delaysOfTimers) = (float*) malloc(map->timersQuantity * sizeof(float));
-      fread((map->delaysOfTimers), 4u/*float*/, map->timersQuantity, mapFile);
-      cceLittleEndianToHostEndianArrayInt32(&(map->delaysOfTimers), map->timersQuantity);
+      (map->timers) = (float*) malloc(map->timersQuantity * sizeof(float));
+      fread((map->timers), 4u/*float*/, map->timersQuantity, mapFile);
+      cceLittleEndianToHostEndianArrayInt32(&(map->timers), map->timersQuantity);
    }
    fread(&(map->logicQuantity), 4u/*uint32_t*/, 1u, mapFile);
    map->logicQuantity = cceLittleEndianToHostEndianInt16(map->logicQuantity);
@@ -934,7 +932,7 @@ int cceWriteMap2Ddev (struct Map2Ddev *map, void (*writeFunc)(FILE*))
    {
       if (*g_endianess == CCE_BIG_ENDIAN)
       {
-         for (uint32_t *iterator = (uint32_t*) map->delaysOfTimers, *end = (uint32_t*) map->delaysOfTimers + map->timersQuantity; iterator < end; ++iterator)
+         for (uint32_t *iterator = (uint32_t*) map->timers, *end = (uint32_t*) map->timers + map->timersQuantity; iterator < end; ++iterator)
          {
             temporary.u32 = cceBigEndianToLittleEndianInt32(*iterator);
             fwrite(&(temporary.u32), 4, 1, mapFile);
@@ -942,7 +940,7 @@ int cceWriteMap2Ddev (struct Map2Ddev *map, void (*writeFunc)(FILE*))
       }
       else
       {
-         fwrite((map->delaysOfTimers), 4/*float*/, (map->timersQuantity), mapFile);
+         fwrite((map->timers), 4/*float*/, (map->timersQuantity), mapFile);
       }
    }
    temporary.u32 = cceHostEndianToLittleEndianInt32(map->logicQuantity);
