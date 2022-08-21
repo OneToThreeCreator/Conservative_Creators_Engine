@@ -28,7 +28,7 @@
 
 #include "../include/coffeechain/engine_common.h"
 #include "../include/coffeechain/utils.h"
-#include "../include/coffeechain/path_getters.h"
+#include "../include/coffeechain/os_interaction.h"
 #include "../include/coffeechain/endianess.h"
 
 #include "engine_common_internal.h"

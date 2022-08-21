@@ -24,7 +24,7 @@
 #include <string.h>
 
 #include "../../include/coffeechain/engine_common.h"
-#include "../../include/coffeechain/path_getters.h"
+#include "../../include/coffeechain/os_interaction.h"
 #include "../../include/coffeechain/endianess.h"
 #include "../../include/coffeechain/map2D/map2D.h"
 #include "../../include/coffeechain/map2D/base_actions.h"

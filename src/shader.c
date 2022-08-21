@@ -22,7 +22,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "../include/coffeechain/path_getters.h"
+#include "../include/coffeechain/os_interaction.h"
 
 #include "shader.h"
 #include "engine_common_internal.h"

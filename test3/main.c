@@ -25,7 +25,7 @@
 #include <coffeechain/map2D/base_actions.h>
 #include <coffeechain/engine_common.h>
 #include <coffeechain/map2D/map2D.h>
-#include <coffeechain/path_getters.h>
+#include <coffeechain/os_interaction.h>
 #include <coffeechain/plugins/text_rendering.h>
 
 static void initPlayer (uint32_t globalBoolsQuantity)

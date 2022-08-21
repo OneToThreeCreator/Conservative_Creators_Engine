@@ -25,7 +25,7 @@
 #include <stdint.h>
 #include <stdio.h>
 
-#include "../../include/coffeechain/path_getters.h"
+#include "../../include/coffeechain/os_interaction.h"
 #include "../../include/coffeechain/utils.h"
 
 #ifdef __OPTIMIZE_SIZE__

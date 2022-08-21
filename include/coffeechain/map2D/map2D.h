@@ -94,9 +94,8 @@ struct Map2DElement
    uint16_t width;
    uint16_t height;
    struct Texture textureInfo;
-   uint8_t textureOffsetGroups[4]; // 0 is texture (more precisely - texture piece) unchangeable
-   uint8_t colorGroups[4];         // 0 is color unchangable
-   uint8_t rotateGroup;            // 0 is unrotatable
+   uint8_t textureOffsetGroups[2]; // 0 is texture (more precisely - texture piece) unchangeable
+   uint8_t colorGroups[2];         // 0 is color unchangable
 };
 
 struct Map2DElementDev

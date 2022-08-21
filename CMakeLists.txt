@@ -20,7 +20,7 @@
 
 cmake_minimum_required(VERSION 3.0)
 
-project(CoffeeChain VERSION 0.5.0 DESCRIPTION "open 2D engine for creating games - shared library" LANGUAGES C)
+project(CoffeeChain VERSION 0.5.1 DESCRIPTION "open 2D engine for creating games - shared library" LANGUAGES C)
 
 if (NOT DEFINED CoffeeChain_BUILD_TESTING)
    option(CoffeeChain_BUILD_TESTING "Build CoffeeChain test program" ON)
@@ -57,8 +57,8 @@ add_library(coffeechain ${CoffeeChain_LIB_TYPE}
    include/coffeechain/utils.h
    src/platform/engine_common_glfw.c
    src/platform/engine_common_glfw.h
-   src/platform/path_getters.c
-   include/coffeechain/path_getters.h
+   src/platform/os_interaction.c
+   include/coffeechain/os_interaction.h
    src/platform/platforms.h
    src/platform/endianess.c
    include/coffeechain/endianess.h

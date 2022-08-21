@@ -21,7 +21,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
-#include <coffeechain/path_getters.h>
+#include <coffeechain/os_interaction.h>
 
 static uint8_t createTestFile (char *path)
 {
