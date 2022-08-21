@@ -28,14 +28,18 @@
 #include "../../include/coffeechain/os_interaction.h"
 #include "../../include/coffeechain/utils.h"
 
-#ifdef __OPTIMIZE_SIZE__
-typedef uint32_t cce_uint;
+#if defined(CCE_TMPDIR_NAME_TEMPLATE)
+
+#ifndef CCE_TMPDIR_NAME_TEMPLATE_SIZE
+#define CCE_TMPDIR_NAME_TEMPLATE_SIZE strlen(CCE_TMPDIR_NAME_TEMPLATE)
+#endif
+
 #else
-typedef uint_fast32_t cce_uint;
-#endif // __OPTIMIZE_SIZE__
 
 #define CCE_TMPDIR_NAME_TEMPLATE "CoffeeChain-tmpdir-XXXXXX"
 #define CCE_TMPDIR_NAME_TEMPLATE_SIZE 25u
+
+#endif // defined(CCE_TMPDIR_NAME_TEMPLATE)
 
 static char *tmpPath = NULL;
 static size_t tmpPathLength;
