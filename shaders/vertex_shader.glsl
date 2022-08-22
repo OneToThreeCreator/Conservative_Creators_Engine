@@ -18,7 +18,7 @@
     USA
 */
 
-// For gl version 3.2 core and above
+#version 330 core
 layout (location = 0) in ivec2 aCoords;
 layout (location = 1) in ivec2 aPosition;
 layout (location = 2) in vec2  aTexturePieceCoords;

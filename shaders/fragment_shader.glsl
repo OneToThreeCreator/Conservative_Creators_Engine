@@ -18,7 +18,7 @@
     USA
 */
 
-// For gl version 3.3 core and above
+#version 330 core
 out vec4 FragColor;
 
 in vec4     Color;

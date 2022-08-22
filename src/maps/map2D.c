@@ -342,14 +342,14 @@ CCE_PUBLIC_OPTIONS int cceInitEngine2D (uint16_t globalBoolsQuantity, uint32_t t
    
    {
       #ifdef SYSTEM_RESOURCE_PATH
-      shaderProgram = makeVFshaderProgram(SYSTEM_RESOURCE_PATH "shaders/vertex_shader.glsl", SYSTEM_RESOURCE_PATH "shaders/fragment_shader.glsl", 330u, "", "");
+      shaderProgram = cce__makeVFshaderProgram(SYSTEM_RESOURCE_PATH "shaders/vertex_shader.glsl", SYSTEM_RESOURCE_PATH "shaders/fragment_shader.glsl", NULL, NULL);
       if (shaderProgram == 0u)
       #endif // SYSTEM_RESOURCE_PATH
       {
          cceAppendPath(cce__resourcePath, pathLength + 11u, "shaders");
          char *vertexPath   = cceCreateNewPathFromOldPath(cce__resourcePath, "vertex_shader.glsl",   0u);
          char *fragmentPath = cceCreateNewPathFromOldPath(cce__resourcePath, "fragment_shader.glsl", 0u);
-         shaderProgram = makeVFshaderProgram(vertexPath, fragmentPath, 330u, "", "");
+         shaderProgram = cce__makeVFshaderProgram(vertexPath, fragmentPath, NULL, NULL);
          free(vertexPath);
          free(fragmentPath);
          *(cce__resourcePath + pathLength) = '\0';
