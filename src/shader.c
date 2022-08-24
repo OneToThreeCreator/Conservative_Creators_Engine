@@ -31,8 +31,15 @@ char* cce__prependStringToShader (char *shaderSrc, const char *const shaderAddit
 {
    size_t shaderSrcLength = strlen(shaderSrc);
    size_t additionalStringLength = strlen(shaderAdditionalString);
-   memmove(shaderSrc + additionalStringLength, shaderSrc, shaderSrcLength + 1 /*\0*/);
-   memcpy(shaderSrc, shaderAdditionalString, additionalStringLength);
+   char *toInsert = strstr(shaderSrc, "#version");
+   if (toInsert == NULL)
+      toInsert = shaderSrc;
+   else
+      toInsert = memchr(toInsert, '\n', shaderSrcLength - (toInsert - shaderSrc)) + 1;
+   
+   memmove(toInsert + additionalStringLength + 1, toInsert, shaderSrcLength - (toInsert - shaderSrc) + 1 /*\0*/);
+   memcpy(toInsert, shaderAdditionalString, additionalStringLength);
+   toInsert[additionalStringLength] = '\n';
    return shaderSrc;
 }
 
@@ -44,7 +51,7 @@ GLuint cce__makeVFshaderProgram  (const char *vertexPath, const char *fragmentPa
    if (vertexShaderAdditionalString != NULL)
       additionalStringLength = strlen(vertexShaderAdditionalString);
    
-   char *shaderSrc = cce__readTextFile(vertexPath, additionalStringLength);
+   char *shaderSrc = cce__readTextFile(vertexPath, additionalStringLength + 1);
    if (shaderSrc == NULL)
    {
       fprintf(stderr, "OPENGL::SHADER::VERTEX::FAILED_TO_LOAD:\n%s\n", vertexPath);
@@ -60,7 +67,7 @@ GLuint cce__makeVFshaderProgram  (const char *vertexPath, const char *fragmentPa
    additionalStringLength = 0;
    if (fragmentShaderAdditionalString != NULL)
       additionalStringLength = strlen(fragmentShaderAdditionalString);
-   shaderSrc = cce__readTextFile(fragmentPath, additionalStringLength);
+   shaderSrc = cce__readTextFile(fragmentPath, additionalStringLength + 1);
    if (shaderSrc == NULL)
    {
       fprintf(stderr, "OPENGL::SHADER::FRAGMENT::FAILED_TO_LOAD:\n%s\n", fragmentPath);
@@ -89,7 +96,7 @@ GLuint cce__makeVGFshaderProgram (const char *vertexPath, const char *geometryPa
    if (vertexShaderAdditionalString != NULL)
       additionalStringLength = strlen(vertexShaderAdditionalString);
    
-   char *shaderSrc = cce__readTextFile(vertexPath, additionalStringLength);
+   char *shaderSrc = cce__readTextFile(vertexPath, additionalStringLength + 1);
    if (shaderSrc == NULL)
    {
       fprintf(stderr, "OPENGL::SHADER::VERTEX::FAILED_TO_LOAD:\n%s\n", vertexPath);
@@ -105,7 +112,7 @@ GLuint cce__makeVGFshaderProgram (const char *vertexPath, const char *geometryPa
    additionalStringLength = 0;
    if (fragmentShaderAdditionalString != NULL)
       additionalStringLength = strlen(geometryShaderAdditionalString);
-   shaderSrc = cce__readTextFile(geometryPath, additionalStringLength);
+   shaderSrc = cce__readTextFile(geometryPath, additionalStringLength + 1);
    if (shaderSrc == NULL)
    {
       fprintf(stderr, "OPENGL::SHADER::GEOMETRY::FAILED_TO_LOAD:\n%s\n", fragmentPath);
@@ -121,7 +128,7 @@ GLuint cce__makeVGFshaderProgram (const char *vertexPath, const char *geometryPa
    additionalStringLength = 0;
    if (fragmentShaderAdditionalString != NULL)
       additionalStringLength = strlen(fragmentShaderAdditionalString);
-   shaderSrc = cce__readTextFile(fragmentPath, additionalStringLength);
+   shaderSrc = cce__readTextFile(fragmentPath, additionalStringLength + 1);
    if (shaderSrc == NULL)
    {
       fprintf(stderr, "OPENGL::SHADER::FRAGMENT::FAILED_TO_LOAD:\n%s\n", fragmentPath);
