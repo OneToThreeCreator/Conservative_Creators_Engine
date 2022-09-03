@@ -27,7 +27,6 @@
 #include "../../include/coffeechain/engine_common.h"
 #include "../../include/coffeechain/utils.h"
 #include "../../include/coffeechain/endianess.h"
-#include "../../include/coffeechain/os_interaction.h"
 #include "../../include/coffeechain/map2D/base_actions.h"
 #include "../../include/coffeechain/map2D/map2D.h"
 
@@ -39,36 +38,18 @@ void (**cce_endianSwapActions)(void*);
 static const struct Map2Darray *allMaps;
 static struct Map2D *currentMap;
 static struct DynamicMap2D *g_dynamicMap;
-static struct UsedUBO *g_UBOs;
-static const GLint *g_uniformsOffsets;
-static const GLint *g_uniformLocations;
-static const GLint *g_uniformBufferSize;
-static GLuint g_shaderProgram;
 cce_void *g_currentMapBuffer = NULL;
 cce_void *g_dynamicMapBuffer = NULL;
 static void (*g_setUniformBufferToDefault)(GLuint, GLint);
 static uint32_t actionsQuantity;
-static GLint uniformOffset;
 static cce_flag *map2Dflags;
 
 #define PI 3.14159265f
 
-static void moveAction (void *data)
+static void transformAction (void *data)
 {
-   struct moveActionStruct *params = (struct moveActionStruct*) data;
-   cceMoveGroupMap2D(params->groupID, params->coords.x, params->coords.y, params->action, params->mapType);
-}
-
-static void extendAction (void *data)
-{
-   struct extendActionStruct *params = (struct extendActionStruct*) data;
-   cceExtendGroupMap2D(params->groupID, params->change.x, params->change.y, params->action, params->mapType);
-}
-
-static void rotateAction (void *data)
-{
-   struct rotateActionStruct *params = (struct rotateActionStruct*) data;
-   cceRotateGroupMap2D(params->groupID, params->angle, params->offset.x, params->offset.y, params->action, params->mapType);
+   struct transformActionStruct *params = (struct transformActionStruct*) data;
+   cceMoveGroupMap2D(params->groupID, params->coords.x, params->coords.y, params->flags);
 }
 
 static void offsetTextureAction (void *data)

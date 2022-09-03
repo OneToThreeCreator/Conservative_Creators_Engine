@@ -25,19 +25,17 @@
 #include <string.h>
 #include <stdarg.h>
 
+
 #include "../../include/coffeechain/engine_common.h"
 #include "../../include/coffeechain/utils.h"
 #include "../../include/coffeechain/endianess.h"
 #include "../../include/coffeechain/os_interaction.h"
 
 #include "../engine_common_internal.h"
-#include "../shader.h"
 #include "../external/stb_image.h"
 #include "../../include/coffeechain/map2D/map2D.h"
 #include "map2D_internal.h"
 
-struct cce_i32vec2                           cce__globalOffset;
-static float                                 g_stepMultiplier;
 uint16_t                                     cce__loadedMap2Dnumber;
 static char                                 *cce__resourcePath;
 CCE_PUBLIC_OPTIONS const uint16_t     *const cceLoadedMap2Dnumber = &cce__loadedMap2Dnumber;
@@ -46,74 +44,17 @@ static uint8_t                               g_nearestMaps[16];
 static struct cce_u32vec2                    g_textureSize;
 CCE_PUBLIC_OPTIONS const struct cce_u32vec2 *cceTextureSize = &g_textureSize;
 CCE_ARRAY(g_textures, static struct LoadedTextures, static uint16_t);
-static GLint                                 g_uniformBufferSize;
-CCE_ARRAY(g_UBOs, static struct UsedUBO, static uint16_t);
-static GLuint                                g_cleanUBO;
-static uint16_t                              glTexturesArraySize;
-static GLuint                                glTexturesArray;
-static GLuint                                g_EBO;
-static uint32_t                              g_elementBufferSize = 0;
+
+static void (*drawMap2Dcommon) (struct Map2Darray*);
+static void (*processLogicMap2Dcommon) (struct Map2Darray*);
+static void (*drawMap2D) (struct Map2D*);
 
 static struct DynamicMap2D *g_dynamicMap;
-
-static void (*cce_setUniformBufferToDefault)(GLuint, GLint);
-static void (*drawMap2Ddependant)(struct Map2D*);
-static GLint *bufferUniformsOffsets;
-static GLint *uniformLocations;
-static GLuint shaderProgram;
 
 static char *texturesPath = NULL;
 static size_t texturesPathLength;
 
 static cce_flag map2Dflags;
-
-/* CBO - clear buffer object. Requires function glClearBufferSubData to present in openGL */
-static void setUniformBufferToDefault_withCBOext (GLuint UBO, GLint RotateAngleSinCosOffset)
-{
-   glBindBuffer(GL_UNIFORM_BUFFER, UBO);
-   GL_CHECK_ERRORS;
-   glClearBufferSubData(GL_UNIFORM_BUFFER, GL_R32F, 0u, g_uniformBufferSize, GL_RED, GL_FLOAT, NULL);
-   GL_CHECK_ERRORS;
-   struct cce_f32vec2 zeroOne = {0.0f, 1.0f};
-   glClearBufferSubData(GL_UNIFORM_BUFFER, GL_RG32F, RotateAngleSinCosOffset, 255 * sizeof(struct cce_f32vec2) , GL_RG, GL_FLOAT, &zeroOne);
-   GL_CHECK_ERRORS;
-}
-
-static void setUniformBufferToDefault_withoutCBOext (GLuint UBO, GLint RotateAngleSinCosOffset)
-{
-   glBindBuffer(GL_UNIFORM_BUFFER, UBO);
-   GL_CHECK_ERRORS;
-   void *uboData = glMapBuffer(GL_UNIFORM_BUFFER, GL_WRITE_ONLY);
-   GL_CHECK_ERRORS;
-   memset(uboData, 0, g_uniformBufferSize);
-   struct cce_f32vec2 *sinCos = (struct cce_f32vec2*) (((cce_void*) uboData) + RotateAngleSinCosOffset);
-   for (struct cce_f32vec2 *end = sinCos + 255; sinCos < end; ++sinCos)
-   {
-      sinCos->y = 1.0f;
-   }
-   glUnmapBuffer(GL_UNIFORM_BUFFER);
-   GL_CHECK_ERRORS;
-}
-
-static void drawMap2D (struct Map2D *map)
-{
-   glBindVertexArray(map->VAO);
-   GL_CHECK_ERRORS;
-   glBindBufferRange(GL_UNIFORM_BUFFER, 1u, (g_UBOs + map->UBO_ID)->UBO, 0u, g_uniformBufferSize);
-   GL_CHECK_ERRORS;
-   glDrawElements(GL_TRIANGLES, map->elementsQuantity * 6, GL_UNSIGNED_INT, (void*) 0);
-   GL_CHECK_ERRORS;
-}
-
-static void drawMap2DcleanUBO (struct Map2D *map)
-{
-   glBindVertexArray(map->VAO);
-   GL_CHECK_ERRORS;
-   glBindBufferRange(GL_UNIFORM_BUFFER, 1u, g_cleanUBO, 0u, g_uniformBufferSize);
-   GL_CHECK_ERRORS;
-   glDrawElements(GL_TRIANGLES, map->elementsQuantity * 6, GL_UNSIGNED_INT, (void*) 0);
-   GL_CHECK_ERRORS;
-}
 
 static void drawMap2Dmain (struct Map2Darray *maps)
 {
@@ -127,9 +68,9 @@ static void drawMap2Dnearest (struct Map2Darray *maps)
    {
       struct ExitMap2D *exitMap = maps->main->exitMaps + *iterator;
       glUniform2i(*(uniformLocations + 2), exitMap->xOffset, exitMap->yOffset);
-      drawMap2Ddependant(*(maps->dependies + *iterator));
+      drawMap2D(*(maps->dependies + *iterator));
    }
-   glUniform2i(*(uniformLocations + 2), 0, 0);
+   glUniform2i(uniformLocations[2], 0, 0);
 }
 
 static void drawMap2Dall (struct Map2Darray *maps)
@@ -139,7 +80,7 @@ static void drawMap2Dall (struct Map2Darray *maps)
    for (struct Map2D **iterator = maps->dependies, **end = maps->dependies + maps->main->exitMapsQuantity; iterator < end; ++iterator, ++exitMap)
    {
       glUniform2i(*(uniformLocations + 2), exitMap->xOffset, exitMap->yOffset);
-      drawMap2Ddependant(*iterator);
+      drawMap2D(*iterator);
    }
    glUniform2i(*(uniformLocations + 2), 0, 0);
 }
@@ -209,9 +150,6 @@ static void processLogicMap2Dall (struct Map2Darray *maps)
    cce__processLogicDynamicMap2D(g_dynamicMap, maps->main, cce__fourthLogicTypeFuncDynamicMap2Dall, maps);
 }
 
-static void (*drawMap2Dcommon) (struct Map2Darray*);
-static void (*processLogicMap2Dcommon) (struct Map2Darray*);
-
 #define CCE_RENDER_MAP_FLAGS (CCE_RENDER_ONLY_CURRENT_MAP | CCE_RENDER_VISIBLE_MAPS | CCE_RENDER_ALL_LOADED_MAPS)
 #define CCE_PROCESS_LOGIC_FLAGS (CCE_PROCESS_LOGIC_ONLY_FOR_CURRENT_MAP | CCE_DONT_PROCESS_LOGIC | \
 CCE_PROCESS_LOGIC_FOR_VISIBLE_MAPS | CCE_PROCESS_LOGIC_FOR_ALL_MAPS)
@@ -273,46 +211,7 @@ static void cceSetFlags2D (cce_flag flags)
          flags |= CCE_PROCESS_LOGIC_ONLY_FOR_CURRENT_MAP;
       }
    }
-   if ((((flags & CCE_PROCESS_LOGIC_FLAGS) == CCE_PROCESS_LOGIC_ONLY_FOR_CURRENT_MAP) ||
-        ((flags & CCE_PROCESS_LOGIC_FLAGS) == CCE_DONT_PROCESS_LOGIC)) &&
-        ((flags & CCE_FORCE_INITIALIZE_MAP_ONLOAD) == 0))
-   {
-      glGenBuffers(1, &g_cleanUBO);
-      glBindBuffer(GL_UNIFORM_BUFFER, g_cleanUBO);
-      GL_CHECK_ERRORS;
-      glBufferData(GL_UNIFORM_BUFFER, g_uniformBufferSize, NULL, GL_DYNAMIC_DRAW);
-      GL_CHECK_ERRORS;
-      cce_setUniformBufferToDefault(g_cleanUBO, *(bufferUniformsOffsets + CCE_ROTATEANGLESINCOS_OFFSET));
-      drawMap2Ddependant = drawMap2DcleanUBO;
-   }
-   else
-   {
-      drawMap2Ddependant = drawMap2D;
-   }
    map2Dflags |= flags;
-}
-
-static GLuint createTextureArray (uint16_t newSize)
-{
-   GLuint texture;
-   glGenTextures(1, &texture);
-   glBindTexture(GL_TEXTURE_2D_ARRAY, texture);
-   glTexImage3D(GL_TEXTURE_2D_ARRAY, 0, GL_RGBA8, g_textureSize.x, g_textureSize.y, newSize, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
-   GL_CHECK_ERRORS;   
-   
-   glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_REPEAT);
-   glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T, GL_REPEAT);
-   glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-   glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-   
-   return texture;
-}
-
-CCE_PUBLIC_OPTIONS void cceSetGridMultiplierMap2D (float multiplier)
-{
-   struct cce_u32vec2 aspectRatio = cce__getCurrentStep();
-   glUniform2f(*uniformLocations, 1.0f / (aspectRatio.x * multiplier), 1.0f / (aspectRatio.y * multiplier));
-   g_stepMultiplier = multiplier;
 }
 
 CCE_PUBLIC_OPTIONS int cceInitEngine2D (uint16_t globalBoolsQuantity, uint32_t textureMaxWidth, uint32_t textureMaxHeight,
@@ -331,7 +230,6 @@ CCE_PUBLIC_OPTIONS int cceInitEngine2D (uint16_t globalBoolsQuantity, uint32_t t
    size_t pathLength = strlen(resourcePath) + 1u;
    cce__resourcePath = malloc((pathLength + 11u) * sizeof(char));
    memcpy(cce__resourcePath, resourcePath, pathLength);
-   *(cce__resourcePath + pathLength) = '\0';
    
    map2Dflags = CCE_INIT;
    if (cce__initEngine(windowLabel, globalBoolsQuantity) != 0)
@@ -340,103 +238,8 @@ CCE_PUBLIC_OPTIONS int cceInitEngine2D (uint16_t globalBoolsQuantity, uint32_t t
       return -1;
    }
    
-   {
-      #ifdef SYSTEM_RESOURCE_PATH
-      shaderProgram = cce__makeVFshaderProgram(SYSTEM_RESOURCE_PATH "shaders/vertex_shader.glsl", SYSTEM_RESOURCE_PATH "shaders/fragment_shader.glsl", NULL, NULL);
-      if (shaderProgram == 0u)
-      #endif // SYSTEM_RESOURCE_PATH
-      {
-         cceAppendPath(cce__resourcePath, pathLength + 11u, "shaders");
-         char *vertexPath   = cceCreateNewPathFromOldPath(cce__resourcePath, "vertex_shader.glsl",   0u);
-         char *fragmentPath = cceCreateNewPathFromOldPath(cce__resourcePath, "fragment_shader.glsl", 0u);
-         shaderProgram = cce__makeVFshaderProgram(vertexPath, fragmentPath, NULL, NULL);
-         free(vertexPath);
-         free(fragmentPath);
-         *(cce__resourcePath + pathLength) = '\0';
-      }
-   }
-   if (!shaderProgram)
-   {
-      fputs("ENGINE::INIT::SHADERS_CANNOT_BE_LOADED", stderr);
-      cce__terminateEngine();
-      free(cce__resourcePath);
-      return -1;
-   }
-   
-   uniformLocations = malloc(3 * sizeof(GLint));
-   *uniformLocations = glGetUniformLocation(shaderProgram, "InverseStep");
-   GL_CHECK_ERRORS;
-   *(uniformLocations + 1) = glGetUniformLocation(shaderProgram, "GlobalMoveCoords");
-   GL_CHECK_ERRORS;
-   *(uniformLocations + 2) = glGetUniformLocation(shaderProgram, "MapOffset");
-   GL_CHECK_ERRORS;
-   {
-      const GLchar *uniformNames[] = {"Colors", "MoveCoords", "Extension", "TextureOffset", "RotationOffset", "RotateAngleSinCos"};
-      GLuint indices[6];
-      glGetUniformIndices(shaderProgram, 6, uniformNames, indices);
-      GL_CHECK_ERRORS;
-      bufferUniformsOffsets = (GLint*) malloc(6 * sizeof(GLint));
-      glGetActiveUniformsiv(shaderProgram, 6, indices, GL_UNIFORM_OFFSET, bufferUniformsOffsets);
-      GL_CHECK_ERRORS;
-      glUniformBlockBinding(shaderProgram, glGetUniformBlockIndex(shaderProgram, "Variables"), 1u);
-      GL_CHECK_ERRORS;
-   }
-   CCE_ALLOC_ARRAY(g_UBOs);
-   {
-      GLint maxUniformOffset = 0;
-      uint8_t i = 0, maxI;
-      for (GLint *iterator = bufferUniformsOffsets, *end = bufferUniformsOffsets + 6; iterator < end; ++iterator, ++i)
-      {
-         if (maxUniformOffset < (*iterator))
-         {
-            maxUniformOffset = (*iterator);
-            maxI = i;
-         }
-      }
-      switch (maxI)
-      {
-         case 0:
-         {
-            g_uniformBufferSize = maxUniformOffset + (4/*GLint and GLfloat*/ * 4/*vec4*/ * 255/*array*/);
-            break;
-         }
-         case 1:
-         case 2:
-         case 3:
-         case 4:
-         case 5:
-         {
-            g_uniformBufferSize = maxUniformOffset + (4/*GLint and GLfloat*/ * 2/*vec2*/ * 255/*array*/);
-            break;
-         }
-      }
-   }
-   if (GLAD_GL_ARB_clear_buffer_object)
-   {
-      cce_setUniformBufferToDefault = setUniformBufferToDefault_withCBOext;
-   }
-   else
-   {
-      cce_setUniformBufferToDefault = setUniformBufferToDefault_withoutCBOext;
-   }
-   
-   for (struct UsedUBO *iterator = g_UBOs, *end = g_UBOs + g_UBOsQuantityAllocated; iterator < end; ++iterator)
-   {
-      glGenBuffers(1u, &(iterator->UBO));
-      GL_CHECK_ERRORS;
-      glBindBuffer(GL_UNIFORM_BUFFER, iterator->UBO);
-      GL_CHECK_ERRORS;
-      glBufferData(GL_UNIFORM_BUFFER, (g_uniformBufferSize), NULL, GL_DYNAMIC_DRAW);
-      GL_CHECK_ERRORS;
-      iterator->flags = 0u;
-      cce_setUniformBufferToDefault(iterator->UBO, *(bufferUniformsOffsets + CCE_ROTATEANGLESINCOS_OFFSET));
-      iterator->moveGroupValues = NULL;
-      iterator->extensionGroupValues = NULL;
-   }
-   glEnable(GL_BLEND);
-   glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-   glGenBuffers(1, &g_EBO);
-   cce__initMap2DLoaders(&g_EBO, &map2Dflags);
+      
+   cce__initMap2DLoaders(&map2Dflags);
    cceAppendPath(cce__resourcePath, pathLength + 11, "maps");
    cceSetMap2Dpath(cce__resourcePath);
    *(cce__resourcePath + pathLength) = '\0';
@@ -447,7 +250,6 @@ CCE_PUBLIC_OPTIONS int cceInitEngine2D (uint16_t globalBoolsQuantity, uint32_t t
    CCE_ALLOC_ARRAY_ZEROED(g_textures);
    glTexturesArray = createTextureArray(CCE_ALLOCATION_STEP);
    glTexturesArraySize = CCE_ALLOCATION_STEP;
-   g_elementBufferSize = 0;
    stbi_set_flip_vertically_on_load(1);
    cceAppendPath(cce__resourcePath, pathLength + 11, "textures");
    cceSetTexturesPath(resourcePath);
@@ -473,9 +275,10 @@ CCE_PUBLIC_OPTIONS void cceSetTexturesPath (const char *path)
    texturesPathLength = strlen(texturesPath);
 }
 
+/*
 void cce__setAttribPointerVAO (void)
 {
-   /* Pointers */
+   / Pointers /
    glVertexAttribIPointer(0, 2, GL_INT,             sizeof(struct Map2DElementVertices), (void*)(offsetof(struct Map2DElementVertices, vertexCoords)));
    GL_CHECK_ERRORS;
    glVertexAttribIPointer(1, 2, GL_INT,             sizeof(struct Map2DElementVertices), (void*)(offsetof(struct Map2DElementVertices, position)));
@@ -497,47 +300,18 @@ void cce__setAttribPointerVAO (void)
    glVertexAttribIPointer(9, 4, GL_UNSIGNED_BYTE,   sizeof(struct Map2DElementVertices), (void*)(offsetof(struct Map2DElementVertices, colorIDs)));
    GL_CHECK_ERRORS;
    
-   /* I'm lazy */
+   / I'm lazy /
    for (uint8_t i = 0u; i < 10; ++i)
    {
       glEnableVertexAttribArray(i);
       GL_CHECK_ERRORS;
    }
 }
+*/
 
-void cce__extendElementBufferIfNecessary (uint32_t minimalSize)
-{
-   if (g_elementBufferSize >= minimalSize)
-      return;
+// #define GET_SIGN_FROM_BIT(n, bit)(1-((((n)&(1<<(bit)))>>(bit))*2))
 
-   g_elementBufferSize = (minimalSize & ~(CCE_ALLOCATION_STEP - 1u)) + CCE_ALLOCATION_STEP;
-   glBindBuffer(GL_COPY_WRITE_BUFFER, g_EBO);
-   GL_CHECK_ERRORS;
-   glBufferData(GL_COPY_WRITE_BUFFER, g_elementBufferSize * 6 * sizeof(uint32_t), NULL, GL_STATIC_DRAW); // There are 6 indexes per one rectangle
-   GL_CHECK_ERRORS;
-   
-   uint32_t values[6] = {0, 1, 2, 1, 3, 2};
-   uint32_t *buffer = glMapBuffer(GL_COPY_WRITE_BUFFER, GL_WRITE_ONLY);
-   GL_CHECK_ERRORS;
-   memcpy(buffer, values, 6 * sizeof(uint32_t));
-   uint32_t *bufferend = buffer + (g_elementBufferSize * 6);
-   buffer += 6;
-   while (buffer < bufferend)
-   {
-      for (uint32_t *iterator = values, *end = values + 6; iterator < end; ++iterator)
-      {
-         *iterator += 4; // One rectangle has 4 vertices
-      }
-      memcpy(buffer, values, 6 * sizeof(uint32_t));
-      buffer += 6;
-   }
-   glUnmapBuffer(GL_COPY_WRITE_BUFFER);
-   GL_CHECK_ERRORS;
-}
-
-#define GET_SIGN_FROM_BIT(n, bit)(1-((((n)&(1<<(bit)))>>(bit))*2))
-
-void cce__elementToMap2DElementVertices (struct Map2DElementVertices *buffer, int32_t x, int32_t y, uint16_t width, uint16_t height,
+/*void cce__elementToMap2DElementVertices (struct Map2DElementVertices *buffer, int32_t x, int32_t y, uint16_t width, uint16_t height,
                                          uint8_t *moveGroups, uint8_t moveGroupsQuantity, uint8_t *extensionGroups, uint8_t extensionGroupsQuantity,
                                          uint8_t globalOffset, uint8_t rotationGroup, struct Texture *textureInfo, uint16_t textureID,
                                          uint8_t *textureOffsetGroups, uint8_t textureOffsetGroupsQuantity, uint8_t *colorGroups, uint8_t colorGroupsQuantity)
@@ -561,18 +335,19 @@ void cce__elementToMap2DElementVertices (struct Map2DElementVertices *buffer, in
       buffer->position.y      = y;
       buffer->transformGroups.rotateGroupID  = rotationGroup;
       buffer->transformGroups.isGlobalOffset = globalOffset;
-      memcpy(buffer->moveIDs, moveGroups, MIN(moveGroupsQuantity, 4));
-      memset(buffer->moveIDs + moveGroupsQuantity, 0, 4 - MIN(moveGroupsQuantity, 4));
-      memcpy(buffer->extendIDs, extensionGroups, MIN(extensionGroupsQuantity, 4));
-      memset(buffer->extendIDs + extensionGroupsQuantity, 0, 4 - MIN(extensionGroupsQuantity, 4));
+      memcpy(buffer->moveIDs, moveGroups, CCE_MIN(moveGroupsQuantity, 4));
+      memset(buffer->moveIDs + moveGroupsQuantity, 0, 4 - CCE_MIN(moveGroupsQuantity, 4));
+      memcpy(buffer->extendIDs, extensionGroups, CCE_MIN(extensionGroupsQuantity, 4));
+      memset(buffer->extendIDs + extensionGroupsQuantity, 0, 4 - CCE_MIN(extensionGroupsQuantity, 4));
       buffer->textureFragmentSize = textureFragmentSize;
       buffer->textureID           = textureID;
-      memcpy(buffer->textureOffsetIDs, textureOffsetGroups, MIN(textureOffsetGroupsQuantity, 4));
-      memset(buffer->textureOffsetIDs + textureOffsetGroupsQuantity, 0, 4 - MIN(textureOffsetGroupsQuantity, 4));
-      memcpy(buffer->colorIDs, colorGroups, MIN(colorGroupsQuantity, 4));
-      memset(buffer->colorIDs + colorGroupsQuantity, 0, 4 - MIN(colorGroupsQuantity, 4));
+      memcpy(buffer->textureOffsetIDs, textureOffsetGroups, CCE_MIN(textureOffsetGroupsQuantity, 4));
+      memset(buffer->textureOffsetIDs + textureOffsetGroupsQuantity, 0, 4 - CCE_MIN(textureOffsetGroupsQuantity, 4));
+      memcpy(buffer->colorIDs, colorGroups, CCE_MIN(colorGroupsQuantity, 4));
+      memset(buffer->colorIDs + colorGroupsQuantity, 0, 4 - CCE_MIN(colorGroupsQuantity, 4));
    }
 }
+*/
 
 static int loadTexture (char *path, uint16_t position)
 {
@@ -673,123 +448,9 @@ void cce__updateTexturesArray (void)
    return;
 }
 
-static void updateUBOarray (void)
-{
-   uint16_t freeUBOsQuantityFromEnd = 0;
-   struct UsedUBO *end = g_UBOs + g_UBOsQuantity;
-   for (struct UsedUBO *iterator = g_UBOs; iterator < end; ++iterator)
-   {
-      if ((iterator->flags & 0x3) == 0x3)
-      {
-         iterator->flags &= 0x1;
-         cce_setUniformBufferToDefault(iterator->UBO, *(bufferUniformsOffsets + CCE_ROTATEANGLESINCOS_OFFSET));
-      }
-      if (iterator->flags & 0x1)
-         freeUBOsQuantityFromEnd = 0;
-      else
-         ++freeUBOsQuantityFromEnd;
-   }
-   g_UBOsQuantity -= freeUBOsQuantityFromEnd;
-   uint16_t size = CCE_CEIL_SIZE_TO_ALLOCATION_STEP(g_UBOsQuantity);
-   if (size < g_UBOsQuantityAllocated)
-   {
-      for (struct UsedUBO *iterator = end - freeUBOsQuantityFromEnd; iterator < end; ++iterator)
-      {
-         glDeleteBuffers(1, &(iterator->UBO));
-         free(iterator->moveGroupValues);
-         free(iterator->extensionGroupValues);
-      }
-      g_UBOs = realloc(g_UBOs, size);
-      g_UBOsQuantityAllocated = size;
-   }
-}
-
-uint16_t cce__getFreeUBO (void)
-{
-   map2Dflags |= CCE_PROCESS_UBO_ARRAY;
-   for (struct UsedUBO *iterator = g_UBOs, *end = g_UBOs + g_UBOsQuantity; iterator < end; ++iterator)
-   {
-      if (iterator->flags & 0x1)
-         continue;
-      iterator->flags |= 0x1;
-      return (uint16_t) (iterator - g_UBOs);
-   }
-   if (g_UBOsQuantity >= g_UBOsQuantityAllocated)
-   {
-      g_UBOsQuantityAllocated += CCE_ALLOCATION_STEP;
-      g_UBOs = realloc(g_UBOs, g_UBOsQuantityAllocated * sizeof(struct UsedUBO));
-      for (struct UsedUBO *iterator = g_UBOs + g_UBOsQuantityAllocated - CCE_ALLOCATION_STEP, *end = g_UBOs + g_UBOsQuantityAllocated; iterator < end; ++iterator)
-      {
-         glGenBuffers(1u, &(iterator->UBO));
-         GL_CHECK_ERRORS;
-         glBindBuffer(GL_UNIFORM_BUFFER, iterator->UBO);
-         GL_CHECK_ERRORS;
-         glBufferData(GL_UNIFORM_BUFFER, (g_uniformBufferSize), NULL, GL_DYNAMIC_DRAW);
-         GL_CHECK_ERRORS;
-         iterator->flags = 0u;
-         cce_setUniformBufferToDefault(iterator->UBO, *(bufferUniformsOffsets + CCE_ROTATEANGLESINCOS_OFFSET));
-         iterator->moveGroupValues=NULL;
-         iterator->extensionGroupValues = NULL;
-      }
-   }
-   struct UsedUBO *ubo = g_UBOs + g_UBOsQuantity;
-   ubo->flags |= 0x1;
-   return g_UBOsQuantity++;
-}
-
-void cce__releaseUBO (uint16_t ID)
-{
-   (g_UBOs + ID)->flags = 0x2;
-   return;
-}
-
-void cce__releaseUnusedUBO (uint16_t ID)
-{
-   (g_UBOs + ID)->flags = 0x0;
-   return;
-}
-
-void cce__allocateUBObuffers (uint16_t uboID, uint16_t moveGroupsQuantity, uint16_t extensionGroupsQuantity)
-{
-   if (uboID > g_UBOsQuantity)
-   {
-      return;
-   }
-   struct UsedUBO *ubo = (g_UBOs + uboID);
-   if (moveGroupsQuantity > 0)
-   {
-      ubo->moveGroupValues      = realloc(ubo->moveGroupValues, moveGroupsQuantity           * sizeof(struct cce_i32vec2));
-      memset(ubo->moveGroupValues, 0, moveGroupsQuantity      * sizeof(struct cce_i32vec2));
-   }
-   else
-   {
-      free(ubo->moveGroupValues);
-      ubo->moveGroupValues = NULL;
-   }
-   ubo->moveGroupValuesQuantity = moveGroupsQuantity;
-   if (extensionGroupsQuantity > 0)
-   {
-      ubo->extensionGroupValues = realloc(ubo->extensionGroupValues, extensionGroupsQuantity * sizeof(struct cce_i16vec2));
-      memset(ubo->extensionGroupValues, 0, extensionGroupsQuantity * sizeof(struct cce_i16vec2));
-   }
-   else
-   {
-      free(ubo->extensionGroupValues);
-      ubo->extensionGroupValues = NULL;
-   }
-   ubo->extensionGroupValuesQuantity = extensionGroupsQuantity;
-
-   if (ubo->flags & 0x2)
-   {
-      cce_setUniformBufferToDefault(ubo->UBO, *(bufferUniformsOffsets + CCE_ROTATEANGLESINCOS_OFFSET));
-      ubo->flags &= 0x1;
-   }
-}
-
 // Gets called before processing of map logic begins
 void cce__initLogicMap2D (struct Map2D *map)
 {
-   map->UBO_ID = cce__getFreeUBO();
    map->temporaryBools = cce__getFreeTemporaryBools();
    cce__allocateUBObuffers(map->UBO_ID, map->moveGroupsQuantity, map->extensionGroupsQuantity);
 
@@ -1282,8 +943,8 @@ static void cce__loadMapsAndSetState (struct Map2Darray *maps)
    while (i < g_dynamicMap->elementsQuantity)
    {
       uint8_t flags = cce__getDynamicElementFlags(i);
-      (g_dynamicMap->elements + i)->x -= offset.x;
-      (g_dynamicMap->elements + i)->y -= offset.y;
+      (g_dynamicMap->elements + i)->position.x -= offset.x;
+      (g_dynamicMap->elements + i)->position.y -= offset.y;
       if ((flags & 0x10) > 0)
          (g_dynamicMap->elements + i)->flags |= 0x4;
             
@@ -1309,6 +970,7 @@ void cce__terminateEngine2D (void)
    free(uniformLocations);
    free(texturesPath);
    glDeleteProgram(shaderProgram);
+   free(cce__elementConversionBuffer);
    cce__terminateEngine();
 }
 

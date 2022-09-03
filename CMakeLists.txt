@@ -20,7 +20,7 @@
 
 cmake_minimum_required(VERSION 3.0)
 
-project(CoffeeChain VERSION 0.5.1 DESCRIPTION "open 2D engine for creating games - shared library" LANGUAGES C)
+project(CoffeeChain VERSION 0.6.0 DESCRIPTION "open 2D engine for creating games - shared library" LANGUAGES C)
 
 if (NOT DEFINED CoffeeChain_BUILD_TESTING)
    option(CoffeeChain_BUILD_TESTING "Build CoffeeChain test program" ON)
@@ -62,19 +62,16 @@ add_library(coffeechain ${CoffeeChain_LIB_TYPE}
    src/platform/platforms.h
    src/platform/endianess.c
    include/coffeechain/endianess.h
-   src/maps/base_actions.c
+   src/map2D/base_actions.c
    include/coffeechain/map2D/base_actions.h
-   src/maps/dynamic_map2D.c
-   src/maps/map2D.c
+   src/map2D/dynamic_map2D.c
+   src/map2D/map2D.c
    include/coffeechain/map2D/map2D.h
-   src/maps/map2D_internal.h
-   src/maps/map2D_file_IO.c
-   src/maps/log.c
-   src/maps/log.h
+   src/map2D/map2D_internal.h
+   src/map2D/map2D_file_IO.c
+   src/map2D/log.c
+   src/map2D/log.h
    src/plugins/text_rendering.c
-   src/external/glad.c
-   src/external/glad.h
-   src/external/khrplatform.h
    src/external/stb_libs.c
    src/external/stb_image.h
    #src/external/stb_vorbis.h
@@ -122,7 +119,11 @@ if (NOT ListLib_FOUND)
    add_subdirectory(external/listlib)
    target_include_directories(coffeechain PRIVATE external/listlib/include)
 endif()
-target_link_libraries(coffeechain PRIVATE list ${INIH_LIBRARIES} glfw)
+
+add_subdirectory(external/glad2/cmake)
+glad_add_library(glad STATIC API gl:core=3.2 EXTENSIONS NONE)
+
+target_link_libraries(coffeechain PRIVATE list ${INIH_LIBRARIES} glfw glad)
 
 if(CMAKE_BUILD_TYPE MATCHES "Debug" OR CMAKE_BUILD_TYPE MATCHES "DEBUG" OR CMAKE_BUILD_TYPE MATCHES "debug")
    if(NOT MSVC)
