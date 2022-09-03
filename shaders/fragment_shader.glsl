@@ -18,7 +18,8 @@
     USA
 */
 
-#version 330 core
+#version 140 core
+
 out vec4 FragColor;
 
 in vec4     Color;
@@ -31,5 +32,5 @@ const vec4 white = vec4(1.0f, 1.0f, 1.0f, 1.0f);
 void main()
 {
    int isTexture = min(TextureID, 1);
-   FragColor = mix(white, texture(Textures, vec3(TextureCoord.xy, TextureID - isTexture)), isTexture) * mix(white, vec4(Color.xyz, 1.0f), Color.w);
+   FragColor = mix(white, texture(Textures, vec3(TextureCoord.xy, TextureID - isTexture)), isTexture) * Color;
 }

@@ -18,31 +18,26 @@
     USA
 */
 
-#version 330 core
-layout (location = 0) in ivec2 aCoords;
-layout (location = 1) in ivec2 aPosition;
-layout (location = 2) in vec2  aTexturePieceCoords;
-layout (location = 3) in ivec4 aMoveIDs;
-layout (location = 4) in ivec4 aExtendIDs;
-layout (location = 5) in ivec2 aTransform; // r - rotateID, g - isGlobalOffset
-layout (location = 6) in vec2  aTextureFragmentSize;
-layout (location = 7) in int   aTextureID;
-layout (location = 8) in ivec4 aTextureOffsetIDs;
-layout (location = 9) in ivec4 aColorIDs;
+#version 140 core
 
-layout (packed) uniform Variables
+#define USHORT_MAX 0xffff
+#define UCHAR_MAX 0xff
+
+layout (location = 0) in vec2 aCoords;
+
+in int gl_InstanceID;
+
+uniform usamplerBuffer ElementData;
+
+layout (shared) uniform Variables
 {
-   ivec2 MoveCoords     [255];
-   ivec2 Extension      [255];
-   vec4  Colors         [255];
-   ivec2 TextureOffset  [255];
-   ivec2 RotationOffset [255];
-   vec2  RotateAngleSinCos [255]; // x - sin, y - cos
+   layout(row_major) mat2x3 Transform     [257]; // Don't use vec3 in uniform blocks
+   ivec2                    Offset        [256]; // Avoid rotation of offsets
+   vec4                     Colors        [256];
+   ivec2                    TextureOffset [256];
 };
 
-uniform vec2  InverseStep = vec2(0.125f, 0.125f);
-uniform ivec2 GlobalMoveCoords = ivec2(0, 0);
-uniform ivec2 MapOffset = ivec2(0, 0);
+uniform mat3 ViewMatrix = mat3(vec3(0.125f, 0, 0), vec3(0, 0.125f, 0), vec3(0, 0, 1));
 
 out vec2 TextureCoord;
 flat out int TextureID;
@@ -50,62 +45,61 @@ out vec4 Color;
 
 void main()
 {
-   TextureID = aTextureID;
+   ivec2 pos;
+   uvec2 size;
+   uvec2 texCoords;
+   uvec4 transformIDs;
+   uvec2 texOffsetIDs;
+   uvec2 texSize;
+   uvec2 colorIDs;
+   uint  flags;
    {
-      ivec4 isTextureOffset = min(aTextureOffsetIDs, 1);
-      ivec4 textureOffsetIDs = aTextureOffsetIDs - isTextureOffset;
-      mat4x2 textureOffsets;
-      textureOffsets[0] = TextureOffset[textureOffsetIDs.x];
-      textureOffsets[1] = TextureOffset[textureOffsetIDs.y];
-      textureOffsets[2] = TextureOffset[textureOffsetIDs.z];
-      textureOffsets[3] = TextureOffset[textureOffsetIDs.w];
-      TextureCoord = aTexturePieceCoords + ((textureOffsets * isTextureOffset) * aTextureFragmentSize);
+      uint samplerPos = gl_InstanceID * 2;
+      uvec4 data = texelFetch(ElementData, samplerPos);
+      pos = ivec2(data.xy);
+      mat2x4 intFromShort;
+      intFromShort[0] = uvec2(data.zw, data.zw >> 8);
+      intFromShort[1] = intFromShort[0] >> 16;
+      intFromShort[0] = intFromShort[0] & UCHAR_MAX;
+      intFromShort[1] = intFromShort[1] & UCHAR_MAX;
+      transformIDs = uvec4(intFromShort[0].xz, intFromShort[1].xz);
+      texOffsetIDs = intFromShort[0].yw;
+      colorIDs = intFromShort[1].yw;
+      
+      data = texelFetch(ElementData, samplerPos + 1);
+      intFromShort[0] = data.xyzw & USHORT_MAX;
+      intFromShort[1] = data.xyzw >> 16;
+      size = uvec2(intFromShort[0].x, intFromShort[1].x);
+      texCoords = uvec2(intFromShort[0].y, intFromShort[1].y);
+      texSize = uvec2(intFromShort[0].z, intFromShort[1].z);
+      TextureID = intFromShort[0].w;
+      flags = intFromShort[1].w & UCHAR_MAX
    }
+   vec3 coords = vec3(aCoords * size, 1);
+   mat3 transform;
+   transform[0] = vec3(1, 0, 0);
+   transform[1] = vec3(0, 1, 0);
+   transform[2] = vec3(0, 0, 1);
+   for (uint i = 0; i < 4; ++i)
    {
-      ivec4 isColor = min(aColorIDs, 1);
-      ivec4 colorIDs = aColorIDs - isColor;
-      mat4 colors;
-      colors[0] = Colors[colorIDs.x];
-      colors[1] = Colors[colorIDs.y];
-      colors[2] = Colors[colorIDs.z];
-      colors[3] = Colors[colorIDs.w];
-      Color = colors * isColor;
+      mat3 tmp;
+      tmp[0] = Transform[transformIDs[i]][0];
+      tmp[1] = Transform[transformIDs[i]][1];
+      tmp[2] = vec3(0, 0, 1);
+      transform *= tmp;
+      pos += Offset[i]
    }
-   vec2 offset;
-   {
-      ivec4  isMoveGroup = min(aMoveIDs, 1);
-      ivec4  moveIDs = aMoveIDs - isMoveGroup;
-      mat4x2 moveOffsets;
-      moveOffsets[0] = MoveCoords[moveIDs.x];
-      moveOffsets[1] = MoveCoords[moveIDs.y];
-      moveOffsets[2] = MoveCoords[moveIDs.z];
-      moveOffsets[3] = MoveCoords[moveIDs.w];
-
-      offset = moveOffsets * isMoveGroup + GlobalMoveCoords * aTransform.g + MapOffset;
-   }
-   vec2 extension;
-   {
-      ivec4 isExtensionGroup = min(aExtendIDs, 1);
-      ivec4 extendIDs = aExtendIDs - isExtensionGroup;
-      mat4x2 extensions;
-      extensions[0] = Extension[extendIDs.x];
-      extensions[1] = Extension[extendIDs.y];
-      extensions[2] = Extension[extendIDs.z];
-      extensions[3] = Extension[extendIDs.w];
-      extension = extensions * isExtensionGroup * sign(aCoords) * 0.5f;
-   }
-   {
-       int  isRotate = min(aTransform.r, 1);
-       mat2 rotate;
-       rotate[0].yx = RotateAngleSinCos[aTransform.r - isRotate] * isRotate;
-       rotate[0].x += (1 - isRotate);
-       rotate[1] = rotate[0].yx;
-       rotate[1].x *= -1;
-       vec2  rotationOffset = (RotationOffset[aTransform.r - isRotate].xy * isRotate) * 0.5f * InverseStep;
-       vec2 coords = aCoords * 0.5f * InverseStep + rotationOffset;
-       //coords = vec2(coords.x * RotateAngleCos - coords.y * RotateAngleSin, coords.y * RotateAngleCos + coords.x * RotateAngleSin) - rotationOffset;
-       vec2 position = (aPosition + offset + extension + abs(aCoords) * 0.5f) * InverseStep;
-       gl_Position = vec4(coords * rotate + position - rotationOffset, 0.0f, 1.0f);
-   }
+   transform *= (Transform[min(flags & CCE_GLOBAL_OFFSET_MASK, 1) * 256]) // Global transform (applied last, separation with translation is not needed)
+   coords = coords * transform;
+   coords.xy += pos;
+   coords *= ViewMatrix;
+   gl_Position = vec4(coords.xy, 0, 1);
+   
+   vec3 color = vec3(1.0f, 1.0f, 1.0f);
+   color = mix(color, Colors[colorIDs.x].xyz, Colors[colorIDs.x].w);
+   color = mix(color, Colors[colorIDs.y].xyz, Colors[colorIDs.y].w);
+   Color = vec4(color, 1.0f);
+   
+   vec3 textureCoords = min(aCoords, 0.0) + texSize * inverseTextureSize
+   TextureCoord = textureCoords + (TextureOffset[texOffsetIDs.x] * texSize + TextureOffset[texOffsetIDs.y] * texSize + texCoords) * inverseTextureSize
 }
-
