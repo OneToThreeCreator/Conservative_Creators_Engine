@@ -1,6 +1,6 @@
 /*
-    CoffeeChain - open source engine for making games.
-    Copyright (C) 2020-2022 Andrey Givoronsky
+    Conservative Creator's Engine - open source engine for making games.
+    Copyright (C) 2020-2022 Andrey Gaivoronskiy
 
     This library is free software; you can redistribute it and/or
     modify it under the terms of the GNU Lesser General Public
@@ -18,8 +18,8 @@
     USA
 */
 
-#ifndef PATH_GETTERS_H
-#define PATH_GETTERS_H
+#ifndef OS_INTERACTION_H
+#define OS_INTERACTION_H
 
 #ifdef __cplusplus
 extern "C"
@@ -28,28 +28,24 @@ extern "C"
 
 #include <stddef.h>
 #include <stdint.h>
+#include <stdio.h>
 
-#if defined(_WIN32) || defined(__WIN32__) || defined(_WIN64) || defined(__TOS_WIN__) || defined(__WINDOWS__) || \
-    defined(__MINGW32__) || defined(__MINGW64__) || defined(__CYGWIN__)
 #include "cce_exports.h"
 #define CCE_PUBLIC_OPTIONS CCE_EXPORTS
-#else
-#define CCE_PUBLIC_OPTIONS
-#endif // Windows
 
-CCE_PUBLIC_OPTIONS char* cceCreateNewPathFromOldPath (const char *const oldPath, const char *const appendPath, size_t freeSpaceToLeave);
+CCE_PUBLIC_OPTIONS char* cceCreateNewPathFromOldPath (const char *oldPath, const char *appendPath, size_t freeSpaceToLeave);
+CCE_PUBLIC_OPTIONS void  cceTruncateFile (FILE *file, size_t size);
 CCE_PUBLIC_OPTIONS char* cceGetDirectory (char *path, size_t bufferSize);
 CCE_PUBLIC_OPTIONS char* cceGetCurrentPath (size_t spaceToLeave);
 CCE_PUBLIC_OPTIONS void  cceDeleteDirectory (const char *path);
-CCE_PUBLIC_OPTIONS char* cceGetAppDataPath (const char *restrict folderName, size_t spaceToLeave);
-CCE_PUBLIC_OPTIONS char* cceAppendPath (char *const buffer, size_t bufferSize, const char *const append);
+CCE_PUBLIC_OPTIONS char* cceGetAppDataPath (const char *folderName, size_t spaceToLeave);
+CCE_PUBLIC_OPTIONS char* cceAppendPath (char *buffer, size_t bufferSize, const char *append);
 CCE_PUBLIC_OPTIONS char* cceGetTemporaryDirectory (size_t spaceToLeave);
 CCE_PUBLIC_OPTIONS void  cceTerminateTemporaryDirectory (void);
-CCE_PUBLIC_OPTIONS char* cceConvertIntToBase64String (size_t number, char *restrict buffer, uint8_t symbolsQuantity);
-
+CCE_PUBLIC_OPTIONS char* cceConvertIntToBase64String (size_t number, char *buffer, uint8_t symbolsQuantity);
 
 #ifdef __cplusplus
 }
 #endif // __cplusplus
 
-#endif //PATH_GETTERS_H
+#endif //OS_INTERACTION_H

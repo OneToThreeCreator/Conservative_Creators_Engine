@@ -1,6 +1,6 @@
 /*
-    CoffeeChain - open source engine for making games.
-    Copyright (C) 2020-2021 Andrey Givoronsky
+    Conservative Creator's Engine - open source engine for making games.
+    Copyright (C) 2020-2022 Andrey Gaivoronskiy
 
     This library is free software; you can redistribute it and/or
     modify it under the terms of the GNU Lesser General Public
@@ -18,26 +18,24 @@
     USA
 */
 
-#version 140 core
+#version 150 core
 
-#define USHORT_MAX 0xffff
-#define UCHAR_MAX 0xff
+#define UCHAR_MAX 0xFFu
 
-layout (location = 0) in vec2 aCoords;
+in vec2 aCoords;
 
-in int gl_InstanceID;
-
+uniform isamplerBuffer ElementInfo;
 uniform usamplerBuffer ElementData;
 
 layout (shared) uniform Variables
 {
    layout(row_major) mat2x3 Transform     [257]; // Don't use vec3 in uniform blocks
    ivec2                    Offset        [256]; // Avoid rotation of offsets
-   vec4                     Colors        [256];
+   vec4                     Colors        [128]; // Half normal group size. Mostly unused anyway
    ivec2                    TextureOffset [256];
 };
 
-uniform mat3 ViewMatrix = mat3(vec3(0.125f, 0, 0), vec3(0, 0.125f, 0), vec3(0, 0, 1));
+uniform mat3 ViewMatrix = mat3(vec3(0.0625f, 0, 0), vec3(0, 1.0f/9.0f, 0), vec3(0, 0, 1));
 
 out vec2 TextureCoord;
 flat out int TextureID;
@@ -47,59 +45,49 @@ void main()
 {
    ivec2 pos;
    uvec2 size;
-   uvec2 texCoords;
+   uvec4 texCoordsAndSize;
    uvec4 transformIDs;
-   uvec2 texOffsetIDs;
-   uvec2 texSize;
-   uvec2 colorIDs;
-   uint  flags;
+   uint  texOffsetID;
+   uint  colorID;
+   uint  isGlobalOffset;
    {
-      uint samplerPos = gl_InstanceID * 2;
-      uvec4 data = texelFetch(ElementData, samplerPos);
-      pos = ivec2(data.xy);
-      mat2x4 intFromShort;
-      intFromShort[0] = uvec2(data.zw, data.zw >> 8);
-      intFromShort[1] = intFromShort[0] >> 16;
-      intFromShort[0] = intFromShort[0] & UCHAR_MAX;
-      intFromShort[1] = intFromShort[1] & UCHAR_MAX;
-      transformIDs = uvec4(intFromShort[0].xz, intFromShort[1].xz);
-      texOffsetIDs = intFromShort[0].yw;
-      colorIDs = intFromShort[1].yw;
-      
-      data = texelFetch(ElementData, samplerPos + 1);
-      intFromShort[0] = data.xyzw & USHORT_MAX;
-      intFromShort[1] = data.xyzw >> 16;
-      size = uvec2(intFromShort[0].x, intFromShort[1].x);
-      texCoords = uvec2(intFromShort[0].y, intFromShort[1].y);
-      texSize = uvec2(intFromShort[0].z, intFromShort[1].z);
-      TextureID = intFromShort[0].w;
-      flags = intFromShort[1].w & UCHAR_MAX
+      ivec4 data1 = texelFetch(ElementInfo, gl_InstanceID);
+      pos = data1.xy;
+      data1.zw += 1 << 15;
+      uvec4 elemData = texelFetch(ElementData, data1.z);
+      uvec4 data2 = texelFetch(ElementData, textureSize(ElementData) - data1.w);
+      TextureID = int(data2.w);
+      texCoordsAndSize.xyz = data2.xyz & 0xFFFu;
+      texCoordsAndSize.w = uint(dot(data2.xyz >> 12u, uvec3(1u, 16u, 256u)));
+      transformIDs = elemData & UCHAR_MAX;
+      elemData = elemData >> 8u;
+      size = elemData.xy;
+      texOffsetID = elemData.z;
+      colorID = elemData.w & 0x7Fu;
+      isGlobalOffset = (elemData.w & 0x80u) << 1u;
    }
    vec3 coords = vec3(aCoords * size, 1);
    mat3 transform;
    transform[0] = vec3(1, 0, 0);
    transform[1] = vec3(0, 1, 0);
    transform[2] = vec3(0, 0, 1);
-   for (uint i = 0; i < 4; ++i)
+   for (uint i = 0u; i < 4u; ++i)
    {
       mat3 tmp;
       tmp[0] = Transform[transformIDs[i]][0];
       tmp[1] = Transform[transformIDs[i]][1];
       tmp[2] = vec3(0, 0, 1);
       transform *= tmp;
-      pos += Offset[i]
+      pos += Offset[i];
    }
-   transform *= (Transform[min(flags & CCE_GLOBAL_OFFSET_MASK, 1) * 256]) // Global transform (applied last, separation with translation is not needed)
+   transform *= mat3(Transform[isGlobalOffset][0], Transform[isGlobalOffset][1], vec3(0, 0, 1)); // Global transform (applied last, separation with translation is not needed)
    coords = coords * transform;
    coords.xy += pos;
    coords *= ViewMatrix;
-   gl_Position = vec4(coords.xy, 0, 1);
+   gl_Position = vec4(coords.xy * 0.5f, 0, 1);
    
-   vec3 color = vec3(1.0f, 1.0f, 1.0f);
-   color = mix(color, Colors[colorIDs.x].xyz, Colors[colorIDs.x].w);
-   color = mix(color, Colors[colorIDs.y].xyz, Colors[colorIDs.y].w);
-   Color = vec4(color, 1.0f);
+   Color = Colors[colorID];
    
-   vec3 textureCoords = min(aCoords, 0.0) + texSize * inverseTextureSize
-   TextureCoord = textureCoords + (TextureOffset[texOffsetIDs.x] * texSize + TextureOffset[texOffsetIDs.y] * texSize + texCoords) * inverseTextureSize
+   vec2 textureCoords = max(aCoords, 0.0) * vec2(float(texCoordsAndSize.z), float(texCoordsAndSize.w)) * inverseTextureSize;
+   TextureCoord = textureCoords + vec2(TextureOffset[texOffsetID] * ivec2(texCoordsAndSize.zw) + ivec2(texCoordsAndSize.xy)) * inverseTextureSize;
 }

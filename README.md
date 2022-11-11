@@ -1,4 +1,4 @@
-# CoffeeChain
+# Conservative creator's engine
 2D crossplatform game engine. WIP.
 # Building on unix-like system:
 Required packages: glfw, cmake.

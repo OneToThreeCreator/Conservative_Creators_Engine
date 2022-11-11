@@ -18,31 +18,30 @@
     USA
 */
 
-#ifndef LOG_H
-#define LOG_H
+#ifndef CCE_OPENWORLD_H
+#define CCE_OPENWORLD_H
 
-#ifdef __cplusplus
-extern "C"
+#include <stdint.h>
+
+#define CCE_EXITMAP2D_A_IS_X 0x1
+#define CCE_EXITMAP2D_ONLESS_TRANSITION 0x2
+
+struct ExitMap2D
 {
-#endif // __cplusplus
+   char   *mapName;
+   int32_t xOffset;
+   int32_t yOffset;
+   int32_t aBorder;
+   int32_t b1Border;
+   int32_t b2Border;
+   uint8_t flags; // 0x1 - a is x (otherwise a is y), 0x2 - b is to the south/west from globalOffset 0
+};
 
-/* #ifdef __APPLE__
-#include <OpenAL/al.h>
-#include <OpenAL/alc.h>
-#else
-#include <AL/al.h>
-#include <AL/alc.h>
-#endif // __APPLE__
-*/
-#include <stdlib.h>
+struct OpenWorldInfo
+{
+   struct ExitMap2D *exitMaps;
+   uint32_t exitMapsQuantity;
+   uint32_t exitMapsAllocated;
+};
 
-void cce__criticalErrorPrint (const char *const msgAndFormat, ...);
-void cce__infoPrint (const char *const msgAndFormat, ...);
-void cce__errorPrint (const char *const msgAndFormat, ...);
-//void cce__openALErrorPrint (ALCenum error);
-
-#ifdef __cplusplus
-}
-#endif // __cplusplus
-
-#endif // LOG_H
+#endif // CCE_OPENWORLD_H

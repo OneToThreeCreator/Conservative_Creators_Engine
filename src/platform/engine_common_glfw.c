@@ -1,6 +1,6 @@
 /*
-    CoffeeChain - open source engine for making games.
-    Copyright (C) 2020-2022 Andrey Givoronsky
+    Conservative Creator's Engine - open source engine for making games.
+    Copyright (C) 2020-2022 Andrey Gaivoronskiy
 
     This library is free software; you can redistribute it and/or
     modify it under the terms of the GNU Lesser General Public
@@ -21,19 +21,15 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "../external/glad.h"
+#include <glad/gl.h>
 #include <GLFW/glfw3.h>
 
-#include "../../include/coffeechain/engine_common.h"
-#include "../../include/coffeechain/utils.h"
+#include "../../include/cce/engine_common.h"
+#include "../../include/cce/utils.h"
 
 #include "../engine_common_internal.h"
 
 #define CCE_FULLSCREEN 0x10
-#define CCE_WAYLAND 0x1
-
-extern void (*cce__engineUpdate__api) (void);
-extern void (*cce__terminateEngine__api) (void);
 
 static struct
 {
@@ -57,19 +53,15 @@ static struct RegisteredKeys
 static size_t keysQuantity = 0u;
 //static size_t keysQuantityAllocated = CCE_ALLOCATION_STEP;
 
-static double deltaTime;
-static double lastTime = 0.0;
-CCE_PUBLIC_OPTIONS const double *const cceDeltaTime = &deltaTime;
-CCE_PUBLIC_OPTIONS const double *const cceCurrentTime = &lastTime;
 static uint8_t engineFlags = 0u;
 const uint8_t *const cce__flags = &engineFlags;
 static uint8_t internalFlags = 0u;
 
-static void calculateInternalDeltaTime (void)
+static uint64_t getTime__glfw (void)
 {
-   double currentTime = glfwGetTime();
-   deltaTime = currentTime - lastTime;
-   lastTime = currentTime;
+   uint64_t currentTime = glfwGetTimerValue();
+   currentTime *= 1000000.0f / glfwGetTimerFrequency();
+   return currentTime;
 }
 
 static void engineUpdate__glfw (void)
@@ -79,7 +71,6 @@ static void engineUpdate__glfw (void)
    {
       engineFlags |= CCE_ENGINE_STOP;
    }
-   calculateInternalDeltaTime();
 }
 
 static void framebufferSizeCallback (GLFWwindow *window, int width, int height)
@@ -121,43 +112,10 @@ static void toFullscreen__glfw (void)
    uint32_t aspectRatio = 0u, monitorAspectRatio = 0u;
    unsigned int width, height;
    glfwSetWindowSizeCallback(g_GLFWstate.window, NULL);
-   if (g_GLFWstate.flags & CCE_FIXED_ASPECT_RATIO)
-   {
-      glfwSetFramebufferSizeCallback(g_GLFWstate.window, framebufferSizeCallback);
-   }
-   if (g_GLFWstate.flags & CCE_FIXED_RESOLUTION)
-   {
-      width = g_GLFWstate.windowWidth;
-      height = g_GLFWstate.windowHeight;
-   }
-   else
-   {
-      width = g_GLFWstate.vidMode->width;
-      height = g_GLFWstate.vidMode->height;
-   }
+   width = g_GLFWstate.windowWidth;
+   height = g_GLFWstate.windowHeight;
    glfwGetWindowPos(g_GLFWstate.window, &g_GLFWstate.windowPositionX, &g_GLFWstate.windowPositionY);
    glfwSetWindowMonitor(g_GLFWstate.window, monitor, 0, 0, width, height, g_GLFWstate.vidMode->refreshRate);
-   if (g_GLFWstate.flags & CCE_FIXED_ASPECT_RATIO)
-   {
-      aspectRatio = (g_GLFWstate.vidMode->width * 100u) / g_GLFWstate.vidMode->height;
-      monitorAspectRatio = (g_GLFWstate.monitorAspectRatio.x * 100u) / g_GLFWstate.monitorAspectRatio.y;
-      if (aspectRatio != monitorAspectRatio)
-      {
-         glfwSetFramebufferSizeCallback(g_GLFWstate.window, NULL);
-         if (aspectRatio < monitorAspectRatio)
-         {
-            height = g_GLFWstate.windowHeight;
-            width = (g_GLFWstate.windowHeight * monitorAspectRatio) / 100u;
-         }
-         else
-         {
-            width = g_GLFWstate.windowWidth;
-            height = (g_GLFWstate.windowWidth * 100u) / monitorAspectRatio;
-         }
-      }
-      glViewport((width - g_GLFWstate.windowWidth) / 2u, (height - g_GLFWstate.windowHeight) / 2u, g_GLFWstate.windowWidth, g_GLFWstate.windowHeight);
-      glfwSetFramebufferSizeCallback(g_GLFWstate.window, framebufferSizeCallback);
-   }
    glfwSetWindowSizeCallback(g_GLFWstate.window, windowResizeCallback);
    g_GLFWstate.flags |= CCE_FULLSCREEN;
    glfwSwapInterval(1);
@@ -179,7 +137,7 @@ static void keyCallback (GLFWwindow *window, int key, int scancode, int action, 
 {
    CCE_UNUSED(window);
    CCE_UNUSED(scancode);
-   struct RegisteredKeys *keyInfo = cce_keys + cceBinarySearch((((uint8_t*) cce_keys) + offsetof(struct RegisteredKeys, key)), keysQuantity, sizeof(int), sizeof(struct RegisteredKeys), key);
+   struct RegisteredKeys *keyInfo = (struct RegisteredKeys*) cceBinarySearchFirstAscending((((uint8_t*) cce_keys) + offsetof(struct RegisteredKeys, key)), keysQuantity, sizeof(int), sizeof(struct RegisteredKeys), key);
    if (keyInfo > cce_keys + keysQuantity)
    {
       return;
@@ -188,46 +146,7 @@ static void keyCallback (GLFWwindow *window, int key, int scancode, int action, 
    {
       if ((modifiers & keyInfo->modifiers) == keyInfo->modifiers)
       {
-         switch (keyInfo->eventType)
-         {
-            
-            case 0x0u:
-            {
-               if (action != GLFW_REPEAT)
-                  cceSetBool(keyInfo->number, action + CCE_DISABLE_BOOL);
-               break;
-            }
-            case 0x1u:
-            {
-               if (action == GLFW_PRESS)
-               {
-                  cceIncreasePlotNumber(keyInfo->number);
-                  break;
-               }
-               break;
-            }
-            case 0x2:
-            {
-               if (action == GLFW_PRESS)
-               {
-                  switch (keyInfo->number)
-                  {
-                     case 0x0:
-                     {
-                        if (g_GLFWstate.flags & CCE_FULLSCREEN)
-                        {
-                           toWindow__glfw();
-                        }
-                        else
-                        {
-                           toFullscreen__glfw();
-                        }
-                     }
-                  }
-               }
-               break;
-            }
-         }
+         
       }
    }
 }
@@ -322,165 +241,50 @@ struct cce_u32vec2 getCurrentStep__glfw (void)
 
 static void setWindowParameters__glfw (cce_enum parameter, uint32_t a, uint32_t b)
 {
-   if (a > 0u && b > 0u)
-   {
-      switch (parameter)
-      {
-         case CCE_FIXED_RESOLUTION:
-         {
-            g_GLFWstate.flags       |= CCE_FIXED_RESOLUTION | CCE_FIXED_ASPECT_RATIO;
-            glfwSetWindowAspectRatio(g_GLFWstate.window, a, b);
-            g_GLFWstate.windowWidth  = a;
-            g_GLFWstate.windowHeight = b;
-            glfwSetWindowSize(g_GLFWstate.window, a, b);
-            g_GLFWstate.monitorAspectRatio = getAspectRatio(a, b);
-            return;
-         }
-         case CCE_FIXED_ASPECT_RATIO:
-         {
-            g_GLFWstate.flags               &= ~CCE_FIXED_RESOLUTION;
-            g_GLFWstate.flags               |=  CCE_FIXED_ASPECT_RATIO;
-            glfwSetWindowAspectRatio(g_GLFWstate.window, a, b);
-            g_GLFWstate.monitorAspectRatio.x = a;
-            g_GLFWstate.monitorAspectRatio.y = b;
-            return;
-         }
-         case CCE_MINIMAL_ASPECT_RATIO:
-         {
-            if ((g_GLFWstate.monitorAspectRatio.x * 100u) / g_GLFWstate.monitorAspectRatio.y < (a*100u)/b)
-            {
-               glfwSetWindowAspectRatio(g_GLFWstate.window, a, b);
-            }
-            return;
-         }
-         case CCE_MAXIMUM_ASPECT_RATIO:
-         {
-            if ((g_GLFWstate.monitorAspectRatio.x * 100u) / g_GLFWstate.monitorAspectRatio.y > (a*100u)/b)
-            {
-               glfwSetWindowAspectRatio(g_GLFWstate.window, a, b);
-            }
-            return;
-         }
-      }
-   }
-   else
-   {
-      GLFWmonitor *monitor = glfwGetPrimaryMonitor();
-      g_GLFWstate.vidMode = glfwGetVideoMode(monitor);
-      g_GLFWstate.monitorAspectRatio = getAspectRatio(g_GLFWstate.vidMode->width, g_GLFWstate.vidMode->height);
-      g_GLFWstate.flags        = 0x0u;
-      glfwSetWindowAspectRatio(g_GLFWstate.window, g_GLFWstate.windowWidth, g_GLFWstate.windowHeight);
-      return;
-   }
+   
 }
 
-static int compare (const void *a, const void *b)
+static int compare (const void *_a, const void *_b)
 {
-   const int num_a = *((int*) (((uint8_t*) a) + offsetof(struct RegisteredKeys, key)));
-   const int num_b = *((int*) (((uint8_t*) b) + offsetof(struct RegisteredKeys, key)));
-   return (num_a > num_b) - (num_a < num_b);
+   const int a = *((const int*) (((uint8_t*) _a) + offsetof(struct RegisteredKeys, key)));
+   const int b = *((const int*) (((uint8_t*) _b) + offsetof(struct RegisteredKeys, key)));
+   return (a > b) - (a < b);
 }
 
 static void terminateEngine__glfw (void);
 
-int cce__initEngine__glfw (const char *label, uint16_t globalBoolsQuantity)
+int cce__initEngine__glfw (const char *label, struct cce_backend_data *functions)
 {
-   //AL = initAL();
    if (glfwInit() != GLFW_TRUE)
    {
       return -1;
    }
-   
    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-   glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+   glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 2);
    glfwWindowHint(GLFW_AUTO_ICONIFY,   GLFW_TRUE);
    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-   glfwWindowHint(GLFW_FLOATING, GLFW_TRUE);
-   char *wl = getenv("WAYLAND_DISPLAY");
-   internalFlags |= CCE_WAYLAND * (wl != NULL && (*wl != '\0'));
-   if ((~internalFlags & CCE_WAYLAND) == CCE_WAYLAND)
-   {
-      glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
-   }
+   //glfwWindowHint(GLFW_VISIBLE,        GLFW_FALSE);
+   glfwWindowHint(GLFW_RESIZABLE,      GL_FALSE);
 
 #ifdef __APPLE__
    glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GLFW_TRUE);
    glfwWindowHint(GLFW_COCOA_CHDIR_RESOURCES, GLFW_FALSE);
    glfwWindowHint(GLFW_COCOA_MENUBAR,         GLFW_FALSE);
 #endif
+#if defined(NDEBUG)
+   glfwWindowHint(GLFW_CONTEXT_NO_ERROR,      GLFW_TRUE);
+#else
+   glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT,  GLFW_TRUE);
+#endif
    
-   
-   if (!label)
+   if (label == NULL || *label == '\0')
    {
       label = CCE_DEFAULT_WINDOW_LABEL;
    }
    
    GLFWmonitor *monitor = glfwGetPrimaryMonitor();
    g_GLFWstate.vidMode = glfwGetVideoMode(monitor);
-   g_GLFWstate.monitorAspectRatio = getAspectRatio(g_GLFWstate.vidMode->width, g_GLFWstate.vidMode->height);
-   switch (g_GLFWstate.monitorAspectRatio.x)
-   {
-      case 1u:
-      {
-         g_GLFWstate.windowWidth = CCE_DEFAULT_WINDOW_WIDTH;
-         g_GLFWstate.windowHeight = CCE_DEFAULT_WINDOW_HEIGHT_1BY1;
-         break;
-      }
-      case 2u:
-      {
-         g_GLFWstate.windowWidth = CCE_DEFAULT_WINDOW_WIDTH;
-         g_GLFWstate.windowHeight = CCE_DEFAULT_WINDOW_HEIGHT_2BY1;
-         break;
-      }
-      case 3u:
-      {
-         g_GLFWstate.windowWidth = CCE_DEFAULT_WINDOW_WIDTH_3BY2;
-         g_GLFWstate.windowHeight = CCE_DEFAULT_WINDOW_HEIGHT_3BY2;
-         break;
-      }
-      case 4u:
-      {
-         g_GLFWstate.windowWidth = CCE_DEFAULT_WINDOW_WIDTH;
-         g_GLFWstate.windowHeight = CCE_DEFAULT_WINDOW_HEIGHT_4BY3;
-         break;
-      }
-      case 5u:
-      {
-         g_GLFWstate.windowWidth = CCE_DEFAULT_WINDOW_WIDTH;
-         g_GLFWstate.windowHeight = CCE_DEFAULT_WINDOW_HEIGHT_5BY4;
-         break;
-      }
-      case 7u:
-      {
-         g_GLFWstate.windowWidth = CCE_DEFAULT_WINDOW_WIDTH_7BY3;
-         g_GLFWstate.windowHeight = CCE_DEFAULT_WINDOW_HEIGHT_7BY3;
-         break;
-      }
-      case 8u:
-      {
-         g_GLFWstate.windowWidth = CCE_DEFAULT_WINDOW_WIDTH;
-         g_GLFWstate.windowHeight = CCE_DEFAULT_WINDOW_HEIGHT_8BY5;
-         break;
-      }
-      case 14u:
-      {
-         g_GLFWstate.windowWidth = CCE_DEFAULT_WINDOW_WIDTH_14BY9;
-         g_GLFWstate.windowHeight = CCE_DEFAULT_WINDOW_HEIGHT_14BY9;
-         break;
-      }
-      case 16u:
-      {
-         g_GLFWstate.windowWidth = CCE_DEFAULT_WINDOW_WIDTH;
-         g_GLFWstate.windowHeight = CCE_DEFAULT_WINDOW_HEIGHT_16BY9;
-         break;
-      }
-      default:
-      {
-         g_GLFWstate.windowWidth = CCE_DEFAULT_WINDOW_WIDTH;
-         g_GLFWstate.windowHeight = CCE_DEFAULT_WINDOW_WIDTH / g_GLFWstate.monitorAspectRatio.x * g_GLFWstate.monitorAspectRatio.y;
-      }
-   }
-   g_GLFWstate.window = glfwCreateWindow(g_GLFWstate.windowWidth, g_GLFWstate.windowHeight, label, NULL, NULL);
+   g_GLFWstate.window = glfwCreateWindow(CCE_DEFAULT_WINDOW_WIDTH, CCE_DEFAULT_WINDOW_HEIGHT, label, NULL, NULL);
    if (!(g_GLFWstate.window))
    {
       fprintf(stderr, "GLFW::WINDOW::FAILED_TO_CREATE\n");
@@ -490,21 +294,22 @@ int cce__initEngine__glfw (const char *label, uint16_t globalBoolsQuantity)
    glfwMakeContextCurrent(g_GLFWstate.window);
    glfwSetFramebufferSizeCallback(g_GLFWstate.window, framebufferSizeCallback);
    glfwSetWindowSizeCallback(g_GLFWstate.window, windowResizeCallback);
-   glfwSetKeyCallback(g_GLFWstate.window, keyCallback);
+   //glfwSetKeyCallback(g_GLFWstate.window, keyCallback);
    if (!gladLoadGL((GLADloadfunc)glfwGetProcAddress))
    {
       fprintf(stderr, "GLAD::INITIALIZATION::FAILED:\nOpenGL could not be loaded by GLAD.\n");
       glfwTerminate();
       return -1;
    }
-   if (!GLAD_GL_VERSION_3_3)
+   if (!GLAD_GL_VERSION_3_1)
    {
-      fprintf(stderr, "GLAD::INITIALIZATION::FAILED:\nOpenGL 3.3 could not be loaded by GLAD.\n");
+      fprintf(stderr, "GLAD::INITIALIZATION::FAILED:\nOpenGL 3.1 (minimum required) could not be loaded by GLAD.\n");
       glfwTerminate();
       return -1;
    }
    cce_keys = malloc(14u * sizeof(struct RegisteredKeys));
    
+   /*
    registerKey__glfw(GLFW_KEY_UP,          GLFW_FALSE, 0x0, globalBoolsQuantity - 12);
    registerKey__glfw(GLFW_KEY_DOWN,        GLFW_FALSE, 0x0, globalBoolsQuantity - 11);
    registerKey__glfw(GLFW_KEY_LEFT,        GLFW_FALSE, 0x0, globalBoolsQuantity - 10);
@@ -521,25 +326,15 @@ int cce__initEngine__glfw (const char *label, uint16_t globalBoolsQuantity)
    
    registerKey__glfw(GLFW_KEY_F11, GLFW_FALSE, 0x2, 0x0);
    qsort(cce_keys, keysQuantity, sizeof(struct RegisteredKeys), compare);
-   
+   */
    glfwSwapInterval(1);
    
-   cceSetWindowParameters = setWindowParameters__glfw;
-   cce__toWindow = toWindow__glfw;
-   if (internalFlags && CCE_WAYLAND)
-   {
-      cce__showWindow = cce__doNothing;
-   }
-   else
-   {
-      cce__showWindow = showWindow__glfw;
-      glfwSetWindowAspectRatio(g_GLFWstate.window, g_GLFWstate.windowWidth, g_GLFWstate.windowHeight);
-   }
-   cce__toFullscreen = toFullscreen__glfw;
-   cce__swapBuffers = swapBuffers__glfw;
-   cce__getCurrentStep = getCurrentStep__glfw;
-   cce__engineUpdate__api = engineUpdate__glfw;
-   cce__terminateEngine__api = terminateEngine__glfw;
+   functions->screenUpdate = swapBuffers__glfw;
+   functions->toWindow = toWindow__glfw;
+   functions->toFullscreen = toFullscreen__glfw;
+   functions->terminateEngine = terminateEngine__glfw;
+   functions->engineUpdate = engineUpdate__glfw;
+   functions->getTime = getTime__glfw;
    return 0;
 }
 

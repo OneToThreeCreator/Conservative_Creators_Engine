@@ -1,6 +1,6 @@
 /*
-    CoffeeChain - open source engine for making games.
-    Copyright (C) 2020-2022 Andrey Givoronsky
+    Conservative Creator's Engine - open source engine for making games.
+    Copyright (C) 2020-2022 Andrey Gaivoronskiy
 
     This library is free software; you can redistribute it and/or
     modify it under the terms of the GNU Lesser General Public
@@ -31,52 +31,6 @@
 #include <AL/alc.h>
 #endif // __APPLE__
 */
-void cce__openGLErrorPrint (GLenum error, size_t line, const char *file)
-{
-   switch (error)
-   {
-      case GL_NO_ERROR: break;
-      case GL_INVALID_ENUM:
-      {
-         fprintf(stderr, "%s: %ld: OPENGL::INVALID_ENUM:\nan unacceptable value is specified for an enumerated argument\n", file, line);
-         break;
-      }
-      case GL_INVALID_VALUE:
-      {
-         fprintf(stderr, "%s: %ld: OPENGL::INVALID_VALUE:\na numeric argument is out of range\n", file, line);
-         break;
-      }
-      case GL_INVALID_OPERATION:
-      {
-         fprintf(stderr, "%s: %ld: OPENGL::INVALID_OPERATION:\nthe specified operation is not allowed in the current state\n", file, line);
-         break;
-      }
-      case GL_INVALID_FRAMEBUFFER_OPERATION:
-      {
-         fprintf(stderr, "%s: %ld: OPENGL::INVALID_OPERATION::FRAMEBUFFER:\nthe framebuffer object is not complete\n", file, line);
-         break;
-      }
-      case GL_OUT_OF_MEMORY:
-      {
-         fprintf(stderr, "%s: %ld: OPENGL::OUT_OF_MEMORY:\nthere is not enough memory left to execute the command\n", file, line);
-         break;
-      }
-/*    case GL_STACK_UNDERFLOW:
-      {
-         fprintf(stderr, "OPENGL::STACK::OVERFLOW:\nan attempt has been made to perform an operation that would cause an internal stack to underflow\n");
-         break;
-      }
-      case GL_STACK_OVERFLOW:
-      {
-         fprintf(stderr, "OPENGL::STACK::OVERFLOW:\nan attempt has been made to perform an operation that would cause an internal stack to overflow\n");
-         break;
-      }*/
-      default:
-      {
-         fprintf(stderr, "%s: %ld: OPENGL::UNKNOWN:\n%d\n", file, line, error);
-      }
-   }
-}
 
 /*
 void cce__openALErrorPrint (ALenum error)

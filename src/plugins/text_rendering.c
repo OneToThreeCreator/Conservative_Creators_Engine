@@ -1,6 +1,6 @@
 /*
-    CoffeeChain - open source engine for making games.
-    Copyright (C) 2020-2022 Andrey Givoronsky
+    Conservative Creator's Engine - open source engine for making games.
+    Copyright (C) 2020-2022 Andrey Gaivoronskiy
 
     This library is free software; you can redistribute it and/or
     modify it under the terms of the GNU Lesser General Public
@@ -23,12 +23,12 @@
 
 #include <ini.h>
 
-#include "../../include/coffeechain/engine_common.h"
-#include "../../include/coffeechain/map2D/map2D.h"
-#include "../../include/coffeechain/map2D/base_actions.h"
-#include "../../include/coffeechain/os_interaction.h"
-#include "../../include/coffeechain/plugins/text_rendering.h"
-#include "../../include/coffeechain/utils.h"
+#include "../../include/cce/engine_common.h"
+#include "../../include/cce/map2D/map2D.h"
+#include "../../include/cce/map2D/actions.h"
+#include "../../include/cce/os_interaction.h"
+#include "../../include/cce/plugins/text_rendering.h"
+#include "../../include/cce/utils.h"
 
 #define UNK 1
 
@@ -320,7 +320,7 @@ static void cce__processStructUTF8 (struct INIKeyHandlerStruct *structure)
    }
 }
 
-static void cce__valueToLetters (struct INIKeyHandlerStruct *st, const char *restrict string)
+static void cce__valueToLetters (struct INIKeyHandlerStruct *st, const char *string)
 {
    char *jiterator = st->letters;
    while (*string != '\0' && *string != '\n')
@@ -501,7 +501,7 @@ CCE_PUBLIC_OPTIONS int cceLoadBitmapFont (const char *cceFontName)
    size_t resourcePathSize = strlen(resourcePath);
    size_t fullResourcePathSize = resourcePathSize + (resourcePath[resourcePathSize - 1] != '/') + 6; /*+ "fonts/"*/;
    FILE *file = NULL;
-   char *restrict path;
+   char *path;
    
    #ifdef SYSTEM_RESOURCE_PATH
    
@@ -600,10 +600,9 @@ static uint32_t* ccePrintStringASCII (char *string, struct Map2DElementDev *elem
          letter = &unknown;
       }
       struct FontInfo *font = fonts + letter->fontID;
-      currentElement->x += index.x * (font->charSize.x + font->charGap.x) + letter->drawOffset.x;
-      currentElement->y -= index.y * (font->charSize.y + font->charGap.y) + letter->size.y + letter->drawOffset.y;
-      currentElement->width = letter->size.x;
-      currentElement->height = letter->size.y;
+      currentElement->position.x += index.x * (font->charSize.x + font->charGap.x) + letter->drawOffset.x;
+      currentElement->position.y -= index.y * (font->charSize.y + font->charGap.y) + letter->size.y + letter->drawOffset.y;
+      currentElement->size = letter->size;
       currentElement->textureInfo.position = letter->position;
       currentElement->textureInfo.size = letter->size;
       currentElement->textureInfo.ID = font->textureID;
@@ -683,10 +682,9 @@ static uint32_t* ccePrintStringUTF8 (char *string, struct Map2DElementDev *eleme
          continue;
       }
       struct FontInfo *font = fonts + letter->fontID;
-      currentElement->x += index.x * (font->charSize.x + font->charGap.x) + letter->drawOffset.x;
-      currentElement->y -= index.y * (font->charSize.y + font->charGap.y) + letter->size.y + letter->drawOffset.y;
-      currentElement->width = letter->size.x;
-      currentElement->height = letter->size.y;
+      currentElement->position.x += index.x * (font->charSize.x + font->charGap.x) + letter->drawOffset.x;
+      currentElement->position.y -= index.y * (font->charSize.y + font->charGap.y) + letter->size.y + letter->drawOffset.y;
+      currentElement->size = letter->size;
       currentElement->textureInfo.position = letter->position;
       currentElement->textureInfo.size = letter->size;
       currentElement->textureInfo.ID = font->textureID;

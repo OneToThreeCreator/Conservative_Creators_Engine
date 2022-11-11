@@ -1,6 +1,6 @@
 /*
-    CoffeeChain - open source engine for making games.
-    Copyright (C) 2020-2022 Andrey Givoronsky
+    Conservative Creator's Engine - open source engine for making games.
+    Copyright (C) 2020-2022 Andrey Gaivoronskiy
 
     This library is free software; you can redistribute it and/or
     modify it under the terms of the GNU Lesser General Public
@@ -23,898 +23,705 @@
 #include <stddef.h>
 #include <string.h>
 
-#include "../../include/coffeechain/engine_common.h"
-#include "../../include/coffeechain/os_interaction.h"
-#include "../../include/coffeechain/endianess.h"
-#include "../../include/coffeechain/utils.h"
-#include "../../include/coffeechain/map2D/map2D.h"
-#include "../../include/coffeechain/map2D/base_actions.h"
+#include "../../include/cce/engine_common.h"
+#include "../../include/cce/engine_common_IO.h"
+#include "../../include/cce/os_interaction.h"
+#include "../../include/cce/endianess.h"
+#include "../../include/cce/utils.h"
+#include "../../include/cce/map2D/map2D.h"
 
 #include "../engine_common_internal.h"
 #include "map2D_internal.h"
+#include "../platform/platforms.h"
 
 static char *mapPath = NULL;
-size_t mapPathLength;
-const cce_flag *map2Dflags;
+static size_t mapPathLength;
+uint16_t cce__staticMapFunctionSet, cce__dynamicMapFunctionSet;
+static ptrdiff_t g_resourceLoadersOffset, g_renderingInfoOffset;
 
-static void (*cce_fileParseFunc)(FILE*, uint16_t);
-static void (*cce_callbackOnFreeing)(uint16_t);
 
-void cce__initMap2DLoaders (const cce_flag *flagsPointer)
-{
-   map2Dflags = flagsPointer;
-}
+typedef int (*cce_rloadfun)(void *buffer, struct cce_buffer *info, char **names);
+typedef char** (*cce_rstorefun)(void *buffer, struct cce_buffer *info);
+
+static size_t resourceSpaceAllocated;
+
+CCE_ARRAY(resourceLoadingFunctions, static cce_rloadfun, static uint16_t);
+static cce_onfreefun *resourceUnloadingFunctions;
+static cce_rstorefun *resourceStoringFunctions;
+static size_t *resourceLoadingFunctionsBufferSizes;
 
 CCE_PUBLIC_OPTIONS void cceSetMap2Dpath (const char *path)
 {
-   if (!path || *path == '\0')
+   if (path == NULL || *path == '\0')
       return;
    free(mapPath);
-   mapPath = cceCreateNewPathFromOldPath(path, "map_", 9u);
+   mapPath = cceCreateNewPathFromOldPath(path, "", CCE_PATH_RESERVED);
    mapPathLength = strlen(mapPath);
 }
 
-CCE_PUBLIC_OPTIONS void cceRegisterMapLoadingCallback (void (*fileParseFunc)(FILE*, uint16_t))
+CCE_PUBLIC_OPTIONS uint32_t cceRegisterMapCustomResourceLoadingCallback (cce_rloadfun onLoad, cce_onfreefun onFree, size_t bufferSize)
 {
-   cce_fileParseFunc = fileParseFunc;
+   if (resourceLoadingFunctionsQuantity >= resourceLoadingFunctionsAllocated)
+   {
+      CCE_REALLOC_ARRAY(resourceLoadingFunctions, resourceLoadingFunctionsQuantity + 1);
+      resourceUnloadingFunctions = realloc(resourceUnloadingFunctions, resourceLoadingFunctionsAllocated * sizeof(cce_onfreefun*));
+      resourceLoadingFunctionsBufferSizes = realloc(resourceLoadingFunctionsBufferSizes, (resourceLoadingFunctionsAllocated + 1) * sizeof(size_t));
+   }
+   resourceLoadingFunctions[resourceLoadingFunctionsQuantity] = onLoad;
+   resourceUnloadingFunctions[resourceLoadingFunctionsQuantity] = onFree;
+   resourceLoadingFunctionsBufferSizes[resourceLoadingFunctionsQuantity] = bufferSize;
+   resourceSpaceAllocated += bufferSize;
+   return resourceLoadingFunctionsQuantity++ | 0x80000000;
 }
 
-CCE_PUBLIC_OPTIONS void cceRegisterMapFreeingCallback (void (*callbackOnFreeing)(uint16_t))
+static struct ElementGroup* cce__loadGroups (uint16_t groupsQuantity, struct ElementGroup *buffer, FILE *map_f)
 {
-   cce_callbackOnFreeing = callbackOnFreeing;
-}
-
-CCE_PUBLIC_OPTIONS void cceFreeMap2D (struct Map2D *map)
-{
-   if (!map)
-      return;
-   if (map->collidersQuantity)
-      free(map->colliders);
-   if (map->moveGroupsQuantity)
+   if (!groupsQuantity)
    {
-      for (struct ElementGroup *iterator = map->moveGroups, *end = map->moveGroups + map->moveGroupsQuantity; iterator < end; ++iterator)
+      return NULL;
+   }
+   for (struct ElementGroup *iterator = buffer, *end = (buffer + groupsQuantity); iterator < end; ++iterator)
+   {
+      fread(&(iterator->elementsQuantity), 2u/*uint16_t*/, 1u, map_f);
+      iterator->elementsQuantity = cceLittleEndianToHostEndianInt16(iterator->elementsQuantity);
+      if (iterator->elementsQuantity)
       {
-         free(iterator->elements);
-      }
-      free(map->moveGroups);
-   }
-   if (map->extensionGroupsQuantity)
-   {
-      for (struct ElementGroup *iterator = map->extensionGroups, *end = map->extensionGroups + map->extensionGroupsQuantity; iterator < end; ++iterator)
-      {
-         free(iterator->elements);
-      }
-      free(map->extensionGroups);
-   }
-   if (map->collisionGroupsQuantity)
-   {
-      for (struct ElementGroup *iterator = map->collisionGroups, *end = map->collisionGroups + map->collisionGroupsQuantity; iterator < end; ++iterator)
-      {
-         free(iterator->elements);
-      }
-      free(map->collisionGroups);
-   }
-   if (map->collisionQuantity)
-      free(map->collision);
-   if (map->timersQuantity)
-      free(map->timers);
-   if (map->logicQuantity)
-   {
-      struct ElementLogic *end = (map->logic + map->logicQuantity);
-      for (struct ElementLogic *iterator = (map->logic); iterator < end; ++iterator)
-      {
-         free(iterator->logicElements);
-         free(iterator->operations);
-         free(iterator->actionIDs);
-         free(iterator->actionsArgOffsets);
-         free(iterator->actionsArg);
-      }
-      free(map->logic);
-   }
-   if ((map->texturesMapReliesOn))
-      cce__releaseTextures(map->texturesMapReliesOn, map->texturesMapReliesOnQuantity);
-   if ((map->exitMapsQuantity))
-      free(map->exitMaps);
-   if (cce_callbackOnFreeing)
-   {
-      if (map->logicQuantity)
-      {
-         cce__setCurrentTemporaryBools(map->temporaryBools);
-      }
-      cce_callbackOnFreeing(map->ID);
-   }
-   if (*map2Dflags & (CCE_PROCESS_LOGIC_FOR_VISIBLE_MAPS | CCE_PROCESS_LOGIC_FOR_ALL_MAPS | CCE_FORCE_INITIALIZE_MAP_ONLOAD))
-   {
-      cce__releaseTemporaryBools(map->temporaryBools);
-   }
-   llrmlist(&map->delayedActions);
-   free(map);
-}
-
-CCE_PUBLIC_OPTIONS void cceFreeMap2Ddev (struct Map2Ddev *map)
-{
-   if (!map)
-      return;
-   if ((map->elementsQuantity))
-      free(map->elements);
-   if ((map->transformGroupsQuantity))
-   {
-      for (struct DynamicElementGroup *iterator = map->transformGroups, *end = map->transformGroups + map->transformGroupsQuantity; iterator < end; ++iterator)
-      {
-         free(iterator->elements);
-      }
-      free(map->transformGroups);
-   }
-   if ((map->collisionGroupsQuantity))
-   {
-      for (struct DynamicElementGroup *iterator = map->collisionGroups, *end = map->collisionGroups + map->collisionGroupsQuantity; iterator < end; ++iterator)
-      {
-         free(iterator->elements);
-      }
-      free(map->collisionGroups);
-   }
-   if ((map->collisionQuantity))
-      free(map->collision);
-   if ((map->timersQuantity))
-      free(map->timers);
-   if ((map->logicQuantity))
-   {
-      for (struct ElementLogic *iterator = map->logic, *end = map->logic + map->logicQuantity; iterator < end; ++iterator)
-      {
-         free(iterator->logicElements);
-         free(iterator->operations);
-         free(iterator->actionIDs);
-         free(iterator->actionsArgOffsets);
-         free(iterator->actionsArg);
-      }
-      free(map->logic);
-   }
-   if ((map->actionsQuantity))
-   {
-      free(map->actionIDs);
-      free(map->actionsArgOffsets);
-      free(map->actionsArg);
-   }
-   if ((map->exitMapsQuantity))
-   {
-      free(map->exitMaps);
-   }
-   if (cce_callbackOnFreeing) cce_callbackOnFreeing(map->ID);
-   free(map);
-}
-
-//#define ADD_TO_2BIT_ARRAY(array, i, number) ((array)[(i) >> (SHIFT_OF_FAST_SIZE - 1)] += ((number) << ((i) & ((1 << (SHIFT_OF_FAST_SIZE - 1)) - 1))))
-//#define GET_VALUE_FROM_2BIT_ARRAY(array, i)(((array)[(i) >> (SHIFT_OF_FAST_SIZE - 1)] >> ((i) & ((1 << (SHIFT_OF_FAST_SIZE - 1)) - 1))) & 3)
-static void convertCCEgroupsToRenderablegroups (uint16_t groupsQuantity, struct ElementGroup *groups, uint8_t *glGroups, uint8_t glGroupsStep, uint32_t elementsWithoutColliderQuantity, uint32_t elementsQuantity)
-{
-   uint8_t i = 1u;
-   uint32_t offset = 0u;
-   struct ElementGroup *end = (groups + (CCE_MIN(256u, groupsQuantity)));
-   while (groups < end)
-   {
-      if (groups->elementsQuantity) for (uint32_t *j = groups->elements, *jend = (groups->elements + groups->elementsQuantity); j < jend; ++j)
-      {
-         if ((*j) < elementsQuantity)
-         {
-            for (uint8_t *iterator = glGroups + (*j) * glGroupsStep * 4, *iend = glGroups + (*j) * glGroupsStep * 4 + 4; iterator < iend; ++iterator)
-            {
-               if (*iterator == 0)
-               {
-                  *iterator = i;
-                  break;
-               }
-            }
-         }
-         if (*j < elementsWithoutColliderQuantity)
-         {
-            if (offset)
-            {
-               *(j - offset) = *j;
-            }
-            (*j) -= elementsWithoutColliderQuantity;
-         }
-         else
-         {
-            --(groups->elementsQuantity);
-            ++offset;
-         }
-      }
-      if (groups->elementsQuantity)
-      {
-         groups->elements = realloc(groups->elements, groups->elementsQuantity * sizeof(uint32_t));
+         iterator->elements = (uint32_t*) malloc(iterator->elementsQuantity * sizeof(uint32_t));
+         fread(iterator->elements, 4u/*uint32_t*/, iterator->elementsQuantity, map_f);
+         cceLittleEndianToHostEndianArrayInt32(iterator->elements, iterator->elementsQuantity);
       }
       else
       {
-         free(groups->elements);
+         iterator->elements = NULL;
       }
-      offset = 0u;
-      ++i, ++groups;
    }
+   return buffer;
 }
 
-static void offsetCCEgroupsFromElementsToColliders (uint16_t groupsQuantity, struct ElementGroup *groups, uint32_t elementsWithoutColliderQuantity)
+void cce__writeGroups (uint16_t groupsQuantity, struct ElementGroup *groups, FILE *map_f)
 {
-   struct ElementGroup *end = (groups + (groupsQuantity));
-   uint32_t offset = 0u;
-   while (groups < end)
+   for (struct ElementGroup *iterator = groups, *end = (groups + groupsQuantity); iterator < end; ++iterator)
    {
-      if (groups->elementsQuantity) for (uint32_t *iterator = groups->elements, *iend = (groups->elements + groups->elementsQuantity); iterator < iend; ++iterator)
-      {
-         if (*iterator < elementsWithoutColliderQuantity)
-         {
-            if (offset)
-            {
-               *(iterator - offset) = *iterator;
-            }
-            (*iterator) -= elementsWithoutColliderQuantity;
-         }
-         else
-         {
-            --(groups->elementsQuantity);
-            ++offset;
-         }
-      }
-      if (groups->elementsQuantity)
-      {
-         groups->elements = realloc(groups->elements, groups->elementsQuantity * sizeof(uint32_t));
-      }
-      else
-      {
-         free(groups->elements);
-      }
-      offset = 0u;
-      ++groups;
-   }
-}
+      uint16_t elementsQuantity = cceHostEndianToLittleEndianInt16(iterator->elementsQuantity);
+      fwrite(&elementsQuantity, 2u/*uint16_t*/, 1u, map_f);
+      if (!iterator->elementsQuantity)
+         continue;
 
-// Just in case of file corruption to avoid underflow (define because string is too long)
-#define ELEMENTSCOLLIDERSQUANTITY(elementsQuantity, elementsWithoutColliderQuantity) (((elementsQuantity) > (elementsWithoutColliderQuantity)) ? \
-                                                                                       (elementsQuantity) - (elementsWithoutColliderQuantity)  : \
-                                                                                        0u)
-
-static struct Map2DCollider* elementsToColliders (uint32_t  elementsQuantity, uint32_t elementsWithoutColliderQuantity, struct Map2DElement *elements,
-                                                  uint16_t **texturesMapReliesOn, uint16_t *texturesMapReliesOnQuantity,
-                                                  uint16_t  transformGroupsQuantity, struct ElementGroup *transformGroups)
-{
-   *texturesMapReliesOn = cce__loadTexturesMap2D(elements, elementsQuantity, texturesMapReliesOnQuantity);
-   elements = (struct Map2DElement*) realloc(elements, (sizeof(struct Map2DElement) + (2 * 4 + 1) * sizeof(uint8_t)) * elementsQuantity);
-   uint8_t *glGroups = (uint8_t*) ((void*) (elements + elementsQuantity));
-   memset(glGroups, 0, elementsQuantity * ((2 * 4 + 1) * sizeof(uint8_t)));
-   uint32_t currentElement = 0;
-   if (transformGroups)
-   {
-      if (transformGroups->elementsQuantity) for (uint32_t *exclude = transformGroups->elements, *excludeEnd = transformGroups->elements + transformGroups->elementsQuantity;
-                                             currentElement < elementsQuantity; ++currentElement)
-      {
-         if (currentElement == *exclude)
-         {
-            ++exclude;
-            if (exclude >= excludeEnd)
-               break;
-            continue;
-         }
-         (*(glGroups + currentElement)) = 1;
-      }
-      convertCCEgroupsToRenderablegroups(transformGroupsQuantity - 1,  transformGroups + 1,  glGroups + (elementsQuantity * (1 * sizeof(uint8_t))), 1, elementsWithoutColliderQuantity, elementsQuantity);
-   }
-   while (currentElement < elementsQuantity)
-   {
-      (*(glGroups + currentElement)) = 1;
-      ++currentElement;
-   }
-   
-   if (transformGroups && transformGroupsQuantity > 256u)
-      offsetCCEgroupsFromElementsToColliders(transformGroupsQuantity - 256u, transformGroups + 256u, elementsWithoutColliderQuantity);
-   
-   // Dangerous memory optimization!
-   struct Map2DCollider *colliders = (struct Map2DCollider*) ((void*) elements);
-   for (struct Map2DCollider *iterator = colliders, *end = colliders + ELEMENTSCOLLIDERSQUANTITY(elementsQuantity, elementsWithoutColliderQuantity); iterator < end; ++iterator, ++elements)
-   {
-      *iterator = elements->collider;
-   }
-   return colliders;
-}
-
-static struct Map2DElement* cce__loadMap2DElements (uint32_t elementsQuantity, FILE *file)
-{
-   struct Map2DElement *elements = malloc(elementsQuantity * sizeof(struct Map2DElement));
-   for (struct Map2DElement *iterator = elements, *end = elements + elementsQuantity; iterator < end; ++iterator)
-   {
-      fread(&(iterator->position), sizeof(int32_t), 2, file); // x and y at the same time
-      cceLittleEndianToHostEndianArrayInt32(&(iterator->position), 2);
-      fread(&(iterator->size), sizeof(uint16_t), 2, file);
-      cceLittleEndianToHostEndianArrayInt16(&(elements->size), 2);
-      fread(&(iterator->textureInfo), sizeof(struct Texture), 1, file);
-      cceLittleEndianToHostEndianArrayInt16(&(iterator->textureInfo), 4);
-      iterator->textureInfo.ID = cceLittleEndianToHostEndianInt32(iterator->textureInfo.ID);
-      fread(iterator->textureOffsetGroups, sizeof(uint8_t), 9, file);
-   }
-   return elements;
-}
-
-static void cce__writeMap2DElements (struct Map2DElement* elements, uint32_t elementsQuantity, FILE *file)
-{
-   union
-   {
-      struct
-      {
-         int32_t x;
-         int32_t y;
-      } i32;
-      struct
-      {
-         uint16_t x;
-         uint16_t y;
-      } u16;
-      struct Texture tInfo;
-   }
-   temporary;
-   for (struct Map2DElement *iterator = elements, *end = elements + elementsQuantity; iterator < end; ++iterator)
-   {
-      cceHostEndianToLittleEndianNewArrayInt32(&(temporary.i32), &(iterator->position), 2);
-      fwrite(&(temporary.i32.x), sizeof(int32_t), 2, file);
-      cceHostEndianToLittleEndianNewArrayInt16(&(temporary.u16), &(iterator->size), 2);
-      fwrite(&(temporary.u16.x), sizeof(uint16_t), 2, file);
-      cceHostEndianToLittleEndianNewArrayInt16(&(temporary.tInfo), &(iterator->textureInfo), 4);
-      temporary.tInfo.ID = cceHostEndianToLittleEndianInt32(iterator->textureInfo.ID);
-      fwrite(&(temporary.tInfo), sizeof(struct Texture), 1, file);
-      fwrite(iterator->textureOffsetGroups, sizeof(uint8_t), 9, file);
-   }
-}
-
-static struct ExitMap2D* cce__loadExitMap2Ds (uint8_t exitMapsQuantity, FILE *file)
-{
-   struct ExitMap2D *exitMaps = malloc(exitMapsQuantity * sizeof(struct ExitMap2D));
-   for (struct ExitMap2D *iterator = exitMaps, *end = exitMaps + exitMapsQuantity; iterator < end; ++iterator)
-   {
-      fread(iterator, 4, 6, file);
-      fread(((int32_t*) iterator) + 6, 1, 1, file);
-      cceLittleEndianToHostEndianArrayInt32(iterator, 6);
-   }
-   return exitMaps;
-}
-
-static void cce__writeExitMap2Ds (struct ExitMap2D *exitMaps, uint8_t exitMapsQuantity, FILE *file)
-{
-   uint32_t temporary[6];
-   for (struct ExitMap2D *iterator = exitMaps, *end = exitMaps + exitMapsQuantity; iterator < end; ++iterator)
-   {
-      cceLittleEndianToHostEndianNewArrayInt32(temporary, iterator, 6);
-      fwrite(temporary, 4, 6, file);
-      fwrite(((int32_t*) iterator) + 6, 1, 1, file);
-   }
-}
-
-struct Map2D* cceLoadMap2D (uint16_t number)
-{
-   cce__shortToString(mapPath, number, ".c2m");
-   FILE *mapFile = fopen(mapPath, "rb");
-   if (!mapFile)
-   {
-      cce__criticalErrorPrint("ENGINE::MAP2D::FAILED_TO_LOAD:\n%s - no such file or directory", mapPath);
-   }
-   *(mapPath + mapPathLength) = '\0';
-   
-   struct Map2D *map = (struct Map2D*) malloc(sizeof(struct Map2D));
-   map->ID = number;
-   map->delayedActions = LL_LIST_INIT(LL_SINGLELINKED);
-   // GL elements
-   {
-      struct Map2DElement *elements;
-      uint32_t elementsWithoutColliderQuantity, elementsCollidersQuantity;
-      fread(&(map->elementsQuantity), 4u/*uint32_t*/, 1u, mapFile);
-      map->elementsQuantity = cceLittleEndianToHostEndianInt32(map->elementsQuantity);
-      fread(&elementsWithoutColliderQuantity, 4u/*uint32_t*/, 1u, mapFile);
-      elementsWithoutColliderQuantity = cceLittleEndianToHostEndianInt32(elementsWithoutColliderQuantity);
-      elementsCollidersQuantity = ELEMENTSCOLLIDERSQUANTITY(map->elementsQuantity, elementsWithoutColliderQuantity);
-      struct Map2DCollider *colliders;
-      colliders = NULL;
-      if (map->elementsQuantity)
-         elements = cce__loadMap2DElements(map->elementsQuantity, mapFile);
-      fread(&(map->transformGroupsQuantity), 2u/*uint16_t*/, 1u, mapFile);
-      map->transformGroupsQuantity = cceLittleEndianToHostEndianInt16(map->transformGroupsQuantity);
-      map->transformGroups = cce__loadGroups(map->transformGroupsQuantity, mapFile);
-      if (map->elementsQuantity)
-      {
-         colliders = elementsToColliders(map->elementsQuantity, elementsWithoutColliderQuantity, elements, &(map->texturesMapReliesOn), &(map->texturesMapReliesOnQuantity),
-                                         map->transformGroupsQuantity, map->transformGroups);
-      }
-      uint32_t collidersQuantity;
-      fread(&collidersQuantity, 4u, 1u, mapFile);
-      collidersQuantity = cceLittleEndianToHostEndianInt32(collidersQuantity);
-      map->collidersQuantity = elementsCollidersQuantity + collidersQuantity;
-      map->colliders = (struct Map2DCollider*) realloc(colliders, (map->collidersQuantity) * sizeof(struct Map2DCollider));
-      if (collidersQuantity)
-      {
-         fread((map->colliders + elementsCollidersQuantity), sizeof(struct Map2DCollider), collidersQuantity, mapFile);
-         if (g_endianess == CCE_BIG_ENDIAN)
-            for (struct Map2DCollider *iterator = map->colliders + elementsCollidersQuantity, *end = map->colliders + map->collidersQuantity; iterator < end; ++iterator)
-            {
-               cceLittleEndianToBigEndianArrayInt32(&(iterator->position), 2);
-               cceLittleEndianToBigEndianArrayInt16(&(iterator->size), 2);
-            }
-      }
-   }
-   fread(&(map->collisionGroupsQuantity), 2u/*uint16_t*/, 1u, mapFile);
-   map->collisionGroupsQuantity = cceLittleEndianToHostEndianInt16(map->collisionGroupsQuantity);
-   map->collisionGroups = cce__loadGroups(map->collisionGroupsQuantity, mapFile);
-   fread(&(map->collisionQuantity), 2u/*uint16_t*/, 1u, mapFile);
-   map->collisionQuantity = cceLittleEndianToHostEndianInt16(map->collisionQuantity);
-   if ((map->collisionQuantity))
-   {
-      (map->collision) = (struct CollisionGroup*) malloc((map->collisionQuantity) * sizeof(struct CollisionGroup));
-      fread((map->collision), sizeof(struct CollisionGroup), (map->collisionQuantity), mapFile);
-      cceLittleEndianToHostEndianArrayInt16(map->collision, map->collisionQuantity * 2);
-   }
-   else
-   {
-      (map->collision) = NULL;
-   }
-   fread(&(map->timersQuantity), 2u/*uint16_t*/, 1u, mapFile);
-   map->timersQuantity = cceLittleEndianToHostEndianInt16(map->timersQuantity);
-   if ((map->timersQuantity))
-   {
-      (map->timers) = (struct Timer*) malloc(map->timersQuantity * sizeof(struct Timer));
-      struct Timer *end = (map->timers + map->timersQuantity - 1u);
-      uint32_t tmp;
-      for (struct Timer *iterator = (map->timers); iterator <= end; ++iterator)
-      {
-         fread((&(iterator->delay)), 4u/*float*/, 1u, mapFile);
-         tmp = cceLittleEndianToHostEndianInt32(*((uint32_t*) &iterator->delay));
-         iterator->delay = *((float*) &tmp);
-         iterator->initTime = 0.0;
-      }
-   }
-   else
-   {
-      (map->timers) = NULL;
-   }
-   fread(&(map->logicQuantity),  4u/*uint32_t*/, 1u, mapFile);
-   map->logicQuantity = cceLittleEndianToHostEndianInt32(map->logicQuantity);
-   if ((map->logicQuantity))
-   {
-      map->logic = cce__loadLogic(map->logicQuantity, mapFile, cce_endianSwapActions);
-   }
-   else
-   {
-      map->logic = NULL;
-   }
-   
-   fread(&(map->staticActionsQuantity), 1u, 1u, mapFile);
-   if (map->staticActionsQuantity)
-   {
-      map->staticActionIDs = (uint32_t *) malloc(map->staticActionsQuantity * sizeof(uint32_t));
-      fread(map->staticActionIDs, 4u, map->staticActionsQuantity, mapFile);
-      cceLittleEndianToHostEndianArrayInt32(map->staticActionIDs, map->staticActionsQuantity);
-      map->staticActionArgOffsets = (uint32_t *) malloc((map->staticActionsQuantity + 1u) * sizeof(uint32_t));
-      fread(map->staticActionArgOffsets + 1, 4u, map->staticActionsQuantity, mapFile);
-      cceLittleEndianToHostEndianArrayInt32(map->staticActionArgOffsets + 1, map->staticActionsQuantity);
-      *(map->staticActionArgOffsets) = 0u;
-      map->staticActionArgs = (cce_void *) malloc((*(map->staticActionArgOffsets + map->staticActionsQuantity)) * sizeof(uint8_t));
-      fread( (map->staticActionArgs), 1u, *(map->staticActionArgOffsets + map->staticActionsQuantity), mapFile);
-
-      if (*map2Dflags & (CCE_PROCESS_LOGIC_FOR_VISIBLE_MAPS | CCE_PROCESS_LOGIC_FOR_ALL_MAPS | CCE_FORCE_INITIALIZE_MAP_ONLOAD))
-      {
-         cce__initLogicMap2D(map);
-      }
-   }
-   fread(&(map->exitMapsQuantity), 1u, 1u, mapFile);
-   if (map->exitMapsQuantity)
-   {
-      map->exitMaps = cce__loadExitMap2Ds(map->exitMapsQuantity, mapFile);
-   }
-   
-   // I'm lazy
-   for (uint8_t smth = 0u, i = 0u; i < 10; ++i)
-   {
-      fread(&smth, 1u, 1u, mapFile);
-      if (smth)
-      {
-         cce__criticalErrorPrint("ENGINE::MAP2D_LOADER::PARSING_ERROR:\nfile of map %u contains fields that isn't implemented in current engine version", number);
-      }
-   }
-   if (cce_fileParseFunc) cce_fileParseFunc(mapFile, number);
-   if (fclose(mapFile) == -1)
-   {
-      cce__errorPrint("ENGINE::MAP2D_LOADER::FILE_UNEXPECTED_CLOSE:\nmap %u file was unexpectedly closed by external file handler", number);
-   }
-   return map;
-}
-
-#define CONVERT_ELEMENTGROUP(dest, src) \
-do \
-{ \
-   dest = (struct ElementGroup*) malloc(src ## Quantity * sizeof(struct ElementGroup)); \
-   struct ElementGroup *d = dest; \
-   for (struct DynamicElementGroup *i = src, *jend = src + src ## Quantity; \
-        i < jend; ++i, ++d) \
-   { \
-      d->elementsQuantity = i->elementsQuantity; \
-      d->elements = (uint32_t*) malloc(i->elementsQuantity * sizeof(uint32_t)); \
-      memcpy(d->elements, i->elements, (i->elementsQuantity * sizeof(uint32_t))); \
-   } \
-} \
-while (0)
-
-/* Do not frees mapdev */
-struct Map2D* cceMap2DdevToMap2D (struct Map2Ddev *mapdev)
-{
-   struct Map2D *map = (struct Map2D*) malloc(sizeof(struct Map2D));
-   map->ID = mapdev->ID;
-   map->delayedActions = LL_LIST_INIT(LL_SINGLELINKED);
-   map->transformGroupsQuantity = mapdev->transformGroupsQuantity;
-   if (mapdev->moveGroupsQuantity)
-   {
-      CONVERT_ELEMENTGROUP(map->transformGroups, mapdev->transformGroups);
-   }
-   else
-   {
-      map->transformGroups = NULL;
-   }
-   {
-      map->elementsQuantity = mapdev->elementsQuantity;
-      uint32_t elementsCollidersQuantity = ELEMENTSCOLLIDERSQUANTITY(mapdev->elementsQuantity, mapdev->elementsWithoutColliderQuantity);
-      struct Map2DElement *elements = (struct Map2DElement*) malloc(mapdev->elementsQuantity * sizeof(struct Map2DElement));
-      memcpy(elements, mapdev->elements, (mapdev->elementsQuantity * sizeof(struct Map2DElement)));
-      struct Map2DCollider *colliders;
-      colliders = NULL;
-      if (mapdev->elementsQuantity)
-      {
-         colliders = elementsToColliders(mapdev->elementsQuantity, mapdev->elementsWithoutColliderQuantity, elements, &(map->texturesMapReliesOn), &(map->texturesMapReliesOnQuantity),
-                                         mapdev->moveGroupsQuantity, map->moveGroups, mapdev->extensionGroupsQuantity, map->extensionGroups, &(map->VAO), &(map->VBO));
-      }
-      map->collidersQuantity = elementsCollidersQuantity + mapdev->collidersQuantity;
-      if (mapdev->collidersQuantity)
-      {
-         map->colliders = (struct Map2DCollider*) realloc(colliders, (map->collidersQuantity) * sizeof(struct Map2DCollider));
-         memcpy(map->colliders + elementsCollidersQuantity, mapdev->colliders, mapdev->collidersQuantity * sizeof(struct Map2DCollider));
-      }
-      else
-      {
-         free(colliders);
-      }
-   }
-   map->collisionGroupsQuantity = mapdev->collisionGroupsQuantity;
-   if (mapdev->collisionGroupsQuantity)
-   {
-      CONVERT_ELEMENTGROUP(map->collisionGroups, mapdev->collisionGroups);
-   }
-   else
-   {
-      map->collisionGroups = NULL;
-   }
-   map->collisionQuantity = mapdev->collisionQuantity;
-   if (mapdev->collisionQuantity)
-   {
-      map->collision = (struct CollisionGroup*) malloc(map->collisionQuantity * sizeof(struct CollisionGroup));
-      memcpy(map->collision, mapdev->collision, (mapdev->collisionQuantity) * sizeof(struct CollisionGroup));
-   }
-   else
-   {
-      map->collision = NULL;
-   }
-   map->timersQuantity = mapdev->timersQuantity;
-   if (mapdev->timersQuantity)
-   {
-      map->timers = (struct Timer*) malloc(mapdev->timersQuantity * sizeof(struct Timer));
-      float *srcDelays = mapdev->timers;
-      for(struct Timer *iterator = map->timers, *end = map->timers + mapdev->timersQuantity; iterator < end; ++iterator, ++srcDelays)
-      {
-         iterator->delay = *srcDelays;
-         iterator->initTime = 0.0;
-      }
-   }
-   else
-   {
-      map->timers = NULL;
-   }
-   map->logicQuantity = mapdev->logicQuantity;
-   if (mapdev->logicQuantity)
-   {
-      map->logic = (struct ElementLogic*) malloc(mapdev->logicQuantity * sizeof(struct ElementLogic));
-      
-      uint_fast32_t operationsQuantityInBytes;
-      uint8_t isLogicQuantityHigherThanThree;
-      for(struct ElementLogic *src = mapdev->logic, *dest = map->logic, *end = (map->logic + mapdev->logicQuantity - 1u); dest <= end; ++src, ++end)
-      {
-         dest->logicElementsQuantity = src->logicElementsQuantity;
-         dest->logicElements = (uint16_t*) malloc(src->logicElementsQuantity * sizeof(uint16_t));
-         memcpy(dest->logicElements, src->logicElements, src->logicElementsQuantity * sizeof(uint16_t));
-         
-         isLogicQuantityHigherThanThree = src->logicElementsQuantity > 3u;
-         operationsQuantityInBytes = (0x01 << ((src->logicElementsQuantity) - 3u) * isLogicQuantityHigherThanThree) + (!isLogicQuantityHigherThanThree);
-         (dest->operations) = (uint_fast16_t*) calloc((operationsQuantityInBytes > sizeof(uint_fast16_t)) ? operationsQuantityInBytes : sizeof(uint_fast16_t), 1u);
-         memcpy(dest->operations, src->operations, operationsQuantityInBytes);
-         
-         dest->elementType = src->elementType;
-         dest->actionsQuantity = src->actionsQuantity;
-         dest->actionIDs = (uint32_t*) malloc(src->actionsQuantity * sizeof(uint32_t));
-         memcpy(dest->actionIDs, src->actionIDs, src->actionsQuantity * sizeof(uint32_t));
-         dest->actionsArgOffsets = (uint32_t*) malloc((src->actionsQuantity + 1u) * sizeof(uint32_t));
-         memcpy(dest->actionsArgOffsets, src->actionsArgOffsets, src->actionsQuantity + 1u);
-         dest->actionsArg = (cce_void *) malloc((*(src->actionsArgOffsets + src->actionsQuantity) - 1u)/* sizeof(cce_void)*/);
-         memcpy(dest->actionsArg, src->actionsArg, (*(src->actionsArgOffsets + src->actionsQuantity) - 1u)/* sizeof(cce_void)*/);
-      }
-   }
-   else
-   {
-      map->logic = NULL;
-   }
-   if (mapdev->actionsQuantity)
-   {
-      map->staticActionIDs = malloc(mapdev->actionsQuantity * sizeof(uint32_t));
-      memcpy(map->staticActionIDs, mapdev->actionIDs, mapdev->actionsQuantity * sizeof(uint32_t));
-      map->staticActionArgOffsets = malloc((mapdev->actionsQuantity + 1) * sizeof(uint32_t));
-      memcpy(map->staticActionArgOffsets, mapdev->actionsArgOffsets, (mapdev->actionsQuantity + 1) * sizeof(uint32_t));
-      map->staticActionArgs = malloc(*(mapdev->actionsArgOffsets + mapdev->actionsQuantity) * sizeof(cce_void));
-      memcpy(map->staticActionArgs, mapdev->actionsArg, *(mapdev->actionsArgOffsets + mapdev->actionsQuantity) * sizeof(cce_void));
-
-      if (*map2Dflags & (CCE_PROCESS_LOGIC_FOR_VISIBLE_MAPS | CCE_PROCESS_LOGIC_FOR_ALL_MAPS | CCE_FORCE_INITIALIZE_MAP_ONLOAD))
-      {
-         cce__initLogicMap2D(map);
-      }
-   }
-   map->exitMapsQuantity = mapdev->exitMapsQuantity;
-   if (mapdev->exitMapsQuantity)
-   {
-      map->exitMaps = (struct ExitMap2D*) malloc(mapdev->exitMapsQuantity * sizeof(struct ExitMap2D));
-      memcpy(map->exitMaps, mapdev->exitMaps, (mapdev->exitMapsQuantity * sizeof(struct ExitMap2D)));
-   }
-   return map;
-}
-
-#define ELEMENTGROUP_SET_ALLOCATED(groups) \
-do \
-{ \
-   for (struct DynamicElementGroup *iterator = groups, *end = groups + groups ## Quantity; \
-        iterator < end; ++iterator) \
-   { \
-      iterator->elementsQuantityAllocated = iterator->elementsQuantity; \
-   } \
-} \
-while(0)
-
-struct Map2Ddev* cceLoadMap2Ddev (uint16_t number)
-{
-   cce__shortToString(mapPath, number, ".c2m");
-   FILE *mapFile = fopen(mapPath, "rb");
-   if (!mapFile)
-   {
-      cce__criticalErrorPrint("ENGINE::MAP2Ddev::FAILED_TO_LOAD:\n%s - no such file or directory", mapPath);
-   }
-   *(mapPath + mapPathLength) = '\0';
-   struct Map2Ddev *map = (struct Map2Ddev*) calloc(1u, sizeof(struct Map2Ddev));
-   map->ID = number;
-   fread(&(map->elementsQuantity), 4u/*uint32_t*/, 1u, mapFile);
-   map->elementsQuantity = cceLittleEndianToHostEndianInt32(map->elementsQuantity);
-   fread(&(map->elementsWithoutColliderQuantity), 4u/*uint32_t*/, 1u, mapFile);
-   map->elementsWithoutColliderQuantity = cceLittleEndianToHostEndianInt32(map->elementsWithoutColliderQuantity);
-   if ((map->elementsQuantity))
-      map->elements = cce__loadMap2DElements(map->elementsQuantity, mapFile);
-   fread(&(map->moveGroupsQuantity), 2u/*uint16_t*/, 1u, mapFile);
-   map->moveGroupsQuantity = cceLittleEndianToHostEndianInt16(map->moveGroupsQuantity);
-   map->moveGroups = (struct DynamicElementGroup*) cce__loadGroups(map->moveGroupsQuantity, mapFile);
-   ELEMENTGROUP_SET_ALLOCATED(map->moveGroups);
-   fread(&(map->extensionGroupsQuantity), 2u/*uint16_t*/, 1u, mapFile);
-   map->extensionGroupsQuantity = cceLittleEndianToHostEndianInt16(map->extensionGroupsQuantity);
-   map->extensionGroups = (struct DynamicElementGroup*) cce__loadGroups(map->extensionGroupsQuantity, mapFile);
-   ELEMENTGROUP_SET_ALLOCATED(map->moveGroups);
-   fread(&(map->collidersQuantity), 4u/*uint32_t*/, 1u, mapFile);
-   map->collidersQuantity = cceLittleEndianToHostEndianInt32(map->collidersQuantity);
-   if (map->collidersQuantity)
-   {
-      map->colliders = (struct Map2DCollider*) malloc(map->collidersQuantity * sizeof(struct Map2DCollider));
-      fread(map->colliders, sizeof(struct Map2DCollider), map->collidersQuantity, mapFile);
-      if (g_endianess == CCE_BIG_ENDIAN)
-         for (struct Map2DCollider *iterator = map->colliders, *end = map->colliders + map->collidersQuantity; iterator < end; ++iterator)
-         {
-            cceLittleEndianToBigEndianArrayInt32(&(iterator->x), 2);
-            cceLittleEndianToBigEndianArrayInt16(&(iterator->width), 2);
-         }
-   }
-   fread(&(map->collisionGroupsQuantity), 2u/*uint16_t*/, 1u, mapFile);
-   map->collisionGroupsQuantity = cceLittleEndianToHostEndianInt16(map->collisionGroupsQuantity);
-   map->collisionGroups = (struct DynamicElementGroup*) cce__loadGroups(map->collisionGroupsQuantity, mapFile);
-   ELEMENTGROUP_SET_ALLOCATED(map->moveGroups);
-   fread(&(map->collisionQuantity), 2u/*uint16_t*/, 1u, mapFile);
-   map->collisionQuantity = cceLittleEndianToHostEndianInt16(map->collisionQuantity);
-   if (map->collisionQuantity)
-   {
-      map->collision = (struct CollisionGroup*) malloc(map->collisionQuantity * sizeof(struct CollisionGroup));
-      fread(map->collision, sizeof(struct CollisionGroup), map->collisionQuantity, mapFile);
-      cceLittleEndianToHostEndianArrayInt16(&(map->collision), map->collisionQuantity * 2);
-   }
-   fread(&(map->timersQuantity), 2u/*uint16_t*/, 1u, mapFile);
-   map->timersQuantity = cceLittleEndianToHostEndianInt16(map->timersQuantity);
-   if ((map->timersQuantity))
-   {
-      (map->timers) = (float*) malloc(map->timersQuantity * sizeof(float));
-      fread((map->timers), 4u/*float*/, map->timersQuantity, mapFile);
-      cceLittleEndianToHostEndianArrayInt32(&(map->timers), map->timersQuantity);
-   }
-   fread(&(map->logicQuantity), 4u/*uint32_t*/, 1u, mapFile);
-   map->logicQuantity = cceLittleEndianToHostEndianInt16(map->logicQuantity);
-   if (map->logicQuantity)
-   {
-      map->logic = cce__loadLogic(map->logicQuantity, mapFile, cce_endianSwapActions);
-   }
-   fread(&(map->actionsQuantity), 1u/*uint8_t*/, 1u, mapFile);
-   if (map->actionsQuantity)
-   {
-      map->actionIDs = (uint32_t *) malloc((map->actionsQuantity) * sizeof(uint32_t));
-      fread( (map->actionIDs),             4u/*uint32_t*/,   (map->actionsQuantity),                                           mapFile);
-      cceLittleEndianToHostEndianArrayInt32(map->actionIDs, map->actionsQuantity);
-      map->actionsArgOffsets = (uint32_t*) malloc((map->actionsQuantity + 1u) * sizeof(uint32_t));
-      *(map->actionsArgOffsets) = 0u;
-      fread( (map->actionsArgOffsets + 1), 4u/*uint32_t*/, (map->actionsQuantity),                                           mapFile);
-      cceLittleEndianToHostEndianArrayInt32(map->actionsArgOffsets + 1, map->actionsQuantity);
-      map->actionsArg = (cce_void *) malloc((*(map->actionsArgOffsets + map->actionsQuantity) - 1u) /*sizeof(cce_void)*/);
-      fread( (map->actionsArg),            1u/*cce_void*/,         *(map->actionsArgOffsets + map->actionsQuantity),          mapFile);
-   }
-   fread(&(map->exitMapsQuantity), 1u/*uint8_t*/, 1u, mapFile);
-   if (map->exitMapsQuantity)
-   {
-      map->exitMaps = cce__loadExitMap2Ds(map->exitMapsQuantity, mapFile);
-   }
-   
-   // I'm lazy, again
-   for (uint8_t smth = 0u, i = 0u; i < 10; ++i)
-   {
-      fread(&smth, 1u, 1u, mapFile);
-      if (smth)
-      {
-         cce__criticalErrorPrint("ENGINE::MAP2Ddev_LOADER::PARSING_ERROR:\nfile of map %u contains fields that isn't implemented in current engine version", number);
-      }
-   }
-   if (cce_fileParseFunc) cce_fileParseFunc(mapFile, number);
-   if (fclose(mapFile) == -1)
-   {
-      cce__errorPrint("ENGINE::MAP2Ddev_LOADER::FILE_UNEXPECTED_CLOSE:\nmap %u file was unexpectedly closed by external file handler", number);
-   }
-   return map;
-}
-
-int cceWriteMap2Ddev (struct Map2Ddev *map, void (*writeFunc)(FILE*))
-{
-   union
-   {
-      uint32_t u32;
-      uint16_t u16;
-      uint16_t arr16[2];
-   } temporary;
-   cce__shortToString(mapPath, map->ID, ".c2m");
-   FILE *mapFile = fopen(mapPath, "wb");
-   if (!mapFile)
-   {
-      cce__errorPrint("ENGINE::MAP2Ddev::FAILED_TO_OPEN_FILE:\n%s - cannot open file. Are you haven't enough free space left? Are you have a directory with same name? Does directory really exist?\n", mapPath);
-      return -1;
-   }
-   *(mapPath + mapPathLength) = '\0';
-   temporary.u32 = cceHostEndianToLittleEndianInt32(map->elementsQuantity);
-   fwrite(&(temporary.u32), 4/*uint32_t*/, 1, mapFile);
-   temporary.u32 = cceHostEndianToLittleEndianInt32(map->elementsWithoutColliderQuantity);
-   fwrite(&(temporary.u32), 4/*uint32_t*/, 1, mapFile);
-   if ((map->elementsQuantity))
-   {
-      cce__writeMap2DElements(map->elements, map->elementsQuantity, mapFile);
-   }
-   temporary.u16 = cceHostEndianToLittleEndianInt16(map->moveGroupsQuantity);
-   fwrite(&(temporary.u16), 2/*uint16_t*/, 1, mapFile);
-   if ((map->moveGroupsQuantity))
-   {
-      cce__writeGroups(map->moveGroupsQuantity, (struct ElementGroup*) map->moveGroups, mapFile);
-   }
-   temporary.u16 = cceHostEndianToLittleEndianInt16(map->extensionGroupsQuantity);
-   fwrite(&(temporary.u16), 2/*uint16_t*/, 1, mapFile);
-   if ((map->extensionGroupsQuantity))
-   {
-      cce__writeGroups(map->extensionGroupsQuantity, (struct ElementGroup*) map->extensionGroups, mapFile);
-   }
-   temporary.u32 = cceHostEndianToLittleEndianInt32(map->collidersQuantity);
-   fwrite(&(temporary.u32), 4/*uint32_t*/, 1, mapFile);
-   if ((map->collidersQuantity))
-   {
       if (*g_endianess == CCE_BIG_ENDIAN)
       {
-         struct Map2DCollider collider;
-         for (struct Map2DCollider *iterator = map->colliders, *end = map->colliders + map->collidersQuantity; iterator < end; ++iterator)
+         uint32_t elementID;
+         for (uint32_t *jiterator = iterator->elements, *jend = iterator->elements + iterator->elementsQuantity; jiterator < jend; ++jiterator)
          {
-            collider = *iterator;
-            cceBigEndianToLittleEndianArrayInt32(&(collider.x), 2);
-            cceBigEndianToLittleEndianArrayInt16(&(collider.width), 2);
-            fwrite(&collider, sizeof(struct Map2DCollider), 1, mapFile);
+            elementID = cceBigEndianToLittleEndianInt32(*jiterator);
+            fwrite(&elementID, 4u/*uint32_t*/, 1, map_f);
          }
       }
       else
       {
-         fwrite(map->colliders, sizeof(struct Map2DCollider), map->collidersQuantity, mapFile);
+         fwrite(iterator->elements, 4u/*uint32_t*/, iterator->elementsQuantity, map_f);
       }
    }
-   temporary.u16 = cceHostEndianToLittleEndianInt16(map->collisionGroupsQuantity);
-   fwrite(&(temporary.u16), 2/*uint16_t*/, 1, mapFile);
-   if ((map->collisionGroupsQuantity))
+}
+
+#define LOADELEMENTS(buffer, sectionSize, info, file, elementDataAlloc, textureDataAlloc, elementsQuantityAlloc) \
+fread(&elementDataQuantity, sizeof(uint16_t), sectionSize > 0, file); \
+elementDataQuantity = cceLittleEndianToHostEndianInt16(elementDataQuantity); \
+fread(&textureDataQuantity, sizeof(uint16_t), sectionSize > 0, file); \
+textureDataQuantity = cceLittleEndianToHostEndianInt16(textureDataQuantity); \
+fread(&elementsTotal,       sizeof(uint32_t), sectionSize > 0, file); \
+elementsTotal = cceLittleEndianToHostEndianInt32(elementsTotal); \
+struct Map2DElementData     *elementData = elementDataAlloc; \
+struct cce_texture2D        *textureData = textureDataAlloc; \
+elementsQuantity                         = elementsQuantityAlloc; \
+fread(elementsQuantity,     sizeof(uint32_t), sectionSize,     file); \
+cceLittleEndianToHostEndianArrayInt32(elementsQuantity, sectionSize); \
+fread(elementData, sizeof(struct Map2DElementData), elementDataQuantity, file); \
+fread(textureData, sizeof(struct cce_texture2D), textureDataQuantity, file); \
+cceLittleEndianToHostEndianArrayInt16(textureData, textureDataQuantity * 5); \
+uint16_t *usedTextures = (**(struct UsedTexturesInfo **)((cce_void*) info + g_resourceLoadersOffset)).texturesMapDependsOn; \
+for (struct cce_texture2D *iterator = textureData, *end = textureData + textureDataQuantity; iterator < end; ++iterator) \
+   if (iterator->ID > 0) \
+      iterator->ID = usedTextures[iterator->ID - 1]
+
+static int loadElements (void *buffer, uint8_t sectionSize, struct cce_buffer *info, FILE *file)
+{
+   struct RenderingInfo *map = buffer;
+   uint32_t *elementsQuantity;
+   uint32_t elementsTotal;
+   uint16_t elementDataQuantity = 0, textureDataQuantity = 0;
+   LOADELEMENTS(buffer, sectionSize, info, file, malloc(elementsTotal * sizeof(struct Map2DElementPosition) + sectionSize * sizeof(struct Map2DElementPositionArray) +
+                elementDataQuantity * sizeof(struct Map2DElementData) + textureDataQuantity * sizeof(struct cce_texture2D)),
+                (struct cce_texture2D*)(elementData + elementDataQuantity), (uint32_t*)(textureData + textureDataQuantity));
+   struct Map2DElementPositionArray *elements = (struct Map2DElementPositionArray*)elementsQuantity;
+   elements[sectionSize - 1].dataAllocated = elements[sectionSize - 1].dataQuantity = elementsQuantity[sectionSize - 1];
+   elements[sectionSize - 1].data = (struct Map2DElementPosition*)(elements + sectionSize) + elementsTotal - elementsQuantity[sectionSize - 1];
+   uint32_t *qiterator = elementsQuantity + sectionSize - 2;
+   for (struct Map2DElementPositionArray *iterator = elements + sectionSize - 1, *end = elements; iterator > end; --iterator, --qiterator)
    {
-      cce__writeGroups(map->collisionGroupsQuantity, (struct ElementGroup*) map->collisionGroups, mapFile);
+      iterator[-1].dataQuantity = *qiterator;
+      iterator[-1].dataAllocated = *qiterator;
+      iterator[-1].data = iterator->data - *qiterator;
    }
-   temporary.u16 = cceHostEndianToLittleEndianInt16(map->collisionQuantity);
-   fwrite(&(temporary.u16), 2/*uint16_t*/, 1, mapFile);
-   if ((map->collisionQuantity))
-   {
-      if (*g_endianess == CCE_BIG_ENDIAN)
-      {
-         for (struct CollisionGroup *iterator = map->collision, *end = map->collision + map->collisionQuantity; iterator < end; ++iterator)
-         {
-            cceBigEndianToLittleEndianNewArrayInt16(temporary.arr16, iterator, 2);
-            fwrite(temporary.arr16, sizeof(struct CollisionGroup), 1, mapFile);
-         }
-      }
-      else
-      {
-         fwrite((map->collision), sizeof(struct CollisionGroup), (map->collisionQuantity), mapFile);
-      }
-   }
-   temporary.u16 = cceHostEndianToLittleEndianInt16(map->timersQuantity);
-   fwrite(&(temporary.u16), 2/*uint16_t*/, 1, mapFile);
-   if ((map->timersQuantity))
-   {
-      if (*g_endianess == CCE_BIG_ENDIAN)
-      {
-         for (uint32_t *iterator = (uint32_t*) map->timers, *end = (uint32_t*) map->timers + map->timersQuantity; iterator < end; ++iterator)
-         {
-            temporary.u32 = cceBigEndianToLittleEndianInt32(*iterator);
-            fwrite(&(temporary.u32), 4, 1, mapFile);
-         }
-      }
-      else
-      {
-         fwrite((map->timers), 4/*float*/, (map->timersQuantity), mapFile);
-      }
-   }
-   temporary.u32 = cceHostEndianToLittleEndianInt32(map->logicQuantity);
-   fwrite(&(temporary.u32), 4/*uint32_t*/, 1, mapFile);
-   if (map->logicQuantity)
-   {
-      cce__writeLogic(map->logicQuantity, map->logic, mapFile, cce_endianSwapActions);
-   }
-   fwrite(&(map->actionsQuantity), 1/*uint8_t*/, 1, mapFile);
-   if (map->actionsQuantity)
-   {
-      if (*g_endianess == CCE_BIG_ENDIAN)
-      {
-         for (uint32_t *iterator = map->actionIDs, *end = map->actionIDs + map->actionsQuantity; iterator < end; ++iterator)
-         {
-            temporary.u32 = cceBigEndianToLittleEndianInt32(*iterator);
-            fwrite(&(temporary.u32), 4, 1, mapFile);
-         }
-         for (uint32_t *iterator = map->actionsArgOffsets + 1, *end = map->actionsArgOffsets + 1 + map->actionsQuantity; iterator < end; ++iterator)
-         {
-            temporary.u32 = cceBigEndianToLittleEndianInt32(*iterator);
-            fwrite(&(temporary.u32), 4, 1, mapFile);
-         }
-      }
-      else
-      {
-         fwrite( (map->actionIDs),             4/*uint32_t*/,  (map->actionsQuantity),                          mapFile);
-         fwrite( (map->actionsArgOffsets + 1), 4/*uint32_t*/,  (map->actionsQuantity),                          mapFile);
-      }
-      fwrite( (map->actionsArg),            1/*cce_void*/, *(map->actionsArgOffsets + map->actionsQuantity), mapFile);
-   }
-   fwrite(&(map->exitMapsQuantity), 1/*uint8_t*/, 1, mapFile);
-   if (map->exitMapsQuantity)
-   {
-      cce__writeExitMap2Ds(map->exitMaps, map->exitMapsQuantity, mapFile);
-   }
-   
-   // I'm lazy, again
-   uint8_t null = 0u;
-   for (uint8_t i = 0u; i < 10; ++i)
-   {
-      fwrite(&null, 1u/*uint8_t*/, 1u, mapFile);
-   }
-   if (writeFunc) writeFunc(mapFile);
-   if (fclose(mapFile) == -1)
-   {
-      cce__errorPrint("ENGINE::MAP2Ddev_MAPWRITER::FILE_UNEXPECTED_CLOSE:\nmap %u file was unexpectedly closed by external file handler", map->ID);
-   }
+   fread(elements->data, sizeof(struct Map2DElementPosition), elementsTotal, file);
+   map->data = cce__map2DElementsToRenderingBuffer(elements, sectionSize, textureData, textureDataQuantity, elementData, elementDataQuantity);
+   free(elementData);
    return 0;
+}
+
+static int loadElementsDynamic (void *buffer, uint8_t sectionSize, struct cce_buffer *info, FILE *file)
+{
+   struct DynamicRenderingInfo *map = buffer;
+   uint32_t *elementsQuantity;
+   uint32_t elementsTotal;
+   uint16_t elementDataQuantity = 0, textureDataQuantity = 0;
+   LOADELEMENTS(buffer, sectionSize, info, file, malloc(sectionSize * sizeof(struct Map2DElementPositionArray)),
+                malloc(elementDataQuantity * sizeof(struct Map2DElementData)), malloc(textureDataQuantity * sizeof(struct cce_texture2D)));
+   map->elements = (struct Map2DElementPositionArray*) elementsQuantity;
+   uint32_t *qiterator = elementsQuantity + sectionSize;
+   for (struct Map2DElementPositionArray *iterator = map->elements + sectionSize, *end = map->elements; iterator > end;)
+   {
+      --iterator, --qiterator;
+      iterator->dataQuantity = *qiterator;
+      iterator->dataAllocated = *qiterator;
+      iterator->data = malloc(*qiterator * sizeof(struct Map2DElementPosition));
+      fread(iterator->data, sizeof(struct Map2DElementPosition), *qiterator, file);
+   }
+   map->elementData = elementData;
+   map->textureInfo = textureData;
+   map->elementDataQuantity  = elementDataQuantity;
+   map->elementDataAllocated = elementDataQuantity;
+   map->textureInfoQuantity  = textureDataQuantity;
+   map->textureInfoAllocated = textureDataQuantity;
+   map->data = cce__map2DElementsToRenderingBuffer(map->elements, sectionSize, textureData, textureDataQuantity, elementData, elementDataQuantity);
+   return 0;
+}
+
+#define LOADCOLLIDERS(map, sectionSize, file, transformGroupsAlloc, collisionGroupsAlloc, collisionAlloc, collisionCacheAlloc, collidersAlloc) \
+fread(&map->collidersQuantity, sizeof(uint32_t), sectionSize > 0, file); \
+map->collidersQuantity = cceLittleEndianToHostEndianInt32(map->collidersQuantity); \
+fread(&map->transformGroupsQuantity, sizeof(uint16_t), CCE_MAX(sectionSize - 1, 3), file); \
+cceLittleEndianToHostEndianArrayInt16(&map->transformGroupsQuantity, 3); \
+map->transformGroups = transformGroupsAlloc; \
+map->collisionGroups = collisionGroupsAlloc; \
+map->collisionCache  = collisionCacheAlloc; \
+map->collision       = collisionAlloc; \
+map->colliders       = collidersAlloc; \
+fread(map->colliders, sizeof(union Collider2D), map->collidersQuantity, file); \
+if (*g_endianess == CCE_BIG_ENDIAN) \
+{ \
+   for (union Collider2D *iterator = map->colliders, *end = map->colliders + map->collidersQuantity; iterator < end; ++iterator) \
+   { \
+      cceLittleEndianToBigEndianArrayInt32(&iterator->rectangle.position, 2); \
+      if (cce__map2Dflags & CCE_CIRCLE_COLLIDER) \
+         iterator->circle.radius = cceLittleEndianToBigEndianInt16(iterator->circle.radius); \
+   } \
+} \
+cce__loadGroups(map->transformGroupsQuantity, map->transformGroups, file); \
+cce__loadGroups(map->collisionGroupsQuantity, map->collisionGroups, file); \
+fread(map->collision, sizeof(struct CollisionGroup), map->collisionGroupsQuantity, file); \
+cceLittleEndianToHostEndianArrayInt16(map->collision, 2 * map->collisionGroupsQuantity); \
+memset(map->collisionCache, 0, map->collisionQuantity * sizeof(uint64_t))
+
+static int loadColliders (void *buffer, uint8_t sectionSize, struct cce_buffer *info, FILE *file)
+{
+   CCE_UNUSED(info);
+   struct CollisionInfo *map = buffer;
+   LOADCOLLIDERS(map, sectionSize, file, 
+                 malloc(map->collidersQuantity       * sizeof(union Collider2D)    + map->transformGroupsQuantity * sizeof(struct ElementGroup) + 
+                        map->collisionGroupsQuantity * sizeof(struct ElementGroup) + map->collisionQuantity       * (sizeof(struct CollisionGroup) + sizeof(uint64_t))),
+                 (map->transformGroups + map->transformGroupsQuantity), (struct CollisionGroup*)(map->collisionCache + map->collisionGroupsQuantity),
+                 (uint64_t*)(map->collisionGroups + map->collisionGroupsQuantity), (union Collider2D*)(map->colliders + map->collidersQuantity));
+   return 0;
+}
+
+static int loadCollidersDynamic (void *buffer, uint8_t sectionSize, struct cce_buffer *info, FILE *file)
+{
+   CCE_UNUSED(info);
+   struct DynamicCollisionInfo *map = buffer;
+   LOADCOLLIDERS(map, sectionSize, file,
+                 malloc(map->transformGroupsQuantity * sizeof(struct ElementGroup)),
+                 malloc(map->collisionGroupsQuantity * sizeof(struct ElementGroup)),
+                 malloc(map->collisionQuantity       * sizeof(struct CollisionGroup)),
+                 malloc(map->collisionQuantity       * sizeof(uint64_t)),
+                 malloc(map->collidersQuantity       * sizeof(union Collider2D)));
+   map->collidersAllocated = map->collidersQuantity;
+   map->transformGroupsAllocated = map->transformGroupsQuantity;
+   map->collisionGroupsAllocated = map->collisionGroupsQuantity;
+   map->collisionAllocated = map->collisionQuantity;
+   return 0;
+}
+
+static void freeElements (void *buffer, struct cce_buffer *info)
+{
+   CCE_UNUSED(info);
+   struct RenderingInfo *map = buffer;
+   cce__deleteMap2DRenderingBuffer(map->data);
+}
+
+static void freeElementsDynamic (void *buffer, struct cce_buffer *info)
+{
+   CCE_UNUSED(info);
+   struct DynamicRenderingInfo *map = buffer;
+   cce__deleteMap2DRenderingBuffer(map->data);
+   for (struct Map2DElementPositionArray *iterator = map->elements, *end = map->elements; iterator < end; ++iterator)
+   {
+      free(iterator->data);
+   }
+   free(map->elements);
+   free(map->elementData);
+   free(map->textureInfo);
+}
+
+static void freeColliders (void *buffer, struct cce_buffer *info)
+{
+   CCE_UNUSED(info);
+   struct CollisionInfo *map = buffer;
+   free(map->transformGroups);
+}
+
+static void freeCollidersDynamic (void *buffer, struct cce_buffer *info)
+{
+   CCE_UNUSED(info);
+   struct DynamicCollisionInfo *map = buffer;
+   free(map->colliders);
+   free(map->transformGroups);
+   free(map->collisionGroups);
+   free(map->collision);
+   free(map->collisionCache);
+}
+
+static uint8_t storeElements (void *buffer, struct cce_buffer *info, FILE *file)
+{
+   struct DynamicRenderingInfo *map = buffer;
+   
+   uint8_t sectionSize = map->layersQuantity;
+   if (sectionSize == 0)
+      return 0;
+   {
+      uint16_t tmp = cceHostEndianToLittleEndianInt16(map->elementDataQuantity);
+      fwrite(&tmp, sizeof(uint16_t), 1, file);
+      tmp = cceHostEndianToLittleEndianInt16(map->textureInfoQuantity);
+      fwrite(&tmp, sizeof(uint16_t), 1, file);
+      fseek(file, sizeof(uint32_t), SEEK_CUR);
+      uint32_t elementsTotalSize = 0;
+      uint32_t tmp2;
+      for (struct Map2DElementPositionArray *iterator = map->elements, *end = map->elements + map->layersQuantity; iterator < end; ++iterator)
+      {
+         elementsTotalSize += iterator->dataQuantity;
+         tmp2 = cceBigEndianToLittleEndianInt32(iterator->dataQuantity);
+         fwrite(&tmp2, sizeof(uint32_t), 1, file);
+      }
+      fseek(file, -(long)((map->layersQuantity + 1) * sizeof(uint32_t)), SEEK_CUR);
+      fwrite(&elementsTotalSize, sizeof(uint32_t), 1, file);
+      fseek(file, (long)(map->layersQuantity * sizeof(uint32_t)), SEEK_CUR);
+   }
+   fwrite(map->elementData, sizeof(struct Map2DElementData), map->elementDataQuantity, file);
+   uint16_t *dependantTextures =         (**(struct UsedTexturesInfo**)((cce_void*) info + g_resourceLoadersOffset)).texturesMapDependsOn;
+   uint16_t  dependantTexturesQuantity = (**(struct UsedTexturesInfo**)((cce_void*) info + g_resourceLoadersOffset)).texturesMapDependsOnQuantity;
+   for (struct cce_texture2D tmp, *iterator = map->textureInfo, *end = map->textureInfo + map->textureInfoQuantity; iterator < end; ++iterator)
+   {
+      if (iterator->ID == 0)
+         goto TEXTUREID_SET;
+      for (uint16_t *jiterator = dependantTextures, *jend = dependantTextures + dependantTexturesQuantity; jiterator < jend; ++jiterator)
+      {
+         if (*jiterator == iterator->ID)
+         {
+            tmp.ID = dependantTextures - jiterator + 1;
+            goto TEXTUREID_SET;
+         }
+      }
+      fprintf(stderr, "ENGINE::MAP2DLOADERS::RENDERING_DATA_STORE_ERROR:\nTextureID specified in element not found in DependantTextures array.\n");
+      tmp.ID = 0;
+TEXTUREID_SET:
+      cceHostEndianToLittleEndianNewArrayInt16(&tmp.position, &iterator->position, 4);
+      fwrite(&tmp, sizeof(struct cce_texture2D), 1, file);
+   }
+   for (struct Map2DElementPositionArray *iterator = map->elements, *end = map->elements + map->layersQuantity; iterator < end; ++iterator)
+   {
+      if (g_endianess == CCE_BIG_ENDIAN)
+      {
+         for (struct Map2DElementPosition tmp, *jiterator = iterator->data, *jend = iterator->data + iterator->dataQuantity; jiterator < jend ;++jiterator)
+         {
+            cceSwapEndianNewArrayIntN(&tmp, jiterator, 4, 2);
+            fwrite(&tmp, sizeof(struct Map2DElementPosition), 1, file);
+         }
+      }
+      else
+      {
+         fwrite(iterator->data, sizeof(struct Map2DElementPosition), iterator->dataQuantity, file);
+      }
+   }
+   return sectionSize;
+}
+
+static uint8_t storeColliders (void *buffer, struct cce_buffer *info, FILE *file)
+{
+   CCE_UNUSED(info);
+   struct CollisionInfo *map = buffer;
+   uint8_t sectionSize = 4;
+   
+   for (uint16_t *iterator = &map->collisionQuantity, *end = &map->transformGroupsQuantity; iterator >= end && *iterator == 0; --iterator, --sectionSize){}
+   
+   if (sectionSize == 1 && map->collidersQuantity == 0)
+      return 0;
+   
+   {
+      uint32_t tmp = cceHostEndianToLittleEndianInt32(map->collidersQuantity);
+      fwrite(&tmp, sizeof(uint32_t),  sectionSize > 0, file);
+      uint16_t tmp2 = cceHostEndianToLittleEndianInt16(map->transformGroupsQuantity);
+      fwrite(&tmp2, sizeof(uint16_t), sectionSize > 1, file);
+      tmp2 = cceHostEndianToLittleEndianInt16(map->collisionGroupsQuantity);
+      fwrite(&tmp2, sizeof(uint16_t), sectionSize > 2, file);
+      tmp2 = cceHostEndianToLittleEndianInt16(map->collisionQuantity);
+      fwrite(&tmp2, sizeof(uint16_t), sectionSize > 3, file);
+   }
+   
+   if (*g_endianess == CCE_BIG_ENDIAN)
+   {
+      union Collider2D tmp;
+      for (union Collider2D *iterator = map->colliders, *end = map->colliders + map->collidersQuantity; iterator < end; ++iterator)
+      {
+         cceBigEndianToLittleEndianNewArrayInt32(&tmp, &iterator->rectangle.position, 2);
+         if (cce__map2Dflags & CCE_CIRCLE_COLLIDER)
+            tmp.circle.radius = cceBigEndianToLittleEndianInt16(iterator->circle.radius);
+         fwrite(&tmp, sizeof(union Collider2D), 1, file);
+      }
+   }
+   else
+   {
+      fwrite(map->colliders, sizeof(union Collider2D), map->collidersQuantity, file);
+   }
+   cce__writeGroups(map->transformGroupsQuantity, map->transformGroups, file);
+   cce__writeGroups(map->collisionGroupsQuantity, map->collisionGroups, file);
+   
+   if (*g_endianess == CCE_BIG_ENDIAN)
+   {
+      struct CollisionGroup tmp;
+      for (struct CollisionGroup *iterator = map->collision, *end = map->collision + map->collisionGroupsQuantity; iterator < end; ++iterator)
+      {
+         cceBigEndianToLittleEndianNewArrayInt16(&tmp, iterator, 2);
+         fwrite(&tmp, sizeof(struct CollisionGroup), 1, file);
+      }
+   }
+   else
+   {
+      fwrite(map->collision, sizeof(struct CollisionGroup), map->collisionGroupsQuantity, file);
+   }
+   return sectionSize;
+}
+
+static int loadResourcesSection (void *buffer, uint8_t sectionSize, struct cce_buffer *info, FILE *file)
+{
+   uint32_t resourceSizes[256]; // VLA support across C compilers is still bad (and most likely wont improve)
+   fread(resourceSizes + 1, sizeof(uint32_t), sectionSize, file);
+   cceLittleEndianToHostEndianArrayInt32(resourceSizes + 1, sectionSize);
+   if (sectionSize > resourceLoadingFunctionsQuantity)
+   {
+      for (uint32_t *iterator = resourceSizes + resourceLoadingFunctionsQuantity, *end = resourceSizes + sectionSize; iterator < end; ++iterator)
+      {
+         if (*iterator != 0)
+         {
+            fprintf(stderr, "ENGINE::MAP2D_LOADING::NONEMPTY_RESOURCE_WITHOUT_LOADER:\nMap2D cannot be loaded because some resource required for map to function does not have corresponding loader");
+            return -1;
+         }
+      }
+   }
+   uint32_t maxSize = 0;
+   for (uint32_t *iterator = resourceSizes + 1, *end = resourceSizes + 1 + sectionSize; iterator < end; ++iterator)
+   {
+      maxSize = (*iterator > maxSize) ? *iterator : maxSize;
+   }
+   char *buf, **names;
+   buf = malloc(maxSize * sizeof(char));
+   uint32_t namesAllocated = maxSize / 16; // Approximation
+   names = malloc(namesAllocated * sizeof(char*));
+   cce_rloadfun *fun = resourceLoadingFunctions;
+   size_t dataBufferSize = 0;
+   {
+      uint32_t *iterator = resourceSizes + sectionSize;
+      size_t *bufferSizes = resourceLoadingFunctionsBufferSizes + sectionSize - 1;
+      resourceSizes[0] = 1; // Workaround to avoid out-of-bounds check
+      dataBufferSize = resourceSpaceAllocated;
+      while (*iterator != 0)
+      {
+         dataBufferSize -= *bufferSizes;
+         --iterator;
+         --bufferSizes;
+      }
+      sectionSize = (iterator - resourceSizes);
+   }
+   size_t sectionsUsedBitFieldSize = HEADSIZE_TO_BITFIELD_SIZE(sectionSize);
+   uint_fast32_t *bits = calloc(1, dataBufferSize + sectionsUsedBitFieldSize * sizeof(uint_fast32_t));
+   uint_fast32_t *dataBuffer = bits + sectionsUsedBitFieldSize;
+   *dataBuffer++ = sectionSize;
+   size_t bitCounter = 0;
+   cce_void *jiterator = (cce_void*)(dataBuffer);
+   size_t *bufferSizes = resourceLoadingFunctionsBufferSizes;
+   for (uint32_t *iterator = resourceSizes + 1, *end = iterator + sectionSize; iterator < end; ++iterator, ++fun, ++bitCounter, jiterator += *bufferSizes++)
+   {
+      if (*iterator == 0)
+         continue;
+      
+      bits[bitCounter >> ((sizeof(uint_fast32_t) >> 2) + 4)] |= 1 << (bitCounter & (sizeof(uint_fast32_t) * 8 - 1));
+      
+      fread(buf, sizeof(char), *iterator, file);
+      for (char *it = buf, **jit = names, *iend = buf + *iterator;; ++jit, it += strlen(it) + 1)
+      {
+         ptrdiff_t namesQuantity = jit - names;
+         if (namesQuantity > namesAllocated)
+         {
+            CCE_REALLOC_ARRAY(names, namesAllocated + 1);
+            jit = names + namesQuantity;
+         }
+         if (it >= iend)
+         {
+            *jit = NULL;
+            break;
+         }
+         *jit = it;
+      }
+      (*fun)(jiterator, info, names);
+   }
+   free(buf);
+   free(names);
+   *((void **)buffer) = dataBuffer;
+   return 0;
+}
+
+static void freeResourcesSection (void *buffer, struct cce_buffer *info)
+{
+   uint_fast32_t *dataBuffer = *(void**)buffer;
+   size_t *sizes = resourceLoadingFunctionsBufferSizes;
+   size_t bitCounter = 0;
+   uint_fast32_t *bits = dataBuffer - HEADSIZE_TO_BITFIELD_SIZE(dataBuffer[-1]) - 1;
+   cce_void *data = (cce_void*) dataBuffer;
+   for (cce_onfreefun *fun = resourceUnloadingFunctions, *end = resourceUnloadingFunctions + dataBuffer[-1];
+        fun < end; ++fun, ++bitCounter, data += *sizes, ++sizes)
+   {
+      if ((bits[bitCounter >> ((sizeof(uint_fast32_t) >> 2) + 4)] & (1 << (bitCounter & (sizeof(uint_fast32_t) * 8 - 1)))) == 0)
+         continue;
+      
+      (*fun)(data, info);
+   }
+}
+
+static uint8_t storeResourcesSection (void *buffer, struct cce_buffer *info, FILE *file)
+{
+   uint32_t resourceSizes[256];
+   uint_fast32_t *dataBuffer = *(void**)buffer;
+   uint8_t sectionSize = dataBuffer[-1];
+   size_t *sizes = resourceLoadingFunctionsBufferSizes;
+   size_t bitCounter = 0, bytesWritten = 0, size;
+   uint_fast32_t *bits = dataBuffer - HEADSIZE_TO_BITFIELD_SIZE(sectionSize) - 1;
+   cce_void *data = (cce_void*) dataBuffer;
+   uint8_t stored = 0;
+   cce_rstorefun *fun = resourceStoringFunctions;
+   resourceSizes[0] = 1;
+   long beginOffset = ftell(file);
+   fseek(file, sectionSize * sizeof(uint32_t), SEEK_CUR);
+   for (uint32_t *iterator = resourceSizes + 1, *end = iterator + sectionSize; iterator < end; ++iterator, ++fun, ++bitCounter, data += *sizes, ++sizes)
+   {
+      *iterator = 0;
+      if ((bits[bitCounter >> ((sizeof(uint_fast32_t) >> 2) + 4)] & (1 << (bitCounter & (sizeof(uint_fast32_t) * 8 - 1)))) == 0)
+         continue;
+      
+      char **names = (*fun)(data, info);
+      if (names == NULL)
+      {
+         *iterator = 0;
+         continue;
+      }
+      for (char **it = names; *it != NULL; ++it)
+      {
+         size = strlen(*it);
+         fwrite(it, sizeof(char), size + 1, file);
+         *iterator = size;
+         bytesWritten += size;
+      }
+      free(names);
+   }
+   long endOffset = ftell(file);
+   fseek(file, beginOffset + sectionSize * sizeof(uint32_t), SEEK_SET);
+   {
+      uint32_t *iterator = resourceSizes + sectionSize;
+      while (*iterator != 0)
+      {
+         --iterator;
+      }
+      if (iterator - resourceSizes != sectionSize)
+      {
+         cceMoveFileContent(file, (iterator - resourceSizes) - sectionSize, SEEK_CUR, bytesWritten);
+         sectionSize = (iterator - resourceSizes);
+      }
+   }
+   cceHostEndianToLittleEndianArrayInt32(resourceSizes + 1, 255);
+   fwrite(resourceSizes + 1, sizeof(uint32_t), sectionSize, file);
+   fseek(file, endOffset, SEEK_SET);
+   return sectionSize;
+}
+
+void cce__initMap2DLoaders (void)
+{
+   resourceSpaceAllocated = 0;
+   CCE_ALLOC_ARRAY(resourceLoadingFunctions);
+   resourceUnloadingFunctions = malloc(resourceLoadingFunctionsAllocated * sizeof(cce_onfreefun*));
+   resourceLoadingFunctionsBufferSizes = malloc(resourceLoadingFunctionsAllocated * sizeof(size_t));
+   cce__staticMapFunctionSet = cceGetFileIOfunctionSet();
+   cceRegisterFileIOcallbacks(cce__staticMapFunctionSet,  loadResourcesSection, freeResourcesSection, NULL,                  sizeof(void*));
+   cceRegisterFileIOcallbacks(cce__staticMapFunctionSet,  loadElements,         freeElements,         NULL,                  sizeof(struct RenderingInfo));
+   cceRegisterFileIOcallbacks(cce__staticMapFunctionSet,  loadColliders,        freeColliders,        NULL,                  sizeof(struct CollisionInfo));
+   g_resourceLoadersOffset = cceGetFunctionBufferOffset(0, cce__staticMapFunctionSet);
+   g_renderingInfoOffset = cceGetFunctionBufferOffset(1, cce__staticMapFunctionSet);
+   cce__dynamicMapFunctionSet  = cceGetFileIOfunctionSet();
+   cceRegisterFileIOcallbacks(cce__dynamicMapFunctionSet, loadResourcesSection, freeResourcesSection, storeResourcesSection, sizeof(void*));
+   cceRegisterFileIOcallbacks(cce__dynamicMapFunctionSet, loadElementsDynamic,  freeElementsDynamic,  storeElements,         sizeof(struct DynamicRenderingInfo));
+   cceRegisterFileIOcallbacks(cce__dynamicMapFunctionSet, loadCollidersDynamic, freeCollidersDynamic, storeColliders,        sizeof(struct DynamicCollisionInfo));
+}
+
+struct cce_buffer* createFailMap (uint16_t functionSetID)
+{
+   struct cce_buffer *result = cceCreateBuffer(2, functionSetID);
+   struct RenderingInfo *info = (struct RenderingInfo*)((cce_void*) result + g_renderingInfoOffset);
+   struct Map2DElementPosition elements[42] = 
+   {
+      {-8,  2, 0, 0},
+      {-8,  1, 0, 0},
+      {-8,  0, 0, 0},
+      {-8, -1, 0, 0},
+      {-8, -2, 0, 0},
+      {-7,  2, 0, 0},
+      {-7,  0, 0, 0},
+      {-7, -2, 0, 0},
+      {-5,  2, 0, 0},
+      {-5,  1, 0, 0},
+      {-5,  0, 0, 0},
+      {-5, -1, 0, 0},
+      {-5, -2, 0, 0},
+      {-4, -2, 0, 0},
+      {-2,  1, 0, 0},
+      {-2,  0, 0, 0},
+      {-2, -1, 0, 0},
+      {-1,  2, 0, 0},
+      {-1, -2, 0, 0},
+      { 0,  1, 0, 0},
+      { 0,  0, 0, 0},
+      { 0, -1, 0, 0},
+      { 2,  1, 0, 0},
+      { 2,  0, 0, 0},
+      { 2, -1, 0, 0},
+      { 2, -2, 0, 0},
+      { 3,  2, 0, 0},
+      { 3,  0, 0, 0},
+      { 4,  1, 0, 0},
+      { 4,  0, 0, 0},
+      { 4, -1, 0, 0},
+      { 4, -2, 0, 0},
+      { 6,  2, 0, 0},
+      { 6,  1, 0, 0},
+      { 6,  0, 0, 0},
+      { 6, -1, 0, 0},
+      { 6, -2, 0, 0},
+      { 7, -2, 0, 0},
+      { 7,  2, 0, 0},
+      { 8,  1, 0, 0},
+      { 8,  0, 0, 0},
+      { 8, -1, 0, 0},
+   }; // ELOAD
+   struct Map2DElementData data = {{1, 1}, {0, 0, 0, 0}, 0, 0};
+   struct cce_texture2D textureInfo = {{0, 0}, {0, 0}, 0};
+   struct Map2DElementPositionArray elementsArray;
+   elementsArray.data = elements;
+   elementsArray.dataQuantity = 42;
+   elementsArray.dataAllocated = 42;
+   info->data = cce__map2DElementsToRenderingBuffer(&elementsArray, 1, &textureInfo, 1, &data, 1);
+   if (functionSetID == cce__dynamicMapFunctionSet)
+   {
+      struct DynamicRenderingInfo *dynamicinfo = (struct DynamicRenderingInfo*)((cce_void*) result + g_renderingInfoOffset);
+      dynamicinfo->elements = malloc(1 * sizeof(struct Map2DElementPositionArray));
+      dynamicinfo->elements->data = malloc(42 * sizeof(struct Map2DElementPosition));
+      memcpy(dynamicinfo->elements->data, elements, 42 * sizeof(struct Map2DElementPosition));
+      dynamicinfo->layersQuantity = 1;
+      dynamicinfo->elements->dataQuantity = 42;
+      dynamicinfo->elements->dataAllocated = 42;
+      dynamicinfo->elementData = malloc(1 * sizeof(struct Map2DElementData));
+      dynamicinfo->elementDataQuantity = 1;
+      dynamicinfo->elementDataAllocated = 1;
+      memcpy(dynamicinfo->elementData, &data, 1 * sizeof(struct Map2DElementData));
+      dynamicinfo->textureInfo = malloc(1 * sizeof(struct Map2DElementData));
+      dynamicinfo->textureInfoQuantity = 1;
+      dynamicinfo->textureInfoAllocated = 1;
+      memcpy(dynamicinfo->textureInfo, &textureInfo, 1 * sizeof(struct cce_texture2D));
+   }
+   return result;
+}
+
+#define CCE_EXPAND_PATH(path, function, additionalConditions) \
+if (path[0] != '/' && additionalConditions) \
+{ \
+   size_t len = strlen(path); \
+   if (len > CCE_PATH_RESERVED) \
+   { \
+      char *newPath = malloc(len + mapPathLength + 1); \
+      memcpy(newPath, mapPath, mapPathLength); \
+      memcpy(newPath + mapPathLength, path, len + 1); \
+      path = newPath; \
+      function; \
+      free(newPath); \
+   } \
+   else \
+   { \
+      memcpy(mapPath + mapPathLength, path, len + 1); \
+      path = mapPath; \
+      function; \
+      mapPath[mapPathLength] = '\0'; \
+   } \
+} \
+else \
+   function
+
+CCE_PUBLIC_OPTIONS struct cce_buffer* cceLoadMap2D(char *path)
+{
+   struct cce_buffer *result;
+   CCE_EXPAND_PATH(path, result = cceLoadBinaryCCF(path, cce__staticMapFunctionSet),
+   #ifdef WINDOWS_SYSTEM
+      path[0] != '\\' && path[1] != ':'
+   #else
+      1
+   #endif
+   );
+   if (result == NULL && ((cce__map2Dflags & (CCE_RETURN_NULL_ON_MAP_LOADING_FAILURE | CCE_RETURN_FALLBACK_ON_MAP_LOADING_FAILURE)) == CCE_RETURN_FALLBACK_ON_MAP_LOADING_FAILURE))
+   {
+      result = createFailMap(cce__staticMapFunctionSet);
+   }
+   return result;
+}
+
+CCE_PUBLIC_OPTIONS struct cce_buffer* cceLoadMap2Ddynamic(char *path)
+{
+   struct cce_buffer *result;
+   CCE_EXPAND_PATH(path, result = cceLoadBinaryCCF(path, cce__dynamicMapFunctionSet),
+   #ifdef WINDOWS_SYSTEM
+      path[0] != '\\' && path[1] != ':'
+   #else
+      1
+   #endif
+   );
+   if (result == NULL && ((cce__map2Dflags & (CCE_RETURN_NULL_ON_MAP_LOADING_FAILURE | CCE_RETURN_FALLBACK_ON_MAP_LOADING_FAILURE)) == CCE_RETURN_FALLBACK_ON_MAP_LOADING_FAILURE))
+   {
+      result = createFailMap(cce__dynamicMapFunctionSet);
+   }
+   return result;
+}
+
+CCE_PUBLIC_OPTIONS int cceWriteMap2Ddynamic (struct cce_buffer *map, char *path)
+{
+   int result;
+   CCE_EXPAND_PATH(path, result = cceWriteBinaryCCF(map, path),
+   #ifdef WINDOWS_SYSTEM
+      path[0] != '\\' && path[1] != ':'
+   #else
+      1
+   #endif
+   );
+   return result;
 }

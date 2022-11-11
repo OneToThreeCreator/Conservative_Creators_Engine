@@ -1,6 +1,6 @@
 /*
-    CoffeeChain - open source engine for making games.
-    Copyright (C) 2020-2022 Andrey Givoronsky
+    Conservative Creator's Engine - open source engine for making games.
+    Copyright (C) 2020-2022 Andrey Gaivoronskiy
 
     This library is free software; you can redistribute it and/or
     modify it under the terms of the GNU Lesser General Public
@@ -25,14 +25,14 @@
 #include <stdint.h>
 #include <stdio.h>
 
-#include "../../include/coffeechain/os_interaction.h"
-#include "../../include/coffeechain/utils.h"
+#include "../../include/cce/os_interaction.h"
+#include "../../include/cce/utils.h"
 
 #if defined(CCE_TMPDIR_NAME_TEMPLATE)
 
 #ifndef CCE_TMPDIR_NAME_TEMPLATE_SIZE
 #define CCE_TMPDIR_NAME_TEMPLATE_SIZE strlen(CCE_TMPDIR_NAME_TEMPLATE)
-#endif
+#endif // CCE_TMPDIR_NAME_TEMPLATE_SIZE
 
 #else
 
@@ -44,33 +44,26 @@
 static char *tmpPath = NULL;
 static size_t tmpPathLength;
 
-CCE_PUBLIC_OPTIONS char* cceCreateNewPathFromOldPath (const char *const oldPath, const char *const appendPath, size_t freeSpaceToLeave)
+CCE_PUBLIC_OPTIONS char* cceCreateNewPathFromOldPath (const char *oldPath, const char *appendPath, size_t freeSpaceToLeave)
 {
    char *newPath;
    size_t oldPathSize = strlen(oldPath);
    size_t appendPathSize = strlen(appendPath);
-   if (*(oldPath + oldPathSize - 1u) == '/' || *(oldPath + oldPathSize - 1u) == '\\')
-   {
-      newPath = malloc(oldPathSize + appendPathSize + freeSpaceToLeave + 1u); // \0
-      memcpy(newPath, oldPath, oldPathSize);
-   }
-   else
-   {
-      newPath = malloc(oldPathSize + appendPathSize + freeSpaceToLeave + 2u); // \0 and /
-      memcpy(newPath, oldPath, oldPathSize);
-      #ifdef WINDOWS_SYSTEM
-      *(newPath + oldPathSize) = '\\';
-      #else
-      *(newPath + oldPathSize) = '/';
-      #endif // WINDOWS_SYSTEM
-      ++oldPathSize;
-   }
+   uint8_t hasPathDelimiter = oldPath[oldPathSize - 1u] == '/' || oldPath[oldPathSize - 1u] == '\\';
+   newPath = malloc(oldPathSize + appendPathSize + freeSpaceToLeave + 1u + !hasPathDelimiter); // \0
+   memcpy(newPath, oldPath, oldPathSize);
+   #ifdef WINDOWS_SYSTEM
+   newPath[oldPathSize] = hasPathDelimiter ? newPath[oldPathSize] : '\\';
+   #else
+   newPath[oldPathSize] = hasPathDelimiter ? newPath[oldPathSize] : '/';
+   #endif // WINDOWS_SYSTEM
+   oldPathSize += !hasPathDelimiter;
    memcpy(newPath + oldPathSize, appendPath, appendPathSize);
    *(newPath + oldPathSize + appendPathSize) = '\0';
    return newPath;
 }
 
-CCE_PUBLIC_OPTIONS char* cceAppendPath (char *const buffer, size_t bufferSize, const char *const append)
+CCE_PUBLIC_OPTIONS char* cceAppendPath (char *buffer, size_t bufferSize, const char *append)
 {
    size_t oldPathLength = strnlen(buffer, bufferSize);
    size_t appendPathLength = strlen(append);
@@ -89,43 +82,6 @@ CCE_PUBLIC_OPTIONS char* cceAppendPath (char *const buffer, size_t bufferSize, c
    }
    memcpy(buffer + oldPathLength, append, appendPathLength);
    *(buffer + oldPathLength + appendPathLength) = '\0';
-   return buffer;
-}
-
-void cce__shortToString (char *str, const unsigned short number, const char *strEnd)
-{
-   size_t lengthEnd = strlen(strEnd);
-   str += strlen(str);
-   if (number > 9)
-   {
-      if (number > 99)
-      {
-         if (number > 999)
-         {
-            if (number > 9999)
-            {
-               *(str++) = number / 10000 + '0';
-            }
-            *(str++) = number % 10000 / 1000 + '0';
-         }
-         *(str++) = number % 1000 / 100 + '0';
-      }
-      *(str++) = number % 100 / 10 + '0';
-   }
-   *(str++) = number % 10 + '0';
-   memcpy(str, strEnd, lengthEnd + 1u);
-}
-
-CCE_PUBLIC_OPTIONS char* cceConvertIntToBase64String (size_t number, char *restrict buffer, uint8_t symbolsQuantity)
-{
-   static const char
-   dictionary[64] = {'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
-                     'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z',
-                     '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '-', '_'};
-   for (uint8_t i = 0u; i < symbolsQuantity; ++i)
-   {
-      *(buffer + symbolsQuantity - i - 1u) = *(dictionary + ((number >> (i * 6)) & 63));
-   }
    return buffer;
 }
 
@@ -148,6 +104,11 @@ CCE_PUBLIC_OPTIONS void cceTerminateTemporaryDirectory (void)
 #include <ftw.h>
 
 #define DEFAULT_PATH_LENGTH 256
+
+CCE_PUBLIC_OPTIONS void cceTruncateFile (FILE *file, size_t size)
+{
+   ftruncate(fileno(file), size);
+}
 
 CCE_PUBLIC_OPTIONS char* cceGetCurrentPath (size_t spaceToLeave)
 {
@@ -189,7 +150,7 @@ CCE_PUBLIC_OPTIONS char* cceGetDirectory (char *path, size_t bufferSize)
             {
                if (errno == EEXIST)
                {
-                  // Dangling pointer found
+                  // Dangling link found
                   errno = 0u;
                   break;
                }
@@ -236,7 +197,7 @@ CCE_PUBLIC_OPTIONS char* cceGetDirectory (char *path, size_t bufferSize)
                   {
                      if (errno == EEXIST)
                      {
-                        // Dangling pointer found
+                        // Dangling link found
                         errno = 0u;
                         break;
                      }
@@ -274,11 +235,11 @@ CCE_PUBLIC_OPTIONS char* cceGetDirectory (char *path, size_t bufferSize)
 #define APPDATA_APPEND_SIZE 14u // strlen("/.local/share/") == 14
 #endif
 
-CCE_PUBLIC_OPTIONS char* cceGetAppDataPath (const char *restrict folderName, size_t spaceToLeave)
+CCE_PUBLIC_OPTIONS char* cceGetAppDataPath (const char *folderName, size_t spaceToLeave)
 {
    struct stat st;
-   char *restrict appDataPath;
-   const char *restrict path = getenv("XDG_DATA_HOME");
+   char *appDataPath;
+   const char *path = getenv("XDG_DATA_HOME");
    size_t pathLength, folderNameLength = strlen(folderName);
    if ((path != NULL) && (*path != '\0') && (stat(path, &st) != 0) && !S_ISDIR(st.st_mode))
    {
@@ -432,6 +393,14 @@ static char* getErrorMessage (DWORD error)
    return errorString;
 }
 
+CCE_PUBLIC_OPTIONS void cceTruncateFile (FILE *file, size_t size)
+{
+   long position = ftell(file);
+   fseek(file, size, SEEK_SET);
+   SetEndOfFile(_get_osfhandle(_fileno(file)));
+   fseek(file, position, SEEK_SET);
+}
+
 CCE_PUBLIC_OPTIONS char* cceGetCurrentPath (size_t spaceToLeave)
 {
    size_t size = (spaceToLeave + MAX_PATH) * sizeof(char);
@@ -522,10 +491,10 @@ CCE_PUBLIC_OPTIONS char* cceGetDirectory (char *path, size_t bufferSize)
    return NULL;
 }
 
-CCE_PUBLIC_OPTIONS char* cceGetAppDataPath (const char *restrict folderName, size_t spaceToLeave)
+CCE_PUBLIC_OPTIONS char* cceGetAppDataPath (const char *folderName, size_t spaceToLeave)
 {
-   char *restrict appDataPath;
-   const char *restrict path = getenv("APPDATA");
+   char *appDataPath;
+   const char *path = getenv("APPDATA");
    size_t pathLength, folderNameLength = strlen(folderName);
    if (path && (*path != '\0'))
    {

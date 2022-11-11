@@ -1,6 +1,6 @@
 /*
-    CoffeeChain - open source engine for making games.
-    Copyright (C) 2020-2022 Andrey Givoronsky
+    Conservative Creator's Engine - open source engine for making games.
+    Copyright (C) 2020-2022 Andrey Gaivoronskiy
 
     This library is free software; you can redistribute it and/or
     modify it under the terms of the GNU Lesser General Public
@@ -27,7 +27,9 @@ extern "C"
 #endif // __cplusplus
 
 #include <stdint.h>
-#include "engine_common.h"
+#include <stddef.h>
+#include "cce_exports.h"
+#define CCE_PUBLIC_OPTIONS CCE_EXPORTS
 
 typedef uint8_t cce_endianess;
 
