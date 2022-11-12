@@ -295,18 +295,6 @@ int cce__initEngine__glfw (const char *label, struct cce_backend_data *functions
    glfwSetFramebufferSizeCallback(g_GLFWstate.window, framebufferSizeCallback);
    glfwSetWindowSizeCallback(g_GLFWstate.window, windowResizeCallback);
    //glfwSetKeyCallback(g_GLFWstate.window, keyCallback);
-   if (!gladLoadGL((GLADloadfunc)glfwGetProcAddress))
-   {
-      fprintf(stderr, "GLAD::INITIALIZATION::FAILED:\nOpenGL could not be loaded by GLAD.\n");
-      glfwTerminate();
-      return -1;
-   }
-   if (!GLAD_GL_VERSION_3_1)
-   {
-      fprintf(stderr, "GLAD::INITIALIZATION::FAILED:\nOpenGL 3.1 (minimum required) could not be loaded by GLAD.\n");
-      glfwTerminate();
-      return -1;
-   }
    cce_keys = malloc(14u * sizeof(struct RegisteredKeys));
    
    /*

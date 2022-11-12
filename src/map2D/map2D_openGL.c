@@ -429,10 +429,21 @@ void terminateMap2DRenderer__openGL (void)
    glDeleteVertexArrays(1, &g_VAO);
    glDeleteTextures(1, &glTexturesArray);
    glDeleteProgram(shaderProgram);
+   gladLoaderUnloadGL();
 }
 
 int initMap2DRenderer__openGL (char *cce__resourcePath, const struct LoadedTextures **textures, struct RendereringFunctions *funcStruct)
 {
+   if (!gladLoaderLoadGL())
+   {
+      fprintf(stderr, "GLAD::INITIALIZATION::FAILED:\nOpenGL could not be loaded by GLAD.\n");
+      return -1;
+   }
+   if (!GLAD_GL_VERSION_3_2)
+   {
+      fprintf(stderr, "GLAD::INITIALIZATION::FAILED:\nOpenGL 3.2 (minimum required) could not be loaded by GLAD.\n");
+      return -1;
+   }
    {
       size_t pathLength = strlen(cce__resourcePath) + 1u;
       /*strlen("define CCE_GLOBAL_OFFSET_MASK 0xXXXXXXXX\n") == 41*/

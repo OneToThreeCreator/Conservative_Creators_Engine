@@ -87,7 +87,6 @@ if (NOT glfw3_FOUND)
    target_include_directories(cce PRIVATE external/glfw/include/)
 endif()
 
-
 set_target_properties(cce PROPERTIES 
    VERSION ${CCE_VERSION}
    SOVERSION ${CCE_VERSION_MAJOR}
@@ -122,7 +121,7 @@ if (NOT ListLib_FOUND)
 endif()
 
 add_subdirectory(external/glad2/cmake)
-glad_add_library(glad STATIC API gl:core=3.2 EXTENSIONS GL_NV_copy_image)
+glad_add_library(glad STATIC LOADER API gl:core=3.2 EXTENSIONS GL_NV_copy_image)
 set_property(TARGET glad PROPERTY POSITION_INDEPENDENT_CODE ON)
 
 target_link_libraries(cce PRIVATE list ${INIH_LIBRARIES} glfw glad)
