@@ -647,7 +647,7 @@ struct cce_buffer* createFailMap (uint16_t functionSetID)
       dynamicinfo->elementDataQuantity = 1;
       dynamicinfo->elementDataAllocated = 1;
       memcpy(dynamicinfo->elementData, &data, 1 * sizeof(struct Map2DElementData));
-      dynamicinfo->textureInfo = malloc(1 * sizeof(struct Map2DElementData));
+      dynamicinfo->textureInfo = malloc(1 * sizeof(struct cce_texture2D));
       dynamicinfo->textureInfoQuantity = 1;
       dynamicinfo->textureInfoAllocated = 1;
       memcpy(dynamicinfo->textureInfo, &textureInfo, 1 * sizeof(struct cce_texture2D));

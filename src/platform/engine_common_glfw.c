@@ -43,16 +43,6 @@ static struct
    uint8_t flags;
 } g_GLFWstate;
 
-static struct RegisteredKeys
-{
-   int key;
-   int modifiers;
-   uint16_t eventType; // 0x0 - boolChange, 0x1 - plotNumber, 0x2 - systemAction
-   uint16_t number;
-} *cce_keys;
-static size_t keysQuantity = 0u;
-//static size_t keysQuantityAllocated = CCE_ALLOCATION_STEP;
-
 static uint8_t engineFlags = 0u;
 const uint8_t *const cce__flags = &engineFlags;
 static uint8_t internalFlags = 0u;
@@ -91,20 +81,6 @@ void swapBuffers__glfw (void)
    glfwSwapBuffers(g_GLFWstate.window);
 }
 
-static size_t registerKey__glfw (int glfwKey, int glfwKeyModifiers, uint16_t eventType, uint16_t number)
-{
-   //if (keysQuantity >= keysQuantityAllocated)
-   //{
-   //   keysQuantityAllocated += CCE_ALLOCATION_STEP;
-   //   cce_keys = realloc(cce_keys, keysQuantityAllocated);
-   //}
-   (cce_keys + keysQuantity)->key = glfwKey;
-   (cce_keys + keysQuantity)->modifiers = glfwKeyModifiers;
-   (cce_keys + keysQuantity)->eventType = eventType;
-   (cce_keys + keysQuantity)->number = number;
-   return keysQuantity++;
-}
-
 static void toFullscreen__glfw (void)
 {
    GLFWmonitor *monitor = glfwGetPrimaryMonitor();
@@ -133,21 +109,50 @@ static void showWindow__glfw (void)
    glfwShowWindow(g_GLFWstate.window);
 }
 
+static int8_t verticalControlAxis;
+static int8_t horizontalControlAxis;
+
 static void keyCallback (GLFWwindow *window, int key, int scancode, int action, int modifiers)
 {
    CCE_UNUSED(window);
    CCE_UNUSED(scancode);
-   struct RegisteredKeys *keyInfo = (struct RegisteredKeys*) cceBinarySearchFirstAscending((((uint8_t*) cce_keys) + offsetof(struct RegisteredKeys, key)), keysQuantity, sizeof(int), sizeof(struct RegisteredKeys), key);
-   if (keyInfo > cce_keys + keysQuantity)
-   {
+   if (action == GLFW_REPEAT)
       return;
-   }
-   if (keyInfo->key == key)
+   switch (key)
    {
-      if ((modifiers & keyInfo->modifiers) == keyInfo->modifiers)
-      {
-         
-      }
+      case GLFW_KEY_UP:
+      case GLFW_KEY_DOWN:
+         verticalControlAxis = (key * 2 - GLFW_KEY_DOWN * 2 - 1) * (action == GLFW_PRESS);
+         break;
+      case GLFW_KEY_LEFT:
+      case GLFW_KEY_RIGHT:
+         horizontalControlAxis = (GLFW_KEY_RIGHT * 2 - key * 2 + 1) * (action == GLFW_PRESS);
+         break;
+      case GLFW_KEY_ENTER:
+      case GLFW_KEY_X:
+         break;
+      case GLFW_KEY_RIGHT_SHIFT:
+      case GLFW_KEY_Z:
+         break;
+      case GLFW_KEY_RIGHT_CONTROL:
+      case GLFW_KEY_C:
+         break;
+      case GLFW_KEY_DELETE:
+      case GLFW_KEY_V:
+         break;
+      case GLFW_KEY_SPACE:
+         break;
+      case GLFW_KEY_TAB:
+      case GLFW_KEY_D:
+         break;
+      case GLFW_KEY_F11:
+         if (action != GLFW_PRESS)
+            break;
+         if (g_GLFWstate.flags & CCE_FULLSCREEN)
+            toWindow__glfw();
+         else
+            toFullscreen__glfw();
+         break;
    }
 }
 
@@ -244,13 +249,6 @@ static void setWindowParameters__glfw (cce_enum parameter, uint32_t a, uint32_t 
    
 }
 
-static int compare (const void *_a, const void *_b)
-{
-   const int a = *((const int*) (((uint8_t*) _a) + offsetof(struct RegisteredKeys, key)));
-   const int b = *((const int*) (((uint8_t*) _b) + offsetof(struct RegisteredKeys, key)));
-   return (a > b) - (a < b);
-}
-
 static void terminateEngine__glfw (void);
 
 int cce__initEngine__glfw (const char *label, struct cce_backend_data *functions)
@@ -285,36 +283,25 @@ int cce__initEngine__glfw (const char *label, struct cce_backend_data *functions
    GLFWmonitor *monitor = glfwGetPrimaryMonitor();
    g_GLFWstate.vidMode = glfwGetVideoMode(monitor);
    g_GLFWstate.window = glfwCreateWindow(CCE_DEFAULT_WINDOW_WIDTH, CCE_DEFAULT_WINDOW_HEIGHT, label, NULL, NULL);
-   if (!(g_GLFWstate.window))
+   if (g_GLFWstate.window == NULL)
    {
-      fprintf(stderr, "GLFW::WINDOW::FAILED_TO_CREATE\n");
-      glfwTerminate();
-      return -1;
+#if defined(NDEBUG)
+      glfwWindowHint(GLFW_CONTEXT_NO_ERROR,      GLFW_FALSE); // On wayland at least, this context does not work at the moment of testing. Also, it's perfectly fine to not support this extension.
+#else
+      glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT,  GLFW_FALSE);
+#endif
+      g_GLFWstate.window = glfwCreateWindow(CCE_DEFAULT_WINDOW_WIDTH, CCE_DEFAULT_WINDOW_HEIGHT, label, NULL, NULL);
+      if (g_GLFWstate.window == NULL)
+      {
+         fprintf(stderr, "GLFW::WINDOW::FAILED_TO_CREATE\n");
+         glfwTerminate();
+         return -1;
+      }
    }
    glfwMakeContextCurrent(g_GLFWstate.window);
    glfwSetFramebufferSizeCallback(g_GLFWstate.window, framebufferSizeCallback);
    glfwSetWindowSizeCallback(g_GLFWstate.window, windowResizeCallback);
-   //glfwSetKeyCallback(g_GLFWstate.window, keyCallback);
-   cce_keys = malloc(14u * sizeof(struct RegisteredKeys));
-   
-   /*
-   registerKey__glfw(GLFW_KEY_UP,          GLFW_FALSE, 0x0, globalBoolsQuantity - 12);
-   registerKey__glfw(GLFW_KEY_DOWN,        GLFW_FALSE, 0x0, globalBoolsQuantity - 11);
-   registerKey__glfw(GLFW_KEY_LEFT,        GLFW_FALSE, 0x0, globalBoolsQuantity - 10);
-   registerKey__glfw(GLFW_KEY_RIGHT,       GLFW_FALSE, 0x0, globalBoolsQuantity -  9);
-   registerKey__glfw(GLFW_KEY_A,           GLFW_FALSE, 0x0, globalBoolsQuantity -  8);
-   registerKey__glfw(GLFW_KEY_S,           GLFW_FALSE, 0x0, globalBoolsQuantity -  7);
-   registerKey__glfw(GLFW_KEY_D,           GLFW_FALSE, 0x0, globalBoolsQuantity -  6);
-   registerKey__glfw(GLFW_KEY_W,           GLFW_FALSE, 0x0, globalBoolsQuantity -  5);
-   registerKey__glfw(GLFW_KEY_LEFT_SHIFT,  GLFW_FALSE, 0x0, globalBoolsQuantity -  4);
-   registerKey__glfw(GLFW_KEY_RIGHT_SHIFT, GLFW_FALSE, 0x0, globalBoolsQuantity -  4);
-   registerKey__glfw(GLFW_KEY_ENTER,       GLFW_FALSE, 0x0, globalBoolsQuantity -  3);
-   registerKey__glfw(GLFW_KEY_Q,           GLFW_FALSE, 0x0, globalBoolsQuantity -  2);
-   registerKey__glfw(GLFW_KEY_E,           GLFW_FALSE, 0x0, globalBoolsQuantity -  1);
-   
-   registerKey__glfw(GLFW_KEY_F11, GLFW_FALSE, 0x2, 0x0);
-   qsort(cce_keys, keysQuantity, sizeof(struct RegisteredKeys), compare);
-   */
+   glfwSetKeyCallback(g_GLFWstate.window, keyCallback);
    glfwSwapInterval(1);
    
    functions->screenUpdate = swapBuffers__glfw;
@@ -323,12 +310,13 @@ int cce__initEngine__glfw (const char *label, struct cce_backend_data *functions
    functions->terminateEngine = terminateEngine__glfw;
    functions->engineUpdate = engineUpdate__glfw;
    functions->getTime = getTime__glfw;
+   verticalControlAxis = 0;
+   horizontalControlAxis = 0;
    return 0;
 }
 
 static void terminateEngine__glfw (void)
 {
-   free(cce_keys);
    glfwDestroyWindow(g_GLFWstate.window);
    glfwTerminate();
 }
