@@ -27,6 +27,9 @@
 
 #define CCE_UNUSED(x) (void)(x)
 
+#define CCE__MACRO_CONCAT(x, y) x ## y
+#define CCE_MACRO_CONCAT(x, y) CCE__MACRO_CONCAT(x, y)
+
 #define CCE__MACRO_TO_STR(x) #x 
 #define CCE_MACRO_TO_STR(x) CCE__MACRO_TO_STR(x)
 
@@ -147,7 +150,31 @@ CCE_PUBLIC_OPTIONS uint32_t cceKeepHighBitInt32 (uint32_t x);
 CCE_PUBLIC_OPTIONS uint64_t cceKeepHighBitInt64 (uint64_t x);
 CCE_PUBLIC_OPTIONS float cceFastSinInt8 (uint8_t x);
 
+CCE_PUBLIC_OPTIONS size_t cceStringToLowercase (char *str);
+CCE_PUBLIC_OPTIONS void cceMemoryToLowercase (char *str, size_t size);
+CCE_PUBLIC_OPTIONS size_t cceStringToUppercase (char *str);
+CCE_PUBLIC_OPTIONS void cceMemoryToUppercase (char *str, size_t size);
+CCE_PUBLIC_OPTIONS uint8_t cceStringToBool (const char *str);
+
 #define cceFastCosInt8(x) cceFastSinInt8(x + 64)
+
+#define CCE__STRING_TO_SXVECY(sign, signUpper, uIfUnsigned, bits, comp) \
+CCE_PUBLIC_OPTIONS struct cce_ ## sign ## bits ## vec ## comp cceStringTo ## signUpper ## bits ## Vec ## comp (const char *string)
+
+#define CCE__STRING_TO_XVECY(bits, comp) \
+CCE__STRING_TO_SXVECY(i, I, , bits, comp); \
+CCE__STRING_TO_SXVECY(u, U, u, bits, comp)
+
+#define CCE__STRING_TO_XVEC(bits) \
+CCE__STRING_TO_XVECY(bits, 1); \
+CCE__STRING_TO_XVECY(bits, 2); \
+CCE__STRING_TO_XVECY(bits, 3); \
+CCE__STRING_TO_XVECY(bits, 4)
+
+CCE__STRING_TO_XVEC(8);
+CCE__STRING_TO_XVEC(16);
+CCE__STRING_TO_XVEC(32);
+CCE__STRING_TO_XVEC(64);
 
 #ifdef __cplusplus
 }

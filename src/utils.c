@@ -18,8 +18,10 @@
     USA
 */
 
+#include <ctype.h>
 #include <string.h>
 #include <stdint.h>
+#include <limits.h>
 
 #include "../include/cce/engine_common.h"
 #include "../include/cce/endianess.h"
@@ -237,6 +239,60 @@ CCE_PUBLIC_OPTIONS char* cceConvertIntToBase64String (size_t number, char *buffe
    return buffer;
 }
 
+CCE_PUBLIC_OPTIONS size_t cceStringToLowercase (char *str)
+{
+   unsigned char *iterator = (unsigned char*) str;
+   for (; *iterator != '\0'; ++iterator)
+   {
+      *iterator = tolower(*iterator);
+   }
+   return (char*)iterator - str;
+}
+
+CCE_PUBLIC_OPTIONS void cceMemoryToLowercase (char *str, size_t size)
+{
+   unsigned char *iterator = (unsigned char*) str;
+   for (unsigned char *end = iterator + size; iterator < end; ++iterator)
+   {
+      *iterator = tolower(*iterator);
+   }
+}
+
+CCE_PUBLIC_OPTIONS size_t cceStringToUppercase (char *str)
+{
+   unsigned char *iterator = (unsigned char*) str;
+   for (; *iterator != '\0'; ++iterator)
+   {
+      *iterator = toupper(*iterator);
+   }
+   return (char*)iterator - str;
+}
+
+CCE_PUBLIC_OPTIONS void cceMemoryToUppercase (char *str, size_t size)
+{
+   unsigned char *iterator = (unsigned char*) str;
+   for (unsigned char *end = iterator + size; iterator < end; ++iterator)
+   {
+      *iterator = toupper(*iterator);
+   }
+}
+
+CCE_PUBLIC_OPTIONS uint8_t cceStringToBool (const char *str)
+{
+   char buf[6] = {0};
+   strncpy(buf, str, 6);
+   cceMemoryToLowercase(buf, 5);
+   if (memcmp(buf, "true", 5) == 0 || memcmp(buf, "yes", 4) == 0 || memcmp(buf, "+", 2) == 0)
+   {
+      return 1;
+   }
+   if (memcmp(buf, "false", 6) == 0 || memcmp(buf, "no", 3) == 0 || memcmp(buf, "-", 2) == 0)
+   {
+      return 0;
+   }
+   return atoi(str) > 0;
+}
+
 CCE_PUBLIC_OPTIONS uint8_t cceCeilToPowerOfTwoInt8 (uint8_t x)
 {
    return CCE_CEIL_TO_POWER_OF_TWO(x, x);
@@ -282,3 +338,56 @@ CCE_PUBLIC_OPTIONS float cceFastSinInt8 (uint8_t x)
    x >>= 4;
    return (sinLookup[x] * (1 - distance) + sinLookup[x + 1] * distance) * isNegative;
 }
+
+#define STRTOVEC(st, type, comp, strtoXl) \
+type vector[comp] = {0}; \
+char *firstIncorrect; \
+for (type *it = vector, *end = vector + comp; it < end; ++it) \
+{ \
+   for (;; ++st) \
+   { \
+      if (isdigit(*st) || *st == '+' || *st == '-') \
+         break; \
+      if (*st == '\0' || *st == '\n') \
+      { \
+         goto RETURN; \
+      } \
+   } \
+   *it = strtoXl(st, &firstIncorrect, 10); \
+} \
+RETURN:
+
+#if LLONG_MAX == INT64_MAX
+#define STR_CONV_SUFFIX ll
+#elif LONG_MAX == INT64_MAX
+#define STR_CONV_SUFFIX l
+#else
+#error "long and long long aren't 64-bit types"
+#endif
+
+#define ARRAY_TO_INITIALIZER_LIST1(arr)arr[0]
+#define ARRAY_TO_INITIALIZER_LIST2(arr)ARRAY_TO_INITIALIZER_LIST1(arr), arr[1]
+#define ARRAY_TO_INITIALIZER_LIST3(arr)ARRAY_TO_INITIALIZER_LIST2(arr), arr[2]
+#define ARRAY_TO_INITIALIZER_LIST4(arr)ARRAY_TO_INITIALIZER_LIST3(arr), arr[3]
+
+#define STRING_TO_SXVECY(sign, signUpper, uIfUnsigned, bits, comp) \
+CCE_PUBLIC_OPTIONS struct cce_ ## sign ## bits ## vec ## comp cceStringTo ## signUpper ## bits ## Vec ## comp (const char *string) \
+{ \
+   STRTOVEC(string, uIfUnsigned ## int ## bits ## _t, comp, CCE_MACRO_CONCAT(strto ## uIfUnsigned, STR_CONV_SUFFIX)) \
+   return (struct cce_ ## sign ## bits ## vec ## comp) {ARRAY_TO_INITIALIZER_LIST ## comp(vector)}; \
+}
+
+#define STRING_TO_XVECY(bits, comp) \
+STRING_TO_SXVECY(i, I,  , bits, comp) \
+STRING_TO_SXVECY(u, U, u, bits, comp)
+
+#define STRING_TO_XVEC(bits) \
+STRING_TO_XVECY(bits, 1) \
+STRING_TO_XVECY(bits, 2) \
+STRING_TO_XVECY(bits, 3) \
+STRING_TO_XVECY(bits, 4)
+
+STRING_TO_XVEC(8)
+STRING_TO_XVEC(16)
+STRING_TO_XVEC(32)
+STRING_TO_XVEC(64)

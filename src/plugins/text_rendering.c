@@ -348,54 +348,8 @@ static void cce__valueToLetters (struct INIKeyHandlerStruct *st, const char *str
    *jiterator = '\0';
 }
 
-#define STRTOVEC(st, vec, strtoXl) \
-do \
-{ \
-   char *firstIncorrect; \
-   for (;; ++st) \
-   { \
-      if (isdigit(*st) || *st == '+' || *st == '-') \
-         break; \
-      if (*st == '\0' || *st == '\n') \
-      { \
-         vec.x = 0; \
-         vec.y = 0; \
-         goto RETURN; \
-      } \
-   } \
-   vec.x = strtoXl(st, &firstIncorrect, 10); \
-   st = firstIncorrect; \
-   for (;; ++st) \
-   { \
-      if (isdigit(*st) || *st == '+' || *st == '-') \
-         break; \
-      if (*st == '\0' || *st == '\n') \
-      { \
-         vec.y = 0; \
-         goto RETURN; \
-      } \
-   } \
-   vec.y = strtoXl(st, NULL, 10); \
-RETURN: \
-} \
-while (0)
-
-static struct cce_i16vec2 cce__stringToI16Vec2 (const char *string)
-{
-   struct cce_i16vec2 result;
-   STRTOVEC(string, result, strtol);
-   return result;
-}
-
-static struct cce_u16vec2 cce__stringToU16Vec2 (const char *string)
-{
-   struct cce_u16vec2 result;
-   STRTOVEC(string, result, strtoul);
-   return result;
-}
-
-static int cce__iniKeyHandler (void* structure, const char* section, const char* name,
-                               const char* value)
+static int cce__iniKeyHandler (void *structure, const char *section, const char *name,
+                               const char *value)
 {
    struct INIKeyHandlerStruct *st = (struct INIKeyHandlerStruct*) structure;
    if (section == NULL || strcmp(section, "Properties") == 0)
@@ -418,15 +372,15 @@ static int cce__iniKeyHandler (void* structure, const char* section, const char*
       }
       else if (strcmp(name, "charsize") == 0)
       {
-         st->charSize = cce__stringToU16Vec2(value);
+         st->charSize = cceStringToU16Vec2(value);
       }
       else if (strcmp(name, "baselineoffset") == 0)
       {
-         st->baseLineOffset = cce__stringToI16Vec2(value);
+         st->baseLineOffset = cceStringToI16Vec2(value);
       }
       else if (strcmp(name, "chargap") == 0)
       {
-         st->charGap = cce__stringToU16Vec2(value);
+         st->charGap = cceStringToU16Vec2(value);
       }
       else
       {
@@ -467,7 +421,7 @@ static int cce__iniKeyHandler (void* structure, const char* section, const char*
    }
    if (strcmp(name, "blockoffset") == 0)
    {
-      st->blockOffset = cce__stringToU16Vec2(value);
+      st->blockOffset = cceStringToU16Vec2(value);
    }
    else if (strcmp(name, "chars") == 0)
    {
@@ -475,17 +429,17 @@ static int cce__iniKeyHandler (void* structure, const char* section, const char*
    }
    else if (strcmp(name, "drawcharsize") == 0)
    {
-      st->drawCharSize = cce__stringToU16Vec2(value);
+      st->drawCharSize = cceStringToU16Vec2(value);
    }
    else if (strcmp(name, "charsize") == 0)
    {
-      st->charSize = cce__stringToU16Vec2(value);
+      st->charSize = cceStringToU16Vec2(value);
       if (st->drawCharSize.x == 0 && st->drawCharSize.y == 0)
          st->drawCharSize = st->charSize;
    }
    else if (strcmp(name, "drawoffset") == 0)
    {
-      st->drawOffset = cce__stringToU16Vec2(value);
+      st->drawOffset = cceStringToU16Vec2(value);
    }
    else
    {

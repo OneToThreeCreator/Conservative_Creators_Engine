@@ -26,11 +26,19 @@
 #define CCE_DUMMY_TEXTURE_SECONDARY_COLOR 0,0,0
 #endif // CCE_DUMMY_TEXTURE_SECONDARY_COLOR
 
+#include "../platform/platforms.h"
+
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stddef.h>
 #include <string.h>
+
+#ifdef POSIX_SYSTEM
+#include <strings.h>
+#else
+#include <ctype.h>
+#endif
 #include <stdarg.h>
 
 
@@ -43,8 +51,6 @@
 #include "../external/stb_image.h"
 #include "../../include/cce/map2D/map2D.h"
 #include "map2D_internal.h"
-
-#include "../platform/platforms.h"
 
 static char                                 *cce__resourcePath;
 static struct cce_u32vec2                    g_textureSize;
@@ -559,10 +565,139 @@ cce_ubyte cce__fourthLogicTypeFuncMap2D(uint16_t ID, va_list argp)
 }
 */
 
+
+struct iniValues
+{
+   struct cce_u16vec2 gameResolution;
+   uint8_t layersQuantity;
+   uint8_t layerZero;
+   struct cce_u16vec2 textureSize;
+   char *windowName;
+   char *texturePath;
+   char *mapPath;
+   cce_enum colorFormat;
+   cce_enum colliderType;
+   uint8_t useFallbackMap;
+   struct cce_u8vec2 horizontalAxis;
+   struct cce_u8vec2 verticalAxis;
+   uint8_t buttons[8]; // A, B, X, Y, LB, RB, LT, RT
+};
+
+#ifndef POSIX_SYSTEM
+// s2 must be lowercase (easy to provide most of the time)
+static int strcasecmp(const char *s1, const char *s2)
+{
+   int diff;
+   for (; *s1 != '\0' && *s2 != '\0', ++s1, ++s2)
+   {
+      if ((diff = tolower(*s1) - *s2) != 0)
+         return diff;
+   }
+   return 0;
+}
+#endif
+
+static int iniHandler (void *data, const char *section, const char *name, const char *value)
+{
+   struct iniValues *vals = data;
+   char buf[24] = {0};
+   size_t len = CCE_MAX(strlen(name), 23);
+   memcpy(buf, name, len + 1);
+   cceMemoryToLowercase(buf, len);
+   if (strcasecmp(section, "properties") == 0)
+   {
+      if (memcmp(buf, "gameres", 8) == 0 || memcmp(buf, "res", 4) == 0 || memcmp(buf, "gameresolution", 15) || memcmp(buf, "resolution", 11) == 0)
+      {
+         vals->gameResolution = cceStringToU16Vec2(value);
+      }
+      else if (memcmp(buf, "layers", 7) == 0 || memcmp(buf, "layersquantity", 15) == 0)
+      {
+         vals->layersQuantity = atoi(value);
+      }
+      else if (memcmp(buf, "layerzero", 10) == 0)
+      {
+         vals->layerZero = atoi(value);
+      }
+      else if (memcmp(buf, "texsize", 8) == 0 || memcmp(buf, "texturesize", 12) == 0)
+      {
+         vals->textureSize = cceStringToU16Vec2(value);
+      }
+      else if (memcmp(buf, "windowname", 11) == 0 || memcmp(buf, "name", 5) == 0)
+      {
+         size_t len = strlen(value);
+         vals->windowName = malloc((len + 1) * sizeof(char));
+         memcpy(vals->windowName, value, len + 1);
+      }
+      else if (memcmp(buf, "texpath", 8) == 0 || memcmp(buf, "texturepath", 12) == 0)
+      {
+         size_t len = strlen(value);
+         vals->texturePath = malloc((len + 1) * sizeof(char));
+         memcpy(vals->texturePath, value, len + 1);
+      }
+      else if (memcmp(buf, "mapspath", 9) == 0 || memcmp(buf, "mappath", 8) == 0)
+      {
+         size_t len = strlen(value);
+         vals->mapPath = malloc((len + 1) * sizeof(char));
+         memcpy(vals->mapPath, value, len + 1);
+      }
+      else if (memcmp(buf, "colorformat", 12) == 0)
+      {
+         strncpy(buf, value, 4);
+         cceMemoryToLowercase(buf, 3);
+         if (memcmp(buf, "rgb", 4) == 0)
+         {
+            vals->colorFormat = CCE_COLOR_RGB;
+         }
+         else if (memcmp(buf, "hsv", 4) == 0)
+         {
+            vals->colorFormat = CCE_COLOR_HSV;
+         }
+         else if (memcmp(buf, "hsl", 4) == 0)
+         {
+            vals->colorFormat = CCE_COLOR_HSL;
+         }
+         else if (memcmp(buf, "hcl", 4) == 0 || memcmp(buf, "lch", 4) == 0)
+         {
+            vals->colorFormat = CCE_COLOR_HCL;
+         }
+      }
+      else if (memcmp(buf, "collidertype", 13) == 0 || memcmp(buf, "collider", 9) == 0)
+      {
+         strncpy(buf, value, 10);
+         cceMemoryToLowercase(buf, 9);
+         if (memcmp(buf, "rect", 5) == 0 || memcmp(buf, "rectangle", 10) == 0)
+         {
+            vals->colliderType = CCE_RECTANGLE_COLLIDER;
+         }
+         else if (memcmp(buf, "cir", 4) == 0 || memcmp(buf, "circle", 7) == 0)
+         {
+            vals->colliderType = CCE_CIRCLE_COLLIDER;
+         }
+      }
+      else if (memcmp(buf, "usefallbackmap", 7) == 0 || memcmp(buf, "genfallbackmaponfailure", 24) == 0 || memcmp(buf, "genmaponfailure", 16) == 0)
+      {
+         vals->useFallbackMap = cceStringToBool(value);
+      }
+      return 0;
+   }
+   if (strcasecmp(section, "keybinds") == 0)
+   {
+      if (memcmp(buf, "horizontalmove", 15) == 0 || memcmp(buf, "horizontalaxis", 15) == 0 || memcmp(buf, "horizontal", 11) == 0)
+      {
+         
+      }
+   }
+   return 0;
+}
+
+static void parseGameINI (const char *path)
+{
+   
+}
+
 int initMap2DRenderer__openGL (char *cce__resourcePath, const struct LoadedTextures **textures, struct RendereringFunctions *funcStruct);
 
-CCE_PUBLIC_OPTIONS int cceInitEngine2D (uint32_t textureMaxWidth, uint32_t textureMaxHeight,
-                                        const char *windowLabel, const char *resourcePath, uint8_t layersQuantity, uint8_t layerZeroOffset, cce_flag flags)
+CCE_PUBLIC_OPTIONS int cceInitEngine2D (const char *gameINIpath)
 {
    {
       char *path = getenv("CCE_RESOURCE_PATH");
@@ -585,7 +720,6 @@ CCE_PUBLIC_OPTIONS int cceInitEngine2D (uint32_t textureMaxWidth, uint32_t textu
       return -1;
    }
    cce__initMap2DLoaders();
-   cceRegisterMapCustomResourceCallback(cce__loadTextures, cce__releaseTextures, cce__createTextures, cce__storeTextures, sizeof(struct UsedTexturesInfo));
    g_textureSize.x = textureMaxWidth;
    g_textureSize.y = textureMaxHeight;
    g_renderingBufferOffset = cceGetFunctionBufferOffset(1, cce__staticMapFunctionSet);

@@ -35,58 +35,24 @@
 struct cce_backend_data cce__engineBackend;
 uint64_t cce__currentTime, cce__deltaTime;
 
-/*
-static uint64_t maxTimerCheckDelay = UINT64_MAX;
+static void (*moveCallback)(int8_t, int8_t);
+static void (*buttonCallback)(cce_enum);
+static void (*cursorCallback)(int16_t, int16_t);
 
-
-CCE_PUBLIC_OPTIONS uint8_t cceTimerExpiredCountCompensated (const struct cce_timer *timer)
+CCE_PUBLIC_OPTIONS void cceRegisterMoveCallback (void (*callback)(int8_t, int8_t))
 {
-   if (timer->delay == 0) // Special case
-      return 1;
-   uint64_t timerCheckDelay = engineBackend.currentTime - timer->initTime;
-   if (timerCheckDelay >= timer->delay)
-   {
-      timerCheckDelay -= timer->delay;
-      if (timerCheckDelay < maxTimerCheckDelay)
-      {
-         maxTimerCheckDelay = timerCheckDelay;
-      }
-      return 1;
-   }
-   return 0;
+   moveCallback = callback;
 }
 
-CCE_PUBLIC_OPTIONS uint8_t cceCheckAndRestartTimer (struct cce_timer *timer)
+CCE_PUBLIC_OPTIONS void cceRegisterButtonCallback (void (*callback)(cce_enum))
 {
-   if (timer->delay == 0) // Special case
-   {
-      timer->initTime = engineBackend.currentTime;
-      return 1;
-   }
-   
-   uint64_t expirationTime = timer->initTime + timer->delay;
-   
-   if (engineBackend.currentTime < expirationTime)
-      return 0;
-   
-   
-   
-   uint64_t timerCheckDelay = engineBackend.currentTime - expirationTime;
-   timer->initTime = engineBackend.currentTime - timerCheckDelay;
-   return 1;
+   buttonCallback = callback;
 }
 
-CCE_PUBLIC_OPTIONS void cceStartTimerCompensated (struct cce_timer *timer)
+CCE_PUBLIC_OPTIONS void cceRegisterCursorCallback (void (*callback)(int16_t, int16_t))
 {
-   timer->initTime = engineBackend.currentTime - ((maxTimerCheckDelay == UINT64_MAX) ? maxTimerCheckDelay : 0);
+   cursorCallback = callback;
 }
-
-
-CCE_PUBLIC_OPTIONS void cceResetTimerDelayCompensation (void)
-{
-   maxTimerCheckDelay = UINT64_MAX;
-}
-*/
 
 uint64_t cceGetDeltaTime (void)
 {

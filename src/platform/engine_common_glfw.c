@@ -30,6 +30,7 @@
 #include "../engine_common_internal.h"
 
 #define CCE_FULLSCREEN 0x10
+#define CCE_MOVE_EVENT 0x20
 
 static struct
 {
@@ -123,10 +124,12 @@ static void keyCallback (GLFWwindow *window, int key, int scancode, int action, 
       case GLFW_KEY_UP:
       case GLFW_KEY_DOWN:
          verticalControlAxis = (key * 2 - GLFW_KEY_DOWN * 2 - 1) * (action == GLFW_PRESS);
+         g_GLFWstate.flags |= CCE_MOVE_EVENT;
          break;
       case GLFW_KEY_LEFT:
       case GLFW_KEY_RIGHT:
          horizontalControlAxis = (GLFW_KEY_RIGHT * 2 - key * 2 + 1) * (action == GLFW_PRESS);
+         g_GLFWstate.flags |= CCE_MOVE_EVENT;
          break;
       case GLFW_KEY_ENTER:
       case GLFW_KEY_X:
