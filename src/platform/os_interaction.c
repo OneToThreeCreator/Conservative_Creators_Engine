@@ -137,63 +137,23 @@ CCE_PUBLIC_OPTIONS char* cceGetCurrentPath (size_t spaceToLeave)
 CCE_PUBLIC_OPTIONS char* cceGetDirectory (char *path, size_t bufferSize)
 {
    struct stat st;
-   int mkdirState, statState = stat(path, &st);
-   if (statState != 0)
-   {
-      switch (errno)
-      {
-         case ENOENT:
-         {
-            errno = 0u;
-            mkdirState = mkdir(path, S_IRWXU | S_IRWXG);
-            if (mkdirState != 0)
-            {
-               if (errno == EEXIST)
-               {
-                  // Dangling link found
-                  errno = 0u;
-                  break;
-               }
-            }
-            else
-            {
-               return path;
-            }
-         }
-         // fallthrough
-         default:
-         {
-            fprintf(stderr, "DIRECTORY::FAILED_TO_GET:\n%s - %s\n", path, strerror(errno));
-            return NULL;
-         }
-      }
-   }
-   else if (S_ISDIR(st.st_mode))
-   {
-      return path;
-   }
    size_t length = strnlen(path, bufferSize);
-   if (length + 1u >= bufferSize)
-   {
-      return NULL;
-   }
+   length -= (path[length - 1] == '/'); 
    size_t symbolsRemaining = bufferSize - (length + 1u);
-   for (size_t symbolsQuantity = 1u; symbolsQuantity <= symbolsRemaining; ++symbolsQuantity)
+   for (size_t symbolsQuantity = 0u; symbolsQuantity <= symbolsRemaining; ++symbolsQuantity)
    {
       for (size_t number = 0u; number < (((size_t) 1) << (symbolsQuantity * 6u)); ++number)
       {
          cceConvertIntToBase64String(number, path + length, symbolsQuantity);
          *(path + length + symbolsQuantity) = '\0';
-         statState = stat(path, &st);
-         if (statState != 0)
+         if (stat(path, &st) != 0)
          {
             switch (errno)
             {
                case ENOENT:
                {
                   errno = 0u;
-                  mkdirState = mkdir(path, S_IRWXU | S_IRWXG);
-                  if (mkdirState != 0)
+                  if (mkdir(path, S_IRWXU | S_IRWXG) != 0)
                   {
                      if (errno == EEXIST)
                      {
@@ -376,11 +336,11 @@ static void printSystemError (char *message)
                  NULL, error, 0u, (LPTSTR) &errorString, 0u, NULL);
    if (errorString == NULL)
    {
-      fprintf(stderr, "%s: error code %u", message, error);
+      fprintf(stderr, "%s: error code %u\n", message, error);
    }
    else
    {
-      fprintf(stderr, "%s: %s", message, errorString);
+      fprintf(stderr, "%s: %s\n", message, errorString);
       LocalFree(errorString);
    }
 }
@@ -413,41 +373,12 @@ CCE_PUBLIC_OPTIONS char* cceGetDirectory (char *path, size_t bufferSize)
 {
    DWORD attributes = GetFileAttributesA(path);
    DWORD error;
-   if (attributes == INVALID_FILE_ATTRIBUTES)
-   {
-      error = GetLastError();
-      switch (error)
-      {
-         case ERROR_FILE_NOT_FOUND:
-         {
-            SetLastError(ERROR_SUCCESS);
-            if (CreateDirectoryA(path, NULL) == 0u) // CreateDirectoryA returns zero if failed
-            {
-               error = GetLastError();
-            }
-            else
-            {
-               return path;
-            }
-         }
-         // fallthrough
-         default:
-         {
-            fprintf(stderr, "DIRECTORY::FAILED_TO_GET:\n%s - %s", path, getErrorMessage(error));
-            return NULL;
-         }
-      }
-   }
-   if (attributes & FILE_ATTRIBUTE_DIRECTORY)
-   {
-      return path;
-   }
    
    size_t length = strnlen(path, bufferSize);
    if ((*(path + length - 1) == '\\') || (*(path + length - 1) == '/'))
        --length;
    uint8_t symbolsRemaining = bufferSize - (length + 1u);
-   for (uint8_t symbolsQuantity = 1u; symbolsQuantity <= symbolsRemaining; ++symbolsQuantity)
+   for (uint8_t symbolsQuantity = 0u; symbolsQuantity <= symbolsRemaining; ++symbolsQuantity)
    {
       for (size_t number = 0u; number < (((size_t) 1) << (symbolsQuantity * 6u)); ++number)
       {
