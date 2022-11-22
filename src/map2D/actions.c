@@ -246,85 +246,19 @@ void cce__runActions (uint16_t *actionSizes, void *actionsToCall, uint16_t actio
    }
 }
 
-#define LOAD_ACTIONS(map, sectionSize, file, onLoad, onFree, onEnter, onLeave, onLoadActionsAlloc, onFreeActionsAlloc, onEnterActionsAlloc, onLeaveActionsAlloc, \
-                     onLoadActionSizesAlloc, onFreeActionSizesAlloc, onEnterActionSizesAlloc, onLeaveActionSizesAlloc) \
-if (sectionSize == 0) \
-      return 0; \
-\
-onLoad  ## Quantity = 0; \
-onFree  ## Quantity = 0; \
-onEnter ## Quantity = 0; \
-onLeave ## Quantity = 0; \
-uint32_t onLoadActionsSize = 0, onFreeActionsSize = 0, onEnterActionsSize = 0, onLeaveActionsSize = 0; \
-fread(&onLoad  ## Quantity, sizeof(uint16_t), sectionSize > 0, file); \
-fread(&onFree  ## Quantity, sizeof(uint16_t), sectionSize > 0, file); \
-fread(&onLoadActionsSize,   sizeof(uint32_t), sectionSize > 0, file); \
-fread(&onFreeActionsSize,   sizeof(uint32_t), sectionSize > 0, file); \
-fread(&onEnter ## Quantity, sizeof(uint16_t), sectionSize > 1, file); \
-fread(&onLeave ## Quantity, sizeof(uint16_t), sectionSize > 1, file); \
-fread(&onEnterActionsSize,  sizeof(uint32_t), sectionSize > 1, file); \
-fread(&onLeaveActionsSize,  sizeof(uint32_t), sectionSize > 1, file); \
-\
-onLoad = onLoadActionsAlloc; \
-onFree = onFreeActionsAlloc; \
-onEnter = onEnterActionsAlloc; \
-onLeave = onLeaveActionsAlloc; \
-onLoad ## Sizes = onLoadActionSizesAlloc; \
-onFree  ## Sizes = onFreeActionSizesAlloc; \
-onEnter ## Sizes = onEnterActionSizesAlloc; \
-onLeave ## Sizes = onLeaveActionSizesAlloc; \
-\
-fread(onLoad  ## Sizes, sizeof(uint16_t), onLoad  ## Quantity, file); \
-fread(onLoad,  1, onLoadActionsSize, file); \
-fread(onFree  ## Sizes, sizeof(uint16_t), onFree  ## Quantity, file); \
-fread(onFree,  1, onFreeActionsSize,  file); \
-fread(onEnter ## Sizes, sizeof(uint16_t), onEnter ## Quantity, file); \
-fread(onEnter, 1, onEnterActionsSize, file); \
-fread(onLeave ## Sizes, sizeof(uint16_t), onLeave ## Quantity, file); \
-fread(onLeave, 1, onLeaveActionsSize, file); \
-\
-if (g_endianess == CCE_BIG_ENDIAN) \
-{ \
-   cce__swapActionsEndian(onLoad  ## Sizes, onLoad,  onLoad  ## Quantity); \
-   cce__swapActionsEndian(onFree  ## Sizes, onFree,  onFree  ## Quantity); \
-   cce__swapActionsEndian(onEnter ## Sizes, onEnter, onEnter ## Quantity); \
-   cce__swapActionsEndian(onLeave ## Sizes, onLeave, onLeave ## Quantity); \
-} \
-
 static int loadActions (void *buffer, uint8_t sectionSize, struct cce_buffer *info, FILE *file)
 {
+   uint32_t onLoadActionsSize = 0, onFreeActionsSize = 0;
    struct ActionInfo *map = buffer;
    void *onLoadActions;
    uint16_t *onLoadActionsSizes;
    uint16_t onLoadActionsQuantity;
-   void *dontCare;
-   uint16_t *dontCareSizes;
-   uint16_t dontCareQuantity;
    sectionSize = sectionSize > 0;
-   LOAD_ACTIONS(map, sectionSize, file, onLoadActions, map->onFreeActions, dontCare, dontCare,
-                malloc(onLoadActionsQuantity * sizeof(uint16_t) + onLoadActionsSize), 
-                malloc(map->onFreeActionsQuantity * sizeof(uint16_t) + onFreeActionsSize),
-                NULL, NULL,
-                (uint16_t*)(onLoadActions + onLoadActionsSize), (uint16_t*)(map->onFreeActions + onFreeActionsSize),
-                NULL, NULL)
-   cce__runActions(onLoadActionsSizes, onLoadActions, onLoadActionsQuantity);
-   free(onLoadActions); // We no longer need that
-   return 0;
-}
-
-static int loadActionsOpenWorld (void *buffer, uint8_t sectionSize, struct cce_buffer *info, FILE *file)
-{
-   struct ActionInfoOpenWorld *map = buffer;
-   void *onLoadActions;
-   uint16_t *onLoadActionsSizes;
-   uint16_t onLoadActionsQuantity;
-   LOAD_ACTIONS(map, sectionSize, file, onLoadActions, map->onFreeActions, map->onEnterActions, map->onLeaveActions,
-                malloc(onLoadActionsQuantity * sizeof(uint16_t) + onLoadActionsSize), 
-                malloc((map->onFreeActionsQuantity + map->onEnterActionsQuantity + map->onLeaveActionsQuantity) * sizeof(uint16_t) +
-                       onFreeActionsSize + onEnterActionsSize + onLeaveActionsSize),
-                (map->onFreeActions + onFreeActionsSize), (map->onEnterActions + onEnterActionsSize),
-                (uint16_t*)(onLoadActions + onLoadActionsSize), (uint16_t*)(map->onLeaveActions + onLeaveActionsSize),
-                (map->onFreeActionsSizes + map->onFreeActionsQuantity), (map->onEnterActionsSizes + map->onEnterActionsQuantity))
+   CCE__LOAD_ACTION_METADATA(map, file, onLoadActions, map->onFreeActions, onLoadActionsSize, onFreeActionsSize);
+   CCE__LOAD_ACTIONS(map, file, onLoadActions, map->onFreeActions, onLoadActionsSize, onFreeActionsSize,
+                     malloc(onLoadActionsQuantity * sizeof(uint16_t) + onLoadActionsSize), 
+                     malloc(map->onFreeActionsQuantity * sizeof(uint16_t) + onFreeActionsSize),
+                     (uint16_t*)(onLoadActions + onLoadActionsSize), (uint16_t*)(map->onFreeActions + onFreeActionsSize));
    cce__runActions(onLoadActionsSizes, onLoadActions, onLoadActionsQuantity);
    free(onLoadActions); // We no longer need that
    return 0;
@@ -332,22 +266,27 @@ static int loadActionsOpenWorld (void *buffer, uint8_t sectionSize, struct cce_b
 
 static int loadActionsDynamic (void *buffer, uint8_t sectionSize, struct cce_buffer *info, FILE *file)
 {
+   uint32_t onLoadActionsSize = 0, onFreeActionsSize = 0;
    struct DynamicActionInfo *map = buffer;
-   LOAD_ACTIONS(map, sectionSize, file, map->onLoadActions, map->onFreeActions, map->onEnterActions, map->onLeaveActions,
-                malloc(onLoadActionsSize), 
-                malloc(onFreeActionsSize),
-                malloc(onEnterActionsSize),
-                malloc(onLeaveActionsSize),
-                malloc(map->onLoadActionsQuantity  * sizeof(uint16_t)),
-                malloc(map->onFreeActionsQuantity  * sizeof(uint16_t)),
-                malloc(map->onEnterActionsQuantity * sizeof(uint16_t)),
-                malloc(map->onLeaveActionsQuantity * sizeof(uint16_t)))
+   CCE__LOAD_ACTION_METADATA(map, file, map->onLoadActions, map->onFreeActions, onLoadActionsSize, onFreeActionsSize);
+   CCE__LOAD_ACTIONS(map, file, map->onLoadActions, map->onFreeActions, onLoadActionsSize, onFreeActionsSize,
+                     malloc(onLoadActionsSize), 
+                     malloc(onFreeActionsSize),
+                     malloc(map->onLoadActionsQuantity * sizeof(uint16_t)),
+                     malloc(map->onFreeActionsQuantity * sizeof(uint16_t)));
    cce__runActions(map->onLoadActionsSizes, map->onLoadActions, map->onLoadActionsQuantity);
    map->onLoadActionsSizesAllocated  = map->onLoadActionsQuantity;
    map->onFreeActionsSizesAllocated  = map->onFreeActionsQuantity;
-   map->onEnterActionsSizesAllocated = map->onEnterActionsQuantity;
-   map->onLeaveActionsSizesAllocated = map->onLeaveActionsQuantity;
    return 0;
+}
+
+static void createActions (void *buffer, struct cce_buffer *info)
+{
+   struct DynamicActionInfo *map = buffer;
+   CCE_ALLOC_ARRAY(map->onLoadActionsSizes);
+   CCE_ALLOC_ARRAY(map->onFreeActionsSizes);
+   map->onLoadActions = NULL;
+   map->onFreeActions = NULL;
 }
 
 static void freeActions (void *buffer, struct cce_buffer *info)
@@ -363,10 +302,6 @@ static void freeActionsDynamic (void *buffer, struct cce_buffer *info)
    free(map->onLoadActionsSizes);
    free(map->onFreeActions);
    free(map->onFreeActionsSizes);
-   free(map->onEnterActions);
-   free(map->onEnterActionsSizes);
-   free(map->onLeaveActions);
-   free(map->onLeaveActionsSizes);
 }
 
 #define STORE_ACTIONS_SWAP_ENDIAN(action, sizes, bytesWritten, tmpSizeStore, tmpActionStore) \
@@ -402,14 +337,6 @@ static uint8_t storeActions (void *buffer, struct cce_buffer *info, FILE *file)
    fwrite(&tmp, sizeof(uint16_t), 1, file);
    size_t bytesWrittenPos = ftell(file), endPos;
    fseek(file, sizeof(uint32_t) * 2, SEEK_CUR);
-   if (map->onEnterActionsQuantity > 0 || map->onLeaveActionsQuantity > 0)
-   {
-      tmp = cceHostEndianToLittleEndianInt16(map->onEnterActionsQuantity);
-      fwrite(&tmp, sizeof(uint16_t), 1, file);
-      tmp = cceHostEndianToLittleEndianInt16(map->onLeaveActionsQuantity);
-      fwrite(&tmp, sizeof(uint16_t), 1, file);
-      fseek(file, sizeof(uint32_t) * 2, SEEK_CUR);
-   }
    uint32_t bytesWritten[4] = {0};
    uint16_t *sizes, *end;
    uint16_t maxSize = 0;
@@ -423,39 +350,22 @@ static uint8_t storeActions (void *buffer, struct cce_buffer *info, FILE *file)
       for (uint16_t *iterator = sizes; iterator < end; ++iterator)
          maxSize = *iterator > maxSize ? *iterator : maxSize;
       
-      sizes = map->onEnterActionsSizes, end = map->onEnterActionsSizes + map->onEnterActionsQuantity;
-      for (uint16_t *iterator = sizes; iterator < end; ++iterator)
-         maxSize = *iterator > maxSize ? *iterator : maxSize;
-      
-      sizes = map->onLeaveActionsSizes, end = map->onLeaveActionsSizes + map->onLeaveActionsQuantity;
-      for (uint16_t *iterator = sizes; iterator < end; ++iterator)
-         maxSize = *iterator > maxSize ? *iterator : maxSize;
-      
       cce_void *actionTMP = malloc(maxSize);
       STORE_ACTIONS_SWAP_ENDIAN(map->onLoadActions,  sizes, bytesWritten[0], tmp, actionTMP)
       STORE_ACTIONS_SWAP_ENDIAN(map->onFreeActions,  sizes, bytesWritten[1], tmp, actionTMP)
-      STORE_ACTIONS_SWAP_ENDIAN(map->onEnterActions, sizes, bytesWritten[2], tmp, actionTMP)
-      STORE_ACTIONS_SWAP_ENDIAN(map->onLeaveActions, sizes, bytesWritten[3], tmp, actionTMP)
       free(actionTMP);
    }
    else
    {
       STORE_ACTIONS_PRESERVE_ENDIAN(map->onLoadActions,  sizes, bytesWritten[0])
       STORE_ACTIONS_PRESERVE_ENDIAN(map->onFreeActions,  sizes, bytesWritten[1])
-      STORE_ACTIONS_PRESERVE_ENDIAN(map->onEnterActions, sizes, bytesWritten[2])
-      STORE_ACTIONS_PRESERVE_ENDIAN(map->onLeaveActions, sizes, bytesWritten[3])
    }
    endPos = ftell(file);
    fseek(file, bytesWrittenPos, SEEK_SET);
    cceHostEndianToLittleEndianArrayInt32(bytesWritten, 4);
    fwrite(bytesWritten, sizeof(uint32_t), 2, file);
-   if (map->onEnterActionsQuantity > 0 || map->onLeaveActionsQuantity > 0)
-   {
-      fseek(file, sizeof(uint16_t) * 2, SEEK_CUR);
-      fwrite(bytesWritten + 2, sizeof(uint32_t), 2, file);
-   }
    fseek(file, endPos, SEEK_SET);
-   return (map->onEnterActionsQuantity > 0 || map->onLeaveActionsQuantity > 0) + 1;
+   return 1;
 }
 
 void cce__actionsInit (void)
@@ -470,8 +380,8 @@ void cce__actionsInit (void)
    nextTimer = NULL;
    nextDelayedActionWithoutExternalTimer = NULL;
    lastDelayedActionWithExternalTimer = NULL;
-   cceRegisterFileIOcallbacks(cce__staticMapFunctionSet,  loadActions,        freeActions,        NULL,         sizeof(struct ActionInfo));
-   cceRegisterFileIOcallbacks(cce__dynamicMapFunctionSet, loadActionsDynamic, freeActionsDynamic, storeActions, sizeof(struct DynamicActionInfo));
+   cceRegisterFileIOcallbacks(cce__staticMapFunctionSet,  loadActions,        freeActions,        NULL,         NULL,         sizeof(struct ActionInfo));
+   cceRegisterFileIOcallbacks(cce__dynamicMapFunctionSet, loadActionsDynamic, freeActionsDynamic, createActions, storeActions, sizeof(struct DynamicActionInfo));
    cceRegisterAction(CCE_TRANSFORM_ACTION,            transformAction,            transformActionSwapEndian);
    cceRegisterAction(CCE_COMBINEDTRANSFORM_ACTION,    combinedTransformAction,    combinedTransformActionSwapEndian);
    cceRegisterAction(CCE_OFFSETTEXTURE_ACTION,        offsetTextureAction,        offsetTextureActionSwapEndian);

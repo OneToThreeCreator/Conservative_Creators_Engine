@@ -40,8 +40,28 @@ struct ExitMap2D
 struct OpenWorldInfo
 {
    struct ExitMap2D *exitMaps;
-   uint32_t exitMapsQuantity;
-   uint32_t exitMapsAllocated;
+   struct Action    *onEnterActions;
+   uint16_t         *onEnterActionsSizes;
+   struct Action    *onLeaveActions;
+   uint16_t         *onLeaveActionsSizes;
+   uint32_t          exitMapsQuantity;
+   uint16_t          onEnterActionsQuantity;
+   uint16_t          onLeaveActionsQuantity;
+};
+
+struct OpenWorldInfoDynamic
+{
+   struct ExitMap2D *exitMaps;
+   struct Action    *onEnterActions;
+   uint16_t         *onEnterActionsSizes;
+   struct Action    *onLeaveActions;
+   uint16_t         *onLeaveActionsSizes;
+   uint32_t          exitMapsQuantity;
+   uint16_t          onEnterActionsQuantity;
+   uint16_t          onLeaveActionsQuantity;
+   uint32_t          exitMapsAllocated;
+   uint16_t          onEnterActionsSizesAllocated;
+   uint16_t          onLeaveActionsSizesAllocated;
 };
 
 #endif // CCE_OPENWORLD_H

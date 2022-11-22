@@ -68,59 +68,6 @@ static size_t texturesPathLength;
 
 cce_flag cce__map2Dflags;
 
-int initMap2DRenderer__openGL (char *cce__resourcePath, const struct LoadedTextures **textures, struct RendereringFunctions *funcStruct);
-
-CCE_PUBLIC_OPTIONS int cceInitEngine2D (uint32_t textureMaxWidth, uint32_t textureMaxHeight,
-                                        const char *windowLabel, const char *resourcePath, uint8_t layersQuantity, uint8_t layerZeroOffset, cce_flag flags)
-{
-   {
-      char *path = getenv("CCE_RESOURCE_PATH");
-      if (path != NULL && *path != '\0')
-         resourcePath = path;
-   }
-   if (resourcePath == NULL || *resourcePath == '\0')
-   {
-      fputs("ENGINE::INIT::NO_RESOURCE_PATH:\nEngine could not load the game without knowing where it is", stderr);
-      return -1;
-   }
-   size_t pathLength = strlen(resourcePath) + 1u;
-   cce__resourcePath = malloc((pathLength + 11u) * sizeof(char));
-   memcpy(cce__resourcePath, resourcePath, pathLength);
-   
-   cce__map2Dflags = CCE_INIT;
-   if (cce__initEngine(windowLabel) != 0)
-   {
-      free(cce__resourcePath);
-      return -1;
-   }
-   cce__initMap2DLoaders();
-   g_textureSize.x = textureMaxWidth;
-   g_textureSize.y = textureMaxHeight;
-   g_renderingBufferOffset = cceGetFunctionBufferOffset(1, cce__staticMapFunctionSet);
-   if (initMap2DRenderer__openGL(cce__resourcePath, (const struct LoadedTextures**) &g_textures, &cce__renderingFunctions) != 0)
-   {
-      fputs("ENGINE::INIT::BACKEND_FAILURE:\nCan't initialize engine without backend\n", stderr);
-      return -1;
-   }
-   g_renderingDataSize = cce__getRenderingDataSize();
-   cceAppendPath(cce__resourcePath, pathLength + 11, "maps");
-   cceSetMap2Dpath(cce__resourcePath);
-   *(cce__resourcePath + pathLength) = '\0';
-   
-   CCE_ALLOC_ARRAY_ZEROED(g_textures);
-   CCE_ALLOC_ARRAY(g_texturesEmpty);
-   g_textureBufferSize = 0;
-   cceAppendPath(cce__resourcePath, pathLength + 11, "textures");
-   cceSetTexturesPath(resourcePath);
-   *(cce__resourcePath + pathLength) = '\0';
-   cce__actionsInit();
-   cce__map2Dflags &= ~CCE_INIT;
-   g_layers = calloc(layersQuantity, sizeof(struct cce_buffer*));
-   g_layerZero = g_layers + layerZeroOffset;
-   g_layersQuantity = layersQuantity;
-   return 0;
-}
-
 CCE_PUBLIC_OPTIONS void cceLayerSetMap2D (int8_t layer, uint8_t mapLayer, struct cce_buffer *map)
 {
    if (layer < (g_layers - g_layerZero) || layer >= (g_layerZero - g_layers) + g_layersQuantity)
@@ -471,10 +418,20 @@ int cce__loadTextures (void *buffer, struct cce_buffer *info, char **paths)
    return 0;
 }
 
+void cce__createTextures (void *buffer, struct cce_buffer *info)
+{
+   struct UsedTexturesInfo *data = buffer;
+   data->texturesMapDependsOn          = NULL;
+   data->texturesMapDependsOnQuantity  = 0;
+   data->texturesMapDependsOnAllocated = 0;
+}
+
 void cce__releaseTextures (void *buffer, struct cce_buffer *info)
 {
    uint16_t textureID;
    struct UsedTexturesInfo *data = buffer;
+   if (data->texturesMapDependsOnQuantity == 0)
+      return;
    // Iteration from the end to increase likelyhood of freeing last textures first (potentially avoiding expensive move and decreasing it's cost)
    uint16_t *iterator = data->texturesMapDependsOn + data->texturesMapDependsOnQuantity, *end = data->texturesMapDependsOn;
    do
@@ -601,6 +558,60 @@ cce_ubyte cce__fourthLogicTypeFuncMap2D(uint16_t ID, va_list argp)
                               (cce_void*) map->colliders, sizeof(struct Map2DCollider), (cce_void*) map->colliders, sizeof(struct Map2DCollider));
 }
 */
+
+int initMap2DRenderer__openGL (char *cce__resourcePath, const struct LoadedTextures **textures, struct RendereringFunctions *funcStruct);
+
+CCE_PUBLIC_OPTIONS int cceInitEngine2D (uint32_t textureMaxWidth, uint32_t textureMaxHeight,
+                                        const char *windowLabel, const char *resourcePath, uint8_t layersQuantity, uint8_t layerZeroOffset, cce_flag flags)
+{
+   {
+      char *path = getenv("CCE_RESOURCE_PATH");
+      if (path != NULL && *path != '\0')
+         resourcePath = path;
+   }
+   if (resourcePath == NULL || *resourcePath == '\0')
+   {
+      fputs("ENGINE::INIT::NO_RESOURCE_PATH:\nEngine could not load the game without knowing where it is", stderr);
+      return -1;
+   }
+   size_t pathLength = strlen(resourcePath) + 1u;
+   cce__resourcePath = malloc((pathLength + 11u) * sizeof(char));
+   memcpy(cce__resourcePath, resourcePath, pathLength);
+   
+   cce__map2Dflags = CCE_INIT;
+   if (cce__initEngine(windowLabel) != 0)
+   {
+      free(cce__resourcePath);
+      return -1;
+   }
+   cce__initMap2DLoaders();
+   cceRegisterMapCustomResourceCallback(cce__loadTextures, cce__releaseTextures, cce__createTextures, cce__storeTextures, sizeof(struct UsedTexturesInfo));
+   g_textureSize.x = textureMaxWidth;
+   g_textureSize.y = textureMaxHeight;
+   g_renderingBufferOffset = cceGetFunctionBufferOffset(1, cce__staticMapFunctionSet);
+   if (initMap2DRenderer__openGL(cce__resourcePath, (const struct LoadedTextures**) &g_textures, &cce__renderingFunctions) != 0)
+   {
+      fputs("ENGINE::INIT::BACKEND_FAILURE:\nCan't initialize engine without backend\n", stderr);
+      return -1;
+   }
+   g_renderingDataSize = cce__getRenderingDataSize();
+   cceAppendPath(cce__resourcePath, pathLength + 11, "maps");
+   cceSetMap2Dpath(cce__resourcePath);
+   *(cce__resourcePath + pathLength) = '\0';
+   
+   CCE_ALLOC_ARRAY_ZEROED(g_textures);
+   CCE_ALLOC_ARRAY(g_texturesEmpty);
+   g_textureBufferSize = 0;
+   cceAppendPath(cce__resourcePath, pathLength + 11, "textures");
+   cceSetTexturesPath(resourcePath);
+   *(cce__resourcePath + pathLength) = '\0';
+   cce__actionsInit();
+   cce__map2Dflags &= ~CCE_INIT;
+   g_layers = calloc(layersQuantity, sizeof(struct cce_buffer*));
+   g_layerZero = g_layers + layerZeroOffset;
+   g_layersQuantity = layersQuantity;
+   return 0;
+}
 
 void cce__terminateEngine2D (void)
 {

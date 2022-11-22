@@ -80,6 +80,10 @@ struct CollisionGroup
 
 struct Action;
 
+typedef int (*cce_rloadfun)(void *buffer, struct cce_buffer *info, char **names);
+typedef char** (*cce_rstorefun)(void *buffer, struct cce_buffer *info);
+
+CCE_PUBLIC_OPTIONS uint32_t cceRegisterMapCustomResourceCallback (cce_rloadfun onLoad, cce_dataparsefun onFree, cce_dataparsefun onCreate, cce_rstorefun onStore, size_t bufferSize);
 CCE_PUBLIC_OPTIONS void cceSetMap2Dpath (const char *path);
 CCE_PUBLIC_OPTIONS int cceInitEngine2D (uint32_t textureMaxWidth, uint32_t textureMaxHeight,
                                         const char *windowLabel, const char *resourcePath, uint8_t layersQuantity, uint8_t layerZeroOffset, cce_flag flags);

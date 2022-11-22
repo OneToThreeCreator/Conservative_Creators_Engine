@@ -33,18 +33,23 @@ extern "C"
 #include "cce_exports.h"
 #define CCE_PUBLIC_OPTIONS CCE_EXPORTS
 
-struct cce_buffer;
+struct cce_buffer
+{
+   uint8_t sectionsQuantity;
+   uint8_t flags;
+   uint16_t loadingFunctionBlockID;
+   uint32_t __pad; // Pad to uint64_t (to avoid misaligned reads down the line)
+};
 
-typedef int     (*cce_fparsefun)(void *buffer, uint8_t sectionSize, struct cce_buffer *info, FILE *file);
-typedef uint8_t (*cce_fstorefun)(void *buffer, struct cce_buffer *info, FILE *file);
-typedef void    (*cce_onfreefun)(void *buffer, struct cce_buffer *info);
+typedef int     (*cce_freadfun)(void *buffer, uint8_t sectionSize, struct cce_buffer *info, FILE *file);
+typedef uint8_t (*cce_fwritefun)(void *buffer, struct cce_buffer *info, FILE *file);
+typedef void    (*cce_dataparsefun)(void *buffer, struct cce_buffer *info);
 
 CCE_PUBLIC_OPTIONS FILE* cceMoveFileContent (FILE *file, long offset, int position, size_t size);
 CCE_PUBLIC_OPTIONS uint16_t cceGetFileIOfunctionSet (void);
 CCE_PUBLIC_OPTIONS ptrdiff_t cceGetFunctionBufferOffset (uint8_t functionID, uint16_t functionSetID);
-CCE_PUBLIC_OPTIONS uint8_t cceRegisterFileIOcallbacks (uint16_t functionSet, cce_fparsefun onLoad, cce_onfreefun onFree, cce_fstorefun onWrite, size_t bufferSize);
+CCE_PUBLIC_OPTIONS uint8_t cceRegisterFileIOcallbacks (uint16_t functionSet, cce_freadfun onLoad, cce_dataparsefun onFree, cce_dataparsefun onCreate, cce_fwritefun onWrite, size_t bufferSize);
 CCE_PUBLIC_OPTIONS struct cce_buffer* cceSetBufferSectionQuantity (struct cce_buffer *buffer, uint8_t newSectionsQuantity);
-CCE_PUBLIC_OPTIONS void cceSetBufferCallEveryFunction (struct cce_buffer *buffer);
 CCE_PUBLIC_OPTIONS struct cce_buffer* cceCreateBuffer (uint8_t sectionsQuantity, uint16_t functionSetID);
 CCE_PUBLIC_OPTIONS void cceFreeBuffer (struct cce_buffer *buffer);
 CCE_PUBLIC_OPTIONS struct cce_buffer* cceLoadBinaryCCF (char *path, uint16_t functionSetID);

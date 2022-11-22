@@ -297,29 +297,33 @@ static struct RenderingData* map2DElementsToRenderingBuffer__openGL (const struc
    GL_CHECK_ERRORS;
    uint16_t  positionY;
    uint16_t *iterator;
-   do
+   if (textureInfoQuantity + elementDataQuantity > 0)
    {
-      iterator = glMapBuffer(GL_TEXTURE_BUFFER, GL_WRITE_ONLY);
-      GL_CHECK_ERRORS;
-      for (uint16_t *end = iterator + elementDataQuantity * 4; iterator < end; iterator += 4, ++elementData)
+      do
       {
-         iterator[0] = (elementData->size.x                    << 8) | elementData->transformGroups[0];
-         iterator[1] = (elementData->size.y                    << 8) | elementData->transformGroups[1];
-         iterator[2] = (elementData->textureOffsetGroup        << 8) | elementData->transformGroups[2];
-         iterator[3] = (elementData->colorGroupAndGlobalOffset << 8) | elementData->transformGroups[3];
+         iterator = glMapBuffer(GL_TEXTURE_BUFFER, GL_WRITE_ONLY);
+         GL_CHECK_ERRORS;
+         for (uint16_t *end = iterator + elementDataQuantity * 4; iterator < end; iterator += 4, ++elementData)
+         {
+            iterator[0] = (elementData->size.x                    << 8) | elementData->transformGroups[0];
+            iterator[1] = (elementData->size.y                    << 8) | elementData->transformGroups[1];
+            iterator[2] = (elementData->textureOffsetGroup        << 8) | elementData->transformGroups[2];
+            iterator[3] = (elementData->colorGroupAndGlobalOffset << 8) | elementData->transformGroups[3];
+         }
+         for (uint16_t *jiterator = iterator + textureInfoQuantity * 4; jiterator > iterator; ++textureInfo)
+         {
+            jiterator -= 4;
+            positionY = (*g_textures)[textureInfo->ID].size.y - (textureInfo->position.y + textureInfo->size.y);
+            jiterator[0] = (textureInfo->position.x & 0xFFF) | (textureInfo->size.y << 12);
+            jiterator[1] = (positionY               & 0xFFF) | ((textureInfo->size.y << 8) & 0xF);
+            jiterator[2] = (textureInfo->size.x     & 0xFFF) | ((textureInfo->size.y << 4) & 0xF);
+            jiterator[3] = textureInfo->ID;
+         }
+         elementData -= elementDataQuantity;
+         textureInfo -= textureInfoQuantity;
       }
-      for (uint16_t *jiterator = iterator + (textureInfoQuantity - 1) * 4; jiterator >= iterator; jiterator -= 4, ++textureInfo)
-      {
-         positionY = (*g_textures)[textureInfo->ID].size.y - (textureInfo->position.y + textureInfo->size.y);
-         jiterator[0] = (textureInfo->position.x & 0xFFF) | (textureInfo->size.y << 12);
-         jiterator[1] = (positionY               & 0xFFF) | ((textureInfo->size.y << 8) & 0xF);
-         jiterator[2] = (textureInfo->size.x     & 0xFFF) | ((textureInfo->size.y << 4) & 0xF);
-         jiterator[3] = textureInfo->ID;
-      }
-      elementData -= elementDataQuantity;
-      textureInfo -= textureInfoQuantity;
+      while (glUnmapBuffer(GL_TEXTURE_BUFFER) != GL_TRUE);
    }
-   while (glUnmapBuffer(GL_TEXTURE_BUFFER) != GL_TRUE);
    glBindTexture(GL_TEXTURE_BUFFER, textures[0]);
    GL_CHECK_ERRORS;
    glTexBuffer(GL_TEXTURE_BUFFER, GL_RGBA16UI, elementsBuffers[0]);

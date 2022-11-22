@@ -200,6 +200,40 @@ CCE_PUBLIC_OPTIONS uint8_t cceRegisterAction (uint32_t ID, cce_actionfun action,
 #define CCE_DELAYACTION_ACTION 8
 #define CCE_RUNACTIONS_ACTION 9
 
+#define CCE__LOAD_ACTION_METADATA(map, file, onLoad, onFree, onLoadSize, onFreeSize) \
+fread(&onLoad  ## Quantity, sizeof(uint16_t), 1, file); \
+fread(&onFree  ## Quantity, sizeof(uint16_t), 1, file); \
+fread(&onLoadSize,   sizeof(uint32_t), 1, file); \
+fread(&onFreeSize,   sizeof(uint32_t), 1, file); \
+onLoad ## Quantity = cceLittleEndianToHostEndianInt16(onLoad ## Quantity); \
+onFree ## Quantity = cceLittleEndianToHostEndianInt16(onFree ## Quantity); \
+onLoadSize =  cceLittleEndianToHostEndianInt16(onLoadSize); \
+onFreeSize =  cceLittleEndianToHostEndianInt16(onFreeSize)
+
+#define CCE__LOAD_ACTIONS(map, file, onLoad, onFree, onLoadSize, onFreeSize, onLoadActionsAlloc, onFreeActionsAlloc, \
+                         onLoadActionSizesAlloc, onFreeActionSizesAlloc) \
+do \
+{ \
+   onLoad = onLoadActionsAlloc; \
+   onFree = onFreeActionsAlloc; \
+   onLoad ## Sizes = onLoadActionSizesAlloc; \
+   onFree  ## Sizes = onFreeActionSizesAlloc; \
+   \
+   fread(onLoad ## Sizes, sizeof(uint16_t), onLoad ## Quantity, file); \
+   fread(onLoad,  1, onLoadSize, file); \
+   fread(onFree ## Sizes, sizeof(uint16_t), onFree ## Quantity, file); \
+   fread(onFree,  1, onFreeSize,  file); \
+   \
+   if (g_endianess == CCE_BIG_ENDIAN) \
+   { \
+      cceSwapEndianArrayIntN(onLoad ## Sizes, onLoad ## Quantity, 2); \
+      cceSwapEndianArrayIntN(onFree ## Sizes, onFree ## Quantity, 2); \
+      cce__swapActionsEndian(onLoad ## Sizes, onLoad, onLoad  ## Quantity); \
+      cce__swapActionsEndian(onFree ## Sizes, onFree, onFree  ## Quantity); \
+   } \
+} \
+while (0)
+
 #ifdef __cplusplus
 }
 #endif // __cplusplus

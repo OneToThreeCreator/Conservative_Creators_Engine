@@ -61,23 +61,23 @@ int main (int argc, char **argv)
             appendString += 2;
             appendLength -= 2;
             pathLength -= 2 - (pathLength < 2);
-            for (char *iterator = (path + pathLength), *end = path; iterator >= end && *iterator != '/' && *iterator != '\\'; --iterator, --pathLength)
-            {
-               
-            }
+            for (char *iterator = (path + pathLength), *end = path; iterator >= end && *iterator != '/' && *iterator != '\\'; --iterator, --pathLength) {}
          }
          memcpy(path + pathLength + 1, appendString, appendLength + 1);
          pathLength += appendLength;
       }
    }
-   const uint32_t globalBoolsQuantity = 32768;
    if (cceInitEngine2D(48, 48, "CCE TEST", path, 1, 0, CCE_DEFAULT) != 0)
    {
       free(path);
       printf("Initialization failure\n");
       return -1;
    }
-   struct cce_buffer *map = cceLoadMap2D("/NULL.c2m");
+   struct cce_buffer *map = cceLoadMap2Ddynamic("/NULL.c2m");
+   cceWriteMap2Ddynamic(map, "/tmp/test.c2m");
+   cceFreeMap2D(map);
+   map = cceLoadMap2D("/tmp/test.c2m");
+   remove("/tmp/test.c2m");
    printf("cceLoadMap2D returned %s\n", (map == NULL) ? "NULL" : "Valid map");
    cceLayerSetMap2D(0, 0, map);
    printf("Initialization complete\n");

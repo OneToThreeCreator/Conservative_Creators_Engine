@@ -26,6 +26,7 @@
 #include <cce/endianess.h>
 #include <cce/utils.h>
 
+#include <cce/map2D/actions.h>
 
 #include "../../include/cce/plugins/openworld.h"
 
@@ -39,7 +40,10 @@ int loadOpenWorldData (void *buffer, uint8_t sectionSize, struct cce_buffer *inf
    exitMapNamesSize    = cceLittleEndianToHostEndianInt32(exitMapNamesSize);
    if (map->exitMapsQuantity == 0)
       return 0;
-   map->exitMaps = malloc(map->exitMapsQuantity * sizeof(struct ExitMap2D) + exitMapNamesSize);
+   uint32_t onEnterActionsSize = 0, onLeaveActionsSize = 0;
+   if (sectionSize > 1)
+      CCE__LOAD_ACTION_METADATA(map, file, map->onEnterActions, map->onLeaveActions, onEnterActionsSize, onLeaveActionsSize);
+   map->exitMaps = malloc(map->exitMapsQuantity * sizeof(struct ExitMap2D) + exitMapNamesSize + onEnterActionsSize + onLeaveActionsSize);
    for (struct ExitMap2D *iterator = map->exitMaps, *end = map->exitMaps + map->exitMapsQuantity; iterator < end; ++iterator)
    {
       fread(&iterator->xOffset, sizeof(uint32_t), 5, file);
@@ -54,13 +58,17 @@ int loadOpenWorldData (void *buffer, uint8_t sectionSize, struct cce_buffer *inf
    {
       exitMaps->mapName = iterator;
    }
+   if (sectionSize > 1)
+      CCE__LOAD_ACTIONS(map, file, map->onEnterActions, map->onLeaveActions, onEnterActionsSize, onLeaveActionsSize,
+                        (struct Action*)(exitMapNames + exitMapNamesSize), (struct Action*)((cce_void*)map->onEnterActions + onEnterActionsSize),
+                        (uint16_t*)((cce_void*)map->onLeaveActions + onLeaveActionsSize), (map->onEnterActionsSizes + map->onEnterActionsQuantity));
    return 0;
 }
 
 int loadOpenWorldDataDynamic (void *buffer, uint8_t sectionSize, struct cce_buffer *info, FILE *file)
 {
    CCE_UNUSED(info);
-   struct OpenWorldInfo *map = buffer;
+   struct OpenWorldInfoDynamic *map = buffer;
    uint32_t exitMapNamesSize = 0;
    fread(&map->exitMapsQuantity, sizeof(uint8_t),  sectionSize > 3, file);
    fread(&exitMapNamesSize,      sizeof(uint32_t), sectionSize > 4, file);
@@ -93,6 +101,17 @@ void freeOpenWorldData (void *buffer, struct cce_buffer *info)
 {
    CCE_UNUSED(info);
    struct OpenWorldInfo *map = buffer;
+   free(map->exitMaps);
+}
+
+void freeOpenWorldDataDynamic (void *buffer, struct cce_buffer *info)
+{
+   CCE_UNUSED(info);
+   struct OpenWorldInfoDynamic *map = buffer;
+   for (struct ExitMap2D *iterator = map->exitMaps, *end = map->exitMaps + map->exitMapsQuantity; iterator < end; ++iterator)
+   {
+      free(iterator->mapName);
+   }
    free(map->exitMaps);
 }
 

@@ -43,32 +43,30 @@ struct ElementGroup   collisionGroups [collisionGroupsQuantity]
 struct CollisionGroup collision       [collisionQuantity]
 
 LOGIC:
-uint16_t      onLoadActionsQuantity;
-uint16_t      onFreeActionsQuantity;
-uint32_t      onLoadActionsSize;
-uint32_t      onFreeActionsSize;
+uint16_t      onLoadActionsQuantity
+uint16_t      onFreeActionsQuantity
+uint32_t      onLoadActionsSize
+uint32_t      onFreeActionsSize
 
-// Only when open world plugin is used
-uint16_t      onEnterActionsQuantity;
-uint16_t      onLeaveActionsQuantity;
-uint32_t      onEnterActionsSize;
-uint32_t      onLeaveActionsSize;
-
-uint16_t      onLoadActionSizes  [onLoadActionsQuantity]
-struct Action onLoadActions      [onLoadActionsSize]
-uint16_t      onFreeActionSizes  [onFreeActionsQuantity]
-struct Action onFreeActions      [onFreeActionsSize]
-
-uint16_t      onEnterActionSizes [onEnterActionsQuantity]
-struct Action onEnterActions     [onEnterActionsSize]
-uint16_t      onLeaveActionSizes [onLeaveActionsQuantity]
-struct Action onLeaveActions     [onLeaveActionsSize]
+uint16_t      onLoadActionSizes [onLoadActionsQuantity]
+struct Action onLoadActions     [onLoadActionsSize]
+uint16_t      onFreeActionSizes [onFreeActionsQuantity]
+struct Action onFreeActions     [onFreeActionsSize]
 
 OPENWORLD:
-uint8_t exitMapQuantity;
-uint32_t exitMapNamesSize
-struct ExitMap exitMaps;
-char exitMapNames [exitMapNamesSize]
+uint8_t        exitMapQuantity
+uint32_t       exitMapNamesSize
+uint16_t       onEnterActionsQuantity
+uint16_t       onLeaveActionsQuantity
+uint32_t       onEnterActionsSize
+uint32_t       onLeaveActionsSize
+
+struct ExitMap exitMaps
+char           exitMapNames [exitMapNamesSize]
+uint16_t       onEnterActionSizes [onEnterActionsQuantity]
+struct Action  onEnterActions     [onEnterActionsSize]
+uint16_t       onLeaveActionSizes [onLeaveActionsQuantity]
+struct Action  onLeaveActions     [onLeaveActionsSize]
 
 GAME_DATA:
 Some data that engine doesn't know how to parse // Handles via external functions provided by the running game

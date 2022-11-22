@@ -38,8 +38,6 @@ extern "C"
 
 #define CCE_ENGINE_STOP 0x80
 
-#define HEADSIZE_TO_BITFIELD_SIZE(headSize) (((headSize - 1) / (sizeof(uint_fast32_t) * 8) + 1) | ((UINT_FAST32_MAX == UINT32_MAX) && (UINTPTR_MAX == UINT64_MAX)))
-
 extern const uint8_t *const cce__flags;
 extern uint64_t cce__currentTime, cce__deltaTime;
 

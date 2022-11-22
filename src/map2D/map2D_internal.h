@@ -21,18 +21,17 @@
 #ifndef MAP2D_INTERNAL_H
 #define MAP2D_INTERNAL_H
 
-#ifdef __cplusplus
-extern "C"
-{
-#endif // __cplusplus
-
-
 #include "../../include/cce/engine_common.h"
 #include "../../include/cce/utils.h"
 #include "../../include/cce/map2D/map2D.h"
 
 #include "log.h"
 #include <listlib.h>
+
+#ifdef __cplusplus
+extern "C"
+{
+#endif // __cplusplus
 
 #define CCE_GLOBAL_OFFSET_MASK 0x10
 
@@ -49,7 +48,6 @@ extern "C"
 #ifndef CCE_PATH_RESERVED
 #define CCE_PATH_RESERVED 16
 #endif
-
 
 struct RenderingData;
 
@@ -124,7 +122,6 @@ struct DynamicRenderingInfo
    uint8_t                           layersQuantity;
    uint16_t                          textureInfoQuantity;
    uint16_t                          elementDataQuantity;
-   uint32_t                         *elementsAllocated;
    uint16_t                          textureInfoAllocated;
    uint16_t                          elementDataAllocated;
 };
@@ -168,37 +165,22 @@ struct ActionInfo
    uint16_t              onFreeActionsQuantity;
 };
 
-struct ActionInfoOpenWorld
-{
-   struct Action        *onFreeActions;
-   uint16_t             *onFreeActionsSizes;
-   uint16_t              onFreeActionsQuantity;
-   uint16_t              onEnterActionsQuantity;
-   uint16_t              onLeaveActionsQuantity;
-   struct Action        *onEnterActions;
-   uint16_t             *onEnterActionsSizes;
-   struct Action        *onLeaveActions;
-   uint16_t             *onLeaveActionsSizes;
-};
-
 struct DynamicActionInfo
 {
-   struct Action        *onLoadActions;
-   uint16_t             *onLoadActionsSizes;
    struct Action        *onFreeActions;
    uint16_t             *onFreeActionsSizes;
-   uint16_t              onLoadActionsQuantity;
    uint16_t              onFreeActionsQuantity;
-   uint16_t              onEnterActionsQuantity;
-   uint16_t              onLeaveActionsQuantity;
-   struct Action        *onEnterActions;
-   uint16_t             *onEnterActionsSizes;
-   struct Action        *onLeaveActions;
-   uint16_t             *onLeaveActionsSizes;
+   uint16_t              onLoadActionsQuantity;
    uint16_t              onLoadActionsSizesAllocated;
    uint16_t              onFreeActionsSizesAllocated;
-   uint16_t              onEnterActionsSizesAllocated;
-   uint16_t              onLeaveActionsSizesAllocated;
+   struct Action        *onLoadActions;
+   uint16_t             *onLoadActionsSizes;
+};
+
+struct ResourceInfo
+{
+   void *resourceData;
+   uint8_t resourcesQuantity;
 };
 
 struct UsedTexturesInfo

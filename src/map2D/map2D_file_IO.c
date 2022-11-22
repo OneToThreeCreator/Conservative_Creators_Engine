@@ -39,14 +39,11 @@ static size_t mapPathLength;
 uint16_t cce__staticMapFunctionSet, cce__dynamicMapFunctionSet;
 static ptrdiff_t g_resourceLoadersOffset, g_renderingInfoOffset;
 
-
-typedef int (*cce_rloadfun)(void *buffer, struct cce_buffer *info, char **names);
-typedef char** (*cce_rstorefun)(void *buffer, struct cce_buffer *info);
-
-static size_t resourceSpaceAllocated;
+static size_t resourceSpaceToBeAllocated;
 
 CCE_ARRAY(resourceLoadingFunctions, static cce_rloadfun, static uint16_t);
-static cce_onfreefun *resourceUnloadingFunctions;
+static cce_dataparsefun *resourceUnloadingFunctions;
+static cce_dataparsefun *resourceCreatingFunctions;
 static cce_rstorefun *resourceStoringFunctions;
 static size_t *resourceLoadingFunctionsBufferSizes;
 
@@ -59,18 +56,22 @@ CCE_PUBLIC_OPTIONS void cceSetMap2Dpath (const char *path)
    mapPathLength = strlen(mapPath);
 }
 
-CCE_PUBLIC_OPTIONS uint32_t cceRegisterMapCustomResourceLoadingCallback (cce_rloadfun onLoad, cce_onfreefun onFree, size_t bufferSize)
+CCE_PUBLIC_OPTIONS uint32_t cceRegisterMapCustomResourceCallback (cce_rloadfun onLoad, cce_dataparsefun onFree, cce_dataparsefun onCreate, cce_rstorefun onStore, size_t bufferSize)
 {
    if (resourceLoadingFunctionsQuantity >= resourceLoadingFunctionsAllocated)
    {
       CCE_REALLOC_ARRAY(resourceLoadingFunctions, resourceLoadingFunctionsQuantity + 1);
-      resourceUnloadingFunctions = realloc(resourceUnloadingFunctions, resourceLoadingFunctionsAllocated * sizeof(cce_onfreefun*));
+      resourceUnloadingFunctions = realloc(resourceUnloadingFunctions, resourceLoadingFunctionsAllocated * sizeof(cce_dataparsefun*));
+      resourceCreatingFunctions  = realloc(resourceCreatingFunctions,  resourceLoadingFunctionsAllocated * sizeof(cce_dataparsefun*));
+      resourceStoringFunctions   = realloc(resourceStoringFunctions,   resourceLoadingFunctionsAllocated * sizeof(cce_rstorefun*));
       resourceLoadingFunctionsBufferSizes = realloc(resourceLoadingFunctionsBufferSizes, (resourceLoadingFunctionsAllocated + 1) * sizeof(size_t));
    }
    resourceLoadingFunctions[resourceLoadingFunctionsQuantity] = onLoad;
    resourceUnloadingFunctions[resourceLoadingFunctionsQuantity] = onFree;
+   resourceCreatingFunctions[resourceLoadingFunctionsQuantity] = onCreate;
+   resourceStoringFunctions[resourceLoadingFunctionsQuantity] = onStore;
    resourceLoadingFunctionsBufferSizes[resourceLoadingFunctionsQuantity] = bufferSize;
-   resourceSpaceAllocated += bufferSize;
+   resourceSpaceToBeAllocated += bufferSize;
    return resourceLoadingFunctionsQuantity++ | 0x80000000;
 }
 
@@ -138,7 +139,7 @@ cceLittleEndianToHostEndianArrayInt32(elementsQuantity, sectionSize); \
 fread(elementData, sizeof(struct Map2DElementData), elementDataQuantity, file); \
 fread(textureData, sizeof(struct cce_texture2D), textureDataQuantity, file); \
 cceLittleEndianToHostEndianArrayInt16(textureData, textureDataQuantity * 5); \
-uint16_t *usedTextures = (**(struct UsedTexturesInfo **)((cce_void*) info + g_resourceLoadersOffset)).texturesMapDependsOn; \
+uint16_t *usedTextures = ((struct UsedTexturesInfo*)(((struct ResourceInfo*)((cce_void*) info + g_resourceLoadersOffset))->resourceData))->texturesMapDependsOn; \
 for (struct cce_texture2D *iterator = textureData, *end = textureData + textureDataQuantity; iterator < end; ++iterator) \
    if (iterator->ID > 0) \
       iterator->ID = usedTextures[iterator->ID - 1]
@@ -251,6 +252,38 @@ static int loadCollidersDynamic (void *buffer, uint8_t sectionSize, struct cce_b
    return 0;
 }
 
+static void createElements (void *buffer, struct cce_buffer *info)
+{
+   struct DynamicRenderingInfo *map = buffer;
+   map->elements = NULL;
+   map->textureInfo = NULL;
+   map->elementData = NULL;
+   map->layersQuantity = 0;
+   map->textureInfoQuantity = 0;
+   map->textureInfoAllocated = 0;
+   map->elementDataQuantity = 0;
+   map->elementDataAllocated = 0;
+   map->data = cce__map2DElementsToRenderingBuffer(NULL, 0, NULL, 0, NULL, 0);
+}
+
+static void createColliders (void *buffer, struct cce_buffer *info)
+{
+   struct DynamicCollisionInfo *map = buffer;
+   map->colliders = NULL;
+   map->transformGroups = NULL;
+   map->collisionGroups = NULL;
+   map->collision = NULL;
+   map->collisionCache = NULL;
+   map->collidersQuantity = 0;
+   map->collidersAllocated = 0;
+   map->transformGroupsQuantity = 0;
+   map->transformGroupsAllocated = 0;
+   map->collisionGroupsQuantity = 0;
+   map->collisionGroupsAllocated = 0;
+   map->collisionQuantity = 0;
+   map->collisionAllocated = 0;
+}
+
 static void freeElements (void *buffer, struct cce_buffer *info)
 {
    CCE_UNUSED(info);
@@ -308,20 +341,23 @@ static uint8_t storeElements (void *buffer, struct cce_buffer *info, FILE *file)
       for (struct Map2DElementPositionArray *iterator = map->elements, *end = map->elements + map->layersQuantity; iterator < end; ++iterator)
       {
          elementsTotalSize += iterator->dataQuantity;
-         tmp2 = cceBigEndianToLittleEndianInt32(iterator->dataQuantity);
+         tmp2 = cceHostEndianToLittleEndianInt32(iterator->dataQuantity);
          fwrite(&tmp2, sizeof(uint32_t), 1, file);
       }
-      fseek(file, -(long)((map->layersQuantity + 1) * sizeof(uint32_t)), SEEK_CUR);
+      fseek(file, -((long)((map->layersQuantity + 1) * sizeof(uint32_t))), SEEK_CUR);
       fwrite(&elementsTotalSize, sizeof(uint32_t), 1, file);
       fseek(file, (long)(map->layersQuantity * sizeof(uint32_t)), SEEK_CUR);
    }
-   fwrite(map->elementData, sizeof(struct Map2DElementData), map->elementDataQuantity, file);
+   fwrite(map->elementData, sizeof(struct Map2DElementData), map->elementDataQuantity, file); // All fields are 1-byte, no endian swap is performed
    uint16_t *dependantTextures =         (**(struct UsedTexturesInfo**)((cce_void*) info + g_resourceLoadersOffset)).texturesMapDependsOn;
    uint16_t  dependantTexturesQuantity = (**(struct UsedTexturesInfo**)((cce_void*) info + g_resourceLoadersOffset)).texturesMapDependsOnQuantity;
    for (struct cce_texture2D tmp, *iterator = map->textureInfo, *end = map->textureInfo + map->textureInfoQuantity; iterator < end; ++iterator)
    {
       if (iterator->ID == 0)
+      {
+         tmp.ID = 0;
          goto TEXTUREID_SET;
+      }
       for (uint16_t *jiterator = dependantTextures, *jend = dependantTextures + dependantTexturesQuantity; jiterator < jend; ++jiterator)
       {
          if (*jiterator == iterator->ID)
@@ -412,6 +448,7 @@ static uint8_t storeColliders (void *buffer, struct cce_buffer *info, FILE *file
 
 static int loadResourcesSection (void *buffer, uint8_t sectionSize, struct cce_buffer *info, FILE *file)
 {
+   struct ResourceInfo *map = buffer;
    uint32_t resourceSizes[256]; // VLA support across C compilers is still bad (and most likely wont improve)
    fread(resourceSizes + 1, sizeof(uint32_t), sectionSize, file);
    cceLittleEndianToHostEndianArrayInt32(resourceSizes + 1, sectionSize);
@@ -436,12 +473,13 @@ static int loadResourcesSection (void *buffer, uint8_t sectionSize, struct cce_b
    uint32_t namesAllocated = maxSize / 16; // Approximation
    names = malloc(namesAllocated * sizeof(char*));
    cce_rloadfun *fun = resourceLoadingFunctions;
-   size_t dataBufferSize = 0;
+   cce_dataparsefun *initFun = resourceCreatingFunctions;
+   size_t dataBufferSize;
    {
       uint32_t *iterator = resourceSizes + sectionSize;
       size_t *bufferSizes = resourceLoadingFunctionsBufferSizes + sectionSize - 1;
       resourceSizes[0] = 1; // Workaround to avoid out-of-bounds check
-      dataBufferSize = resourceSpaceAllocated;
+      dataBufferSize = resourceSpaceToBeAllocated;
       while (*iterator != 0)
       {
          dataBufferSize -= *bufferSizes;
@@ -450,19 +488,18 @@ static int loadResourcesSection (void *buffer, uint8_t sectionSize, struct cce_b
       }
       sectionSize = (iterator - resourceSizes);
    }
-   size_t sectionsUsedBitFieldSize = HEADSIZE_TO_BITFIELD_SIZE(sectionSize);
-   uint_fast32_t *bits = calloc(1, dataBufferSize + sectionsUsedBitFieldSize * sizeof(uint_fast32_t));
-   uint_fast32_t *dataBuffer = bits + sectionsUsedBitFieldSize;
-   *dataBuffer++ = sectionSize;
-   size_t bitCounter = 0;
-   cce_void *jiterator = (cce_void*)(dataBuffer);
+   map->resourceData = malloc(dataBufferSize);
+   map->resourcesQuantity = sectionSize;
+   cce_void *jiterator = map->resourceData;
    size_t *bufferSizes = resourceLoadingFunctionsBufferSizes;
-   for (uint32_t *iterator = resourceSizes + 1, *end = iterator + sectionSize; iterator < end; ++iterator, ++fun, ++bitCounter, jiterator += *bufferSizes++)
+   for (uint32_t *iterator = resourceSizes + 1, *end = iterator + sectionSize; iterator < end; ++iterator, ++fun, ++initFun, jiterator += *bufferSizes++)
    {
       if (*iterator == 0)
+      {
+         if (*initFun != NULL)
+            (*initFun)(jiterator, info);
          continue;
-      
-      bits[bitCounter >> ((sizeof(uint_fast32_t) >> 2) + 4)] |= 1 << (bitCounter & (sizeof(uint_fast32_t) * 8 - 1));
+      }
       
       fread(buf, sizeof(char), *iterator, file);
       for (char *it = buf, **jit = names, *iend = buf + *iterator;; ++jit, it += strlen(it) + 1)
@@ -484,46 +521,51 @@ static int loadResourcesSection (void *buffer, uint8_t sectionSize, struct cce_b
    }
    free(buf);
    free(names);
-   *((void **)buffer) = dataBuffer;
    return 0;
+}
+
+static void createResourcesSection (void *buffer, struct cce_buffer *info)
+{
+   struct ResourceInfo *map = buffer;
+   map->resourceData = malloc(resourceSpaceToBeAllocated);
+   map->resourcesQuantity = resourceLoadingFunctionsQuantity;
+   size_t *sizes = resourceLoadingFunctionsBufferSizes;
+   cce_void *data = map->resourceData;
+   for (cce_dataparsefun *fun = resourceCreatingFunctions, *end = resourceCreatingFunctions + resourceLoadingFunctionsQuantity;
+        fun < end; ++fun, data += *sizes, ++sizes)
+   {
+      (*fun)(data, info);
+   }
 }
 
 static void freeResourcesSection (void *buffer, struct cce_buffer *info)
 {
-   uint_fast32_t *dataBuffer = *(void**)buffer;
+   struct ResourceInfo *map = buffer;
    size_t *sizes = resourceLoadingFunctionsBufferSizes;
-   size_t bitCounter = 0;
-   uint_fast32_t *bits = dataBuffer - HEADSIZE_TO_BITFIELD_SIZE(dataBuffer[-1]) - 1;
-   cce_void *data = (cce_void*) dataBuffer;
-   for (cce_onfreefun *fun = resourceUnloadingFunctions, *end = resourceUnloadingFunctions + dataBuffer[-1];
-        fun < end; ++fun, ++bitCounter, data += *sizes, ++sizes)
+   cce_void *data = map->resourceData;
+   for (cce_dataparsefun *fun = resourceUnloadingFunctions, *end = resourceUnloadingFunctions + map->resourcesQuantity;
+        fun < end; ++fun, data += *sizes, ++sizes)
    {
-      if ((bits[bitCounter >> ((sizeof(uint_fast32_t) >> 2) + 4)] & (1 << (bitCounter & (sizeof(uint_fast32_t) * 8 - 1)))) == 0)
-         continue;
-      
       (*fun)(data, info);
    }
 }
 
 static uint8_t storeResourcesSection (void *buffer, struct cce_buffer *info, FILE *file)
 {
+   struct ResourceInfo *map = buffer;
    uint32_t resourceSizes[256];
-   uint_fast32_t *dataBuffer = *(void**)buffer;
-   uint8_t sectionSize = dataBuffer[-1];
+   uint8_t sectionSize = map->resourcesQuantity;
    size_t *sizes = resourceLoadingFunctionsBufferSizes;
-   size_t bitCounter = 0, bytesWritten = 0, size;
-   uint_fast32_t *bits = dataBuffer - HEADSIZE_TO_BITFIELD_SIZE(sectionSize) - 1;
-   cce_void *data = (cce_void*) dataBuffer;
+   size_t bytesWritten = 0, size;
+   cce_void *data = (cce_void*) map->resourceData;
    uint8_t stored = 0;
    cce_rstorefun *fun = resourceStoringFunctions;
    resourceSizes[0] = 1;
    long beginOffset = ftell(file);
    fseek(file, sectionSize * sizeof(uint32_t), SEEK_CUR);
-   for (uint32_t *iterator = resourceSizes + 1, *end = iterator + sectionSize; iterator < end; ++iterator, ++fun, ++bitCounter, data += *sizes, ++sizes)
+   for (uint32_t *iterator = resourceSizes + 1, *end = iterator + sectionSize; iterator < end; ++iterator, ++fun, data += *sizes, ++sizes)
    {
       *iterator = 0;
-      if ((bits[bitCounter >> ((sizeof(uint_fast32_t) >> 2) + 4)] & (1 << (bitCounter & (sizeof(uint_fast32_t) * 8 - 1)))) == 0)
-         continue;
       
       char **names = (*fun)(data, info);
       if (names == NULL)
@@ -562,20 +604,22 @@ static uint8_t storeResourcesSection (void *buffer, struct cce_buffer *info, FIL
 
 void cce__initMap2DLoaders (void)
 {
-   resourceSpaceAllocated = 0;
+   resourceSpaceToBeAllocated = 0;
    CCE_ALLOC_ARRAY(resourceLoadingFunctions);
-   resourceUnloadingFunctions = malloc(resourceLoadingFunctionsAllocated * sizeof(cce_onfreefun*));
+   resourceUnloadingFunctions = malloc(resourceLoadingFunctionsAllocated * sizeof(cce_dataparsefun*));
+   resourceCreatingFunctions  = malloc(resourceLoadingFunctionsAllocated * sizeof(cce_dataparsefun*));
+   resourceStoringFunctions   = malloc(resourceLoadingFunctionsAllocated * sizeof(cce_rstorefun*));
    resourceLoadingFunctionsBufferSizes = malloc(resourceLoadingFunctionsAllocated * sizeof(size_t));
    cce__staticMapFunctionSet = cceGetFileIOfunctionSet();
-   cceRegisterFileIOcallbacks(cce__staticMapFunctionSet,  loadResourcesSection, freeResourcesSection, NULL,                  sizeof(void*));
-   cceRegisterFileIOcallbacks(cce__staticMapFunctionSet,  loadElements,         freeElements,         NULL,                  sizeof(struct RenderingInfo));
-   cceRegisterFileIOcallbacks(cce__staticMapFunctionSet,  loadColliders,        freeColliders,        NULL,                  sizeof(struct CollisionInfo));
+   cceRegisterFileIOcallbacks(cce__staticMapFunctionSet,  loadResourcesSection, freeResourcesSection, NULL,                   NULL,                  sizeof(struct ResourceInfo));
+   cceRegisterFileIOcallbacks(cce__staticMapFunctionSet,  loadElements,         freeElements,         NULL,                   NULL,                  sizeof(struct RenderingInfo));
+   cceRegisterFileIOcallbacks(cce__staticMapFunctionSet,  loadColliders,        freeColliders,        NULL,                   NULL,                  sizeof(struct CollisionInfo));
    g_resourceLoadersOffset = cceGetFunctionBufferOffset(0, cce__staticMapFunctionSet);
-   g_renderingInfoOffset = cceGetFunctionBufferOffset(1, cce__staticMapFunctionSet);
+   g_renderingInfoOffset   = cceGetFunctionBufferOffset(1, cce__staticMapFunctionSet);
    cce__dynamicMapFunctionSet  = cceGetFileIOfunctionSet();
-   cceRegisterFileIOcallbacks(cce__dynamicMapFunctionSet, loadResourcesSection, freeResourcesSection, storeResourcesSection, sizeof(void*));
-   cceRegisterFileIOcallbacks(cce__dynamicMapFunctionSet, loadElementsDynamic,  freeElementsDynamic,  storeElements,         sizeof(struct DynamicRenderingInfo));
-   cceRegisterFileIOcallbacks(cce__dynamicMapFunctionSet, loadCollidersDynamic, freeCollidersDynamic, storeColliders,        sizeof(struct DynamicCollisionInfo));
+   cceRegisterFileIOcallbacks(cce__dynamicMapFunctionSet, loadResourcesSection, freeResourcesSection, createResourcesSection, storeResourcesSection, sizeof(struct ResourceInfo));
+   cceRegisterFileIOcallbacks(cce__dynamicMapFunctionSet, loadElementsDynamic,  freeElementsDynamic,  createElements,         storeElements,         sizeof(struct DynamicRenderingInfo));
+   cceRegisterFileIOcallbacks(cce__dynamicMapFunctionSet, loadCollidersDynamic, freeCollidersDynamic, createColliders,        storeColliders,        sizeof(struct DynamicCollisionInfo));
 }
 
 struct cce_buffer* createFailMap (uint16_t functionSetID)
@@ -626,7 +670,7 @@ struct cce_buffer* createFailMap (uint16_t functionSetID)
       { 8,  1, 0, 0},
       { 8,  0, 0, 0},
       { 8, -1, 0, 0},
-   }; // ELOAD
+   }; // ELOAD (should be visible under any user settings)
    struct Map2DElementData data = {{1, 1}, {0, 0, 0, 0}, 0, 0};
    struct cce_texture2D textureInfo = {{0, 0}, {0, 0}, 0};
    struct Map2DElementPositionArray elementsArray;
