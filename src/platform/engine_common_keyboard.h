@@ -1,3 +1,23 @@
+/*
+    Conservative Creator's Engine - open source engine for making games.
+    Copyright (C) 2020-2022 Andrey Gaivoronskiy
+
+    This library is free software; you can redistribute it and/or
+    modify it under the terms of the GNU Lesser General Public
+    License as published by the Free Software Foundation; either
+    version 2.1 of the License, or any later version.
+
+    This library is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+    Lesser General Public License for more details.
+
+    You should have received a copy of the GNU Lesser General Public
+    License along with this library; if not, write to the Free Software
+    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301
+    USA
+*/
+
 #ifndef ENGINE_COMMON_KEYBOARD_H
 #define ENGINE_COMMON_KEYBOARD_H
 
@@ -79,6 +99,7 @@
 #define CCE_KEY_RALT          0x71
 
 #define CCE_KEY_NUMLOCK       0x21
+#define CCE_KEY_PRINTSCREEN   0x24
 #define CCE_KEY_CAPSLOCK      0x40
 #define CCE_KEY_SCROLLLOCK    0x5F
 
@@ -86,6 +107,7 @@
 #define CCE_KEY_KP_DIVIDE     0xAF
 #define CCE_KEY_KP_MULTIPLY   0xAA
 #define CCE_KEY_KP_PLUS       0xAB
+#define CCE_KEY_KP_COMMA      0xAC
 #define CCE_KEY_KP_MINUS      0xAD
 
 #define CCE_KEY_KP_0          0xB0
@@ -125,11 +147,24 @@
 #define CCE_KEY_F24           0xD8
 #define CCE_KEY_F25           0xD9
 
-#define CCE_KEY_BREAK  CCE_KEY_PAUSE
-#define CCE_KEY_ESC    CCE_KEY_ESCAPE
-#define CCE_KEY_HYPHEN CCE_KEY_MINUS
-#define CCE_KEY_DEL    CCE_KEY_DELETE
-#define CCE_KEY_LCTRL  CCE_KEY_LCONTROL
-#define CCE_KEY_RCTRL  CCE_KEY_RCONTROL
+#define CCE_KEY_BREAK      CCE_KEY_PAUSE
+#define CCE_KEY_PRSCN      CCE_KEY_PRINTSCREEN
+#define CCE_KEY_SYSRQ      CCE_KEY_PRINTSCREEN
+#define CCE_KEY_ESC        CCE_KEY_ESCAPE
+#define CCE_KEY_HYPHEN     CCE_KEY_MINUS
+#define CCE_KEY_DEL        CCE_KEY_DELETE
+#define CCE_KEY_LCTRL      CCE_KEY_LCONTROL
+#define CCE_KEY_RCTRL      CCE_KEY_RCONTROL
+#define CCE_KEY_ALTGR      CCE_KEY_RALT
+#define CCE_KEY_LBRACKET   CCE_KEY_LEFT_BRACKET
+#define CCE_KEY_RBRACKET   CCE_KEY_RIGHT_BRACKET
+#define CCE_KEY_KP_NUMLOCK CCE_KEY_NUMLOCK
+
+#include <stdint.h>
+
+uint8_t cceKeyFromName (const char *name);
+struct cce_u8vec2 cceKeysFromString2 (const char *str);
+struct cce_u8vec3 cceKeysFromString3 (const char *str);
+struct cce_u8vec4 cceKeysFromString4 (const char *str);
 
 #endif // ENGINE_COMMON_KEYBOARD_H

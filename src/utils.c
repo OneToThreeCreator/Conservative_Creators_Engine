@@ -27,6 +27,15 @@
 #include "../include/cce/endianess.h"
 #include "../include/cce/utils.h"
 
+
+const uint8_t cce__charFlags[128] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                                     CCE__CHAR_WHITESPACE_LIKE, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, CCE__CHAR_DELIMITER, CCE__CHAR_WHITESPACE_LIKE, 0, 0,
+                                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, CCE__CHAR_DELIMITER, CCE__CHAR_DELIMITER, 0, 0, 0, 0,
+                                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, CCE__CHAR_WHITESPACE_LIKE,
+                                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 // Generated
 const uint8_t cce__debruijnToBitPosition64[64] = {63, 0,  47, 1,  56, 48, 27, 2,  60, 57, 49, 41, 37, 28, 16, 3,
                                                   61, 54, 58, 35, 52, 50, 42, 21, 44, 38, 32, 29, 23, 17, 11, 4,

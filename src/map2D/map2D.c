@@ -50,6 +50,7 @@
 #include "../engine_common_internal.h"
 #include "../external/stb_image.h"
 #include "../../include/cce/map2D/map2D.h"
+#include "../platform/engine_common_keyboard.h"
 #include "map2D_internal.h"
 
 static char                                 *cce__resourcePath;
@@ -60,7 +61,6 @@ static uint16_t g_textureBufferSize;
 CCE_ARRAY(g_texturesEmpty, static struct LoadedTextures*, static uint16_t);
 static struct RenderingData **g_layers;
 static uint8_t                g_layersQuantity;
-static struct RenderingData **g_layerZero;
 static ptrdiff_t g_renderingBufferOffset;
 static size_t g_renderingDataSize;
 struct TransformationValues cce__groupsCache;
@@ -72,11 +72,11 @@ static size_t texturesPathLength;
 
 cce_flag cce__map2Dflags;
 
-CCE_PUBLIC_OPTIONS void cceLayerSetMap2D (int8_t layer, uint8_t mapLayer, struct cce_buffer *map)
+CCE_PUBLIC_OPTIONS void cceRenderingLayerSetMap2D (uint8_t layer, uint8_t mapLayer, struct cce_buffer *map)
 {
-   if (layer < (g_layers - g_layerZero) || layer >= (g_layerZero - g_layers) + g_layersQuantity)
+   if (layer >= g_layersQuantity)
       return;
-   g_layerZero[layer] = (struct RenderingData*)((cce_void*)((struct RenderingInfo*)((cce_void*) map + g_renderingBufferOffset))->data + mapLayer * g_renderingDataSize);
+   g_layers[layer] = (struct RenderingData*)((cce_void*)((struct RenderingInfo*)((cce_void*) map + g_renderingBufferOffset))->data + mapLayer * g_renderingDataSize);
 }
 
 CCE_PUBLIC_OPTIONS void cceRenderMap2D (void)
@@ -86,8 +86,8 @@ CCE_PUBLIC_OPTIONS void cceRenderMap2D (void)
 
 CCE_PUBLIC_OPTIONS void cceUpdateEngineMap2D (void)
 {
-   cce__engineUpdate();
    cce__screenUpdate();
+   cce__engineUpdate();
 }
 
 CCE_PUBLIC_OPTIONS const char* cceGetResourcePath (void)
@@ -570,7 +570,6 @@ struct iniValues
 {
    struct cce_u16vec2 gameResolution;
    uint8_t layersQuantity;
-   uint8_t layerZero;
    struct cce_u16vec2 textureSize;
    char *windowName;
    char *texturePath;
@@ -597,6 +596,8 @@ static int strcasecmp(const char *s1, const char *s2)
 }
 #endif
 
+#define CCE_STREQ(x,y) (memcmp(x, y, strlen(y) + 1) == 0)
+
 static int iniHandler (void *data, const char *section, const char *name, const char *value)
 {
    struct iniValues *vals = data;
@@ -606,75 +607,71 @@ static int iniHandler (void *data, const char *section, const char *name, const 
    cceMemoryToLowercase(buf, len);
    if (strcasecmp(section, "properties") == 0)
    {
-      if (memcmp(buf, "gameres", 8) == 0 || memcmp(buf, "res", 4) == 0 || memcmp(buf, "gameresolution", 15) || memcmp(buf, "resolution", 11) == 0)
+      if (CCE_STREQ(buf, "gameres") || CCE_STREQ(buf, "res") || CCE_STREQ(buf, "gameresolution") || CCE_STREQ(buf, "resolution"))
       {
          vals->gameResolution = cceStringToU16Vec2(value);
       }
-      else if (memcmp(buf, "layers", 7) == 0 || memcmp(buf, "layersquantity", 15) == 0)
+      else if (CCE_STREQ(buf, "layers") || CCE_STREQ(buf, "layersquantity"))
       {
          vals->layersQuantity = atoi(value);
       }
-      else if (memcmp(buf, "layerzero", 10) == 0)
-      {
-         vals->layerZero = atoi(value);
-      }
-      else if (memcmp(buf, "texsize", 8) == 0 || memcmp(buf, "texturesize", 12) == 0)
+      else if (CCE_STREQ(buf, "texsize") || CCE_STREQ(buf, "texturesize"))
       {
          vals->textureSize = cceStringToU16Vec2(value);
       }
-      else if (memcmp(buf, "windowname", 11) == 0 || memcmp(buf, "name", 5) == 0)
+      else if (CCE_STREQ(buf, "windowname") || CCE_STREQ(buf, "name"))
       {
          size_t len = strlen(value);
          vals->windowName = malloc((len + 1) * sizeof(char));
          memcpy(vals->windowName, value, len + 1);
       }
-      else if (memcmp(buf, "texpath", 8) == 0 || memcmp(buf, "texturepath", 12) == 0)
+      else if (CCE_STREQ(buf, "texpath") || CCE_STREQ(buf, "texturepath"))
       {
          size_t len = strlen(value);
          vals->texturePath = malloc((len + 1) * sizeof(char));
          memcpy(vals->texturePath, value, len + 1);
       }
-      else if (memcmp(buf, "mapspath", 9) == 0 || memcmp(buf, "mappath", 8) == 0)
+      else if (CCE_STREQ(buf, "mapspath") || CCE_STREQ(buf, "mappath"))
       {
          size_t len = strlen(value);
          vals->mapPath = malloc((len + 1) * sizeof(char));
          memcpy(vals->mapPath, value, len + 1);
       }
-      else if (memcmp(buf, "colorformat", 12) == 0)
+      else if (CCE_STREQ(buf, "colorformat"))
       {
          strncpy(buf, value, 4);
          cceMemoryToLowercase(buf, 3);
-         if (memcmp(buf, "rgb", 4) == 0)
+         if (CCE_STREQ(buf, "rgb"))
          {
             vals->colorFormat = CCE_COLOR_RGB;
          }
-         else if (memcmp(buf, "hsv", 4) == 0)
+         else if (CCE_STREQ(buf, "hsv"))
          {
             vals->colorFormat = CCE_COLOR_HSV;
          }
-         else if (memcmp(buf, "hsl", 4) == 0)
+         else if (CCE_STREQ(buf, "hsl"))
          {
             vals->colorFormat = CCE_COLOR_HSL;
          }
-         else if (memcmp(buf, "hcl", 4) == 0 || memcmp(buf, "lch", 4) == 0)
+         else if (CCE_STREQ(buf, "hcl") || CCE_STREQ(buf, "lch"))
          {
             vals->colorFormat = CCE_COLOR_HCL;
          }
       }
-      else if (memcmp(buf, "collidertype", 13) == 0 || memcmp(buf, "collider", 9) == 0)
+      else if (CCE_STREQ(buf, "collidertype") || CCE_STREQ(buf, "collider"))
       {
          strncpy(buf, value, 10);
          cceMemoryToLowercase(buf, 9);
-         if (memcmp(buf, "rect", 5) == 0 || memcmp(buf, "rectangle", 10) == 0)
+         if (CCE_STREQ(buf, "rect") || CCE_STREQ(buf, "rectangle"))
          {
             vals->colliderType = CCE_RECTANGLE_COLLIDER;
          }
-         else if (memcmp(buf, "cir", 4) == 0 || memcmp(buf, "circle", 7) == 0)
+         else if (CCE_STREQ(buf, "cir") || CCE_STREQ(buf, "circle"))
          {
             vals->colliderType = CCE_CIRCLE_COLLIDER;
          }
       }
-      else if (memcmp(buf, "usefallbackmap", 7) == 0 || memcmp(buf, "genfallbackmaponfailure", 24) == 0 || memcmp(buf, "genmaponfailure", 16) == 0)
+      else if (CCE_STREQ(buf, "usefallbackmap") || CCE_STREQ(buf, "genfallbackmaponfailure") || CCE_STREQ(buf, "genmaponfailure"))
       {
          vals->useFallbackMap = cceStringToBool(value);
       }
@@ -682,10 +679,15 @@ static int iniHandler (void *data, const char *section, const char *name, const 
    }
    if (strcasecmp(section, "keybinds") == 0)
    {
-      if (memcmp(buf, "horizontalmove", 15) == 0 || memcmp(buf, "horizontalaxis", 15) == 0 || memcmp(buf, "horizontal", 11) == 0)
+      if (CCE_STREQ(buf, "horizontalmove") || CCE_STREQ(buf, "horizontalaxis") || CCE_STREQ(buf, "horizontal"))
       {
-         
+         vals->horizontalAxis = cceKeysFromString2(value);
       }
+      else if (CCE_STREQ(buf, "verticalmove") || CCE_STREQ(buf, "verticalaxis") || CCE_STREQ(buf, "vertical"))
+      {
+         vals->verticalAxis = cceKeysFromString2(value);
+      }
+      else if (CCE_STREQ(buf, "buttona"))
    }
    return 0;
 }

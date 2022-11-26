@@ -85,10 +85,9 @@ typedef char** (*cce_rstorefun)(void *buffer, struct cce_buffer *info);
 
 CCE_PUBLIC_OPTIONS uint32_t cceRegisterMapCustomResourceCallback (cce_rloadfun onLoad, cce_dataparsefun onFree, cce_dataparsefun onCreate, cce_rstorefun onStore, size_t bufferSize);
 CCE_PUBLIC_OPTIONS void cceSetMap2Dpath (const char *path);
-CCE_PUBLIC_OPTIONS int cceInitEngine2D (uint32_t textureMaxWidth, uint32_t textureMaxHeight,
-                                        const char *windowLabel, const char *resourcePath, uint8_t layersQuantity, uint8_t layerZeroOffset, cce_flag flags);
+CCE_PUBLIC_OPTIONS int cceInitEngine2D (const char *gameINIpath);
 CCE_PUBLIC_OPTIONS void cceSetTexturesPath (const char *path);
-CCE_PUBLIC_OPTIONS void cceLayerSetMap2D (int8_t layer, uint8_t mapLayer, struct cce_buffer *map);
+CCE_PUBLIC_OPTIONS void cceLayerSetMap2D (uint8_t layer, uint8_t mapLayer, struct cce_buffer *map);
 CCE_PUBLIC_OPTIONS void cceRenderMap2D (void);
 CCE_PUBLIC_OPTIONS void cceUpdateEngineMap2D (void);
 CCE_PUBLIC_OPTIONS int cceEngine2D (void);

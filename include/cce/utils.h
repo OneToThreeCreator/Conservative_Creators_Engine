@@ -53,10 +53,17 @@
 (sizeof(result) >= 8) ? (result) |= (result) >> 32 : 0, \
 (result) -= (result) >> 1)
 
+#define CCE__CHAR_DELIMITER 0x1
+#define CCE__CHAR_WHITESPACE_LIKE 0x2
+
+extern const uint8_t  cce__charType[128];
 extern const uint8_t  cce__debruijnToBitPosition64[64];
 extern const uint8_t  cce__debruijnToBitPosition32[32];
 extern const uint64_t cce__debruijnNumberLS6;
 extern const uint32_t cce__debruijnNumberLS5;
+
+#define CCE_CHAR_IS_WHITESPACE_LIKE(ch) (((unsigned)ch) < 128u ? (cce__charType[(unsigned) ch] & CCE__CHAR_WHITESPACE_LIKE) == CCE__CHAR_WHITESPACE_LIKE : 0)
+#define CCE_CHAR_IS_DELIMITER(ch)       (((unsigned)ch) < 128u ? (cce__charType[(unsigned) ch] & CCE__CHAR_DELIMITER) == CCE__CHAR_DELIMITER : 0)
 
 #define CCE_LOWEST_BIT_INDEX(x) \
 ((sizeof(x) == 8) ? cce__debruijnToBitPosition64[(uint64_t)(((x) & -(x)) * cce__debruijnNumberLS6) >> 58] : cce__debruijnToBitPosition32[(uint32_t)((x & -x) * cce__debruijnNumberLS5) >> 27])
