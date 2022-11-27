@@ -127,7 +127,7 @@ set_property(TARGET glad PROPERTY POSITION_INDEPENDENT_CODE ON)
 target_link_libraries(cce PRIVATE list ${INIH_LIBRARIES} glfw glad)
 
 set(CCE_BUILD_TYPE ${CMAKE_BUILD_TYPE})
-string(TOLOWER ${CCE_BUILD_TYPE} CCE_BUILD_TYPE)
+string(TOLOWER "${CCE_BUILD_TYPE}" CCE_BUILD_TYPE)
 
 if("${CCE_BUILD_TYPE}" MATCHES "debug")
    if(NOT MSVC)
@@ -136,7 +136,7 @@ if("${CCE_BUILD_TYPE}" MATCHES "debug")
          target_compile_options(cce PRIVATE -Wextra;-Wshadow;-Woverflow;-pedantic;-Wstrict-aliasing;-Wstrict-overflow;-Wstringop-overflow;-Wpointer-arith)
       endif()
    else()
-      target_compile_options(cce PRIVATE /W4)
+      target_compile_options(cce PRIVATE /W3)
    endif()
 endif()
 
@@ -185,7 +185,7 @@ if(CCE_BUILD_TESTING)
    add_test(NAME cce-test1
       COMMAND cce-test1)
    add_test(NAME cce-test2
-      COMMAND cce-test2 ${CCE_SOURCE_DIR})
+      COMMAND cce-test2 "${CCE_SOURCE_DIR}")
 endif()
 
 if (NOT (CCE_LIB_TYPE MATCHES STATIC) AND CCE_INSTALL)

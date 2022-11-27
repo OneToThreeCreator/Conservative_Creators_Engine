@@ -68,27 +68,27 @@ static void cce__openGLErrorPrint (GLenum error, size_t line, const char *file)
       case GL_NO_ERROR: break;
       case GL_INVALID_ENUM:
       {
-         fprintf(stderr, "%s: %ld: OPENGL::INVALID_ENUM:\nan unacceptable value is specified for an enumerated argument\n", file, line);
+         fprintf(stderr, "%s: %zu: OPENGL::INVALID_ENUM:\nan unacceptable value is specified for an enumerated argument\n", file, line);
          break;
       }
       case GL_INVALID_VALUE:
       {
-         fprintf(stderr, "%s: %ld: OPENGL::INVALID_VALUE:\na numeric argument is out of range\n", file, line);
+         fprintf(stderr, "%s: %zu: OPENGL::INVALID_VALUE:\na numeric argument is out of range\n", file, line);
          break;
       }
       case GL_INVALID_OPERATION:
       {
-         fprintf(stderr, "%s: %ld: OPENGL::INVALID_OPERATION:\nthe specified operation is not allowed in the current state\n", file, line);
+         fprintf(stderr, "%s: %zu: OPENGL::INVALID_OPERATION:\nthe specified operation is not allowed in the current state\n", file, line);
          break;
       }
       case GL_INVALID_FRAMEBUFFER_OPERATION:
       {
-         fprintf(stderr, "%s: %ld: OPENGL::INVALID_OPERATION::FRAMEBUFFER:\nthe framebuffer object is not complete\n", file, line);
+         fprintf(stderr, "%s: %zu: OPENGL::INVALID_OPERATION::FRAMEBUFFER:\nthe framebuffer object is not complete\n", file, line);
          break;
       }
       case GL_OUT_OF_MEMORY:
       {
-         fprintf(stderr, "%s: %ld: OPENGL::OUT_OF_MEMORY:\nthere is not enough memory left to execute the command\n", file, line);
+         fprintf(stderr, "%s: %zu: OPENGL::OUT_OF_MEMORY:\nthere is not enough memory left to execute the command\n", file, line);
          break;
       }
 /*    case GL_STACK_UNDERFLOW:
@@ -103,7 +103,7 @@ static void cce__openGLErrorPrint (GLenum error, size_t line, const char *file)
       }*/
       default:
       {
-         fprintf(stderr, "%s: %ld: OPENGL::UNKNOWN:\n%d\n", file, line, error);
+         fprintf(stderr, "%s: %zu: OPENGL::UNKNOWN:\n%d\n", file, line, error);
       }
    }
 }
@@ -165,12 +165,12 @@ static void setUniformBufferToDefault (GLuint UBO)
       {
          *iterator = (struct cce_f32vec4) {1.0f, 1.0f, 1.0f, 1.0f};
       }
-      struct mat2x3
+      struct mat2x4
       {
-         float data[6];
+         float data[8];
       };
-      struct mat2x3 unitMatrix = {{1, 0, 0, 1, 0, 0}};
-      for (struct mat2x3 *iterator = (struct mat2x3*) (uboData + bufferUniformsOffsets[CCE_TRANSFORMGROUP_OFFSET]), *end = iterator + 257; iterator < end; ++iterator)
+      struct mat2x4 unitMatrix = {{1, 0, 0, 0, 0, 1, 0, 0}};
+      for (struct mat2x4 *iterator = (struct mat2x4*) (uboData + bufferUniformsOffsets[CCE_TRANSFORMGROUP_OFFSET]), *end = iterator + 257; iterator < end; ++iterator)
       {
          *iterator = unitMatrix;
       }
@@ -450,9 +450,9 @@ int initMap2DRenderer__openGL (char *cce__resourcePath, const struct LoadedTextu
    }
    {
       size_t pathLength = strlen(cce__resourcePath) + 1u;
-      /*strlen("define CCE_GLOBAL_OFFSET_MASK 0xXXXXXXXX\n") == 41*/
-      /*strlen("const uvec2 textureSize = uvec2(0.XXXXXXXX, 0.XXXXXXXX);") == 55*/
-      char vertexShaderAdditionalString[41 + 55] = "#define CCE_GLOBAL_OFFSET_MASK " CCE_MACRO_TO_STR(CCE_GLOBAL_OFFSET_MASK) "\nconst vec2 inverseTextureSize = vec2(";
+      /*strlen("define CCE_GLOBAL_OFFSET_MASK 0xXXXXXXXX\n") == 42*/
+      /*strlen("const uvec2 textureSize = uvec2(0.XXXXXXXX, 0.XXXXXXXX);") == 56*/
+      char vertexShaderAdditionalString[42 + 56 + 1] = "#define CCE_GLOBAL_OFFSET_MASK " CCE_MACRO_TO_STR(CCE_GLOBAL_OFFSET_MASK) "\nconst vec2 inverseTextureSize = vec2(";
       sprintf(vertexShaderAdditionalString + strlen(vertexShaderAdditionalString), "%.8f, %.8f);", 1.0f / cceTextureSize->x, 1.0f / cceTextureSize->y);
       
       #ifdef SYSTEM_RESOURCE_PATH
@@ -481,7 +481,7 @@ int initMap2DRenderer__openGL (char *cce__resourcePath, const struct LoadedTextu
    GL_CHECK_ERRORS;
    {
       const GLchar *uniformNames[] = {"Transform", "Offset", "Colors", "TextureOffset"};
-      GLuint indices[6];
+      GLuint indices[4];
       glGetUniformIndices(shaderProgram, 4, uniformNames, indices);
       GL_CHECK_ERRORS;
       bufferUniformsOffsets = (GLint*) malloc(4 * sizeof(GLint));

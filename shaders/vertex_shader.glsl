@@ -29,10 +29,10 @@ uniform usamplerBuffer ElementData;
 
 layout (shared) uniform Variables
 {
-   layout(row_major) mat2x3 Transform     [257]; // Don't use vec3 in uniform blocks
-   ivec2                    Offset        [256]; // Avoid rotation of offsets
-   vec4                     Colors        [128]; // Half normal group size. Mostly unused anyway
-   ivec2                    TextureOffset [256];
+   mat2x4 Transform     [257]; // Don't use vec3 in uniform blocks
+   ivec2  Offset        [256]; // Avoid rotation of offsets
+   vec4   Colors        [128]; // Half normal group size. Mostly unused anyway
+   ivec2  TextureOffset [256];
 };
 
 uniform mat3 ViewMatrix = mat3(vec3(0.0625f, 0, 0), vec3(0, 1.0f/9.0f, 0), vec3(0, 0, 1));
@@ -74,14 +74,14 @@ void main()
    for (uint i = 0u; i < 4u; ++i)
    {
       mat3 tmp;
-      tmp[0] = Transform[transformIDs[i]][0];
-      tmp[1] = Transform[transformIDs[i]][1];
+      tmp[0] = Transform[transformIDs[i]][0].xyz;
+      tmp[1] = Transform[transformIDs[i]][1].xyz;
       tmp[2] = vec3(0, 0, 1);
       transform *= tmp;
       pos += Offset[i];
    }
-   transform *= mat3(Transform[isGlobalOffset][0], Transform[isGlobalOffset][1], vec3(0, 0, 1)); // Global transform (applied last, separation with translation is not needed)
-   coords = coords * transform;
+   //transform *= mat3(Transform[isGlobalOffset][0], Transform[isGlobalOffset][1], vec3(0, 0, 1)); // Global transform (applied last, separation with translation is not needed)
+   coords *= transform;
    coords.xy += pos;
    coords *= ViewMatrix;
    gl_Position = vec4(coords.xy * 0.5f, 0, 1);

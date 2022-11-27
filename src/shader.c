@@ -44,7 +44,7 @@ char* cce__prependStringToShader (char *shaderSrc, const char *const shaderAddit
 }
 
 GLuint cce__makeVFshaderProgram  (const char *vertexPath, const char *fragmentPath,
-                                  const char *vertexShaderAdditionalString, const char *const fragmentShaderAdditionalString)
+                                  const char *vertexShaderAdditionalString, const char *fragmentShaderAdditionalString)
 {
    GLuint vertexShader = 0u, fragmentShader = 0u, shaderProgram = 0u;
    size_t additionalStringLength = 0;
@@ -159,7 +159,7 @@ char* cce__readTextFile (const char *const path, size_t spaceToLeave)
    size_t size = ftell(file);
    rewind(file);
    char *text = malloc((size + spaceToLeave + 1 /*\0*/) * sizeof(char));
-   fread(text, sizeof(char), size, file);
+   size = fread(text, sizeof(char), size, file) * sizeof(char);
    fclose(file);
    *(text + size) = '\0';
    return text;
@@ -180,7 +180,7 @@ GLuint cce__compileShader (const char *shaderSource, GLenum shaderType)
       #ifndef NDEBUG
       fprintf(stderr, "Broken shader:\n%s\n", shaderSource);
       #endif
-      fprintf(stderr, "OPENGL::SHADER::FAILED_TO_COMPILE:\n%s\n", infoLog);
+      fprintf(stderr, "OPENGL::SHADER::FAILED_TO_COMPILE:\nbroken shader:\n%s\n%s\n", shaderSource, infoLog);
       return 0u;
    }
    return shader;

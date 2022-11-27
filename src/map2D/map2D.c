@@ -152,10 +152,10 @@ static int setTextureAttributes (uint16_t ID)
       return 0;
    int width = 0, height = 0, channels, result;
    char *path = g_textures[ID].path;
-   size_t length;
-   if (*path != '/' && *path != '\\' 
+   size_t length = 0;
+   if (*path != '/' 
    #ifdef WINDOWS_SYSTEM
-   && path[1] != ':'
+       && *path != '\\'  && path[1] != ':'
    #endif // WINDOWS_SYSTEM
    )
    {

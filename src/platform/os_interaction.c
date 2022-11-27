@@ -323,10 +323,12 @@ CCE_PUBLIC_OPTIONS void cceDeleteDirectory (const char *path)
 
 #elif defined(WINDOWS_SYSTEM)
 
+#include <io.h>
 #include <windows.h>
 #include <shlobj.h>
 #include <shellapi.h>
 #include <time.h>
+
 
 static void printSystemError (char *message)
 {
@@ -372,7 +374,7 @@ CCE_PUBLIC_OPTIONS char* cceGetCurrentPath (size_t spaceToLeave)
 CCE_PUBLIC_OPTIONS char* cceGetDirectory (char *path, size_t bufferSize)
 {
    DWORD attributes = GetFileAttributesA(path);
-   DWORD error;
+   DWORD error = 0;
    
    size_t length = strnlen(path, bufferSize);
    if ((*(path + length - 1) == '\\') || (*(path + length - 1) == '/'))

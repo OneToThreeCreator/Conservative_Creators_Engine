@@ -43,7 +43,7 @@ int main (int argc, char **argv)
          printf("Usage: %s [PATH_TO_ENGINE_RESOURCES]\nWhen PATH_TO_ENGINE_RESOURCES is not provided, current directory is assumed.", argv[0]);
          exit(argc > 2);
       }
-      if (argv[1][0] == '/')
+      if (argv[1][0] == '/' || argv[1][0] == '\\' || argv[1][1] == ':')
       {
          pathLength = strlen(argv[1]);
          path = malloc(pathLength + 16);
@@ -74,11 +74,6 @@ int main (int argc, char **argv)
       return -1;
    }
    struct cce_buffer *map = cceLoadMap2Ddynamic("/NULL.c2m");
-   cceWriteMap2Ddynamic(map, "/tmp/test.c2m");
-   cceFreeMap2D(map);
-   map = cceLoadMap2D("/tmp/test.c2m");
-   remove("/tmp/test.c2m");
-   printf("cceLoadMap2D returned %s\n", (map == NULL) ? "NULL" : "Valid map");
    cceLayerSetMap2D(0, 0, map);
    printf("Initialization complete\n");
    for (;;)
