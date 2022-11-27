@@ -126,14 +126,14 @@ set_property(TARGET glad PROPERTY POSITION_INDEPENDENT_CODE ON)
 
 target_link_libraries(cce PRIVATE list ${INIH_LIBRARIES} glfw glad)
 
-set(CCE_BUILD_TYPE CMAKE_BUILD_TYPE)
+set(CCE_BUILD_TYPE ${CMAKE_BUILD_TYPE})
 string(TOLOWER ${CCE_BUILD_TYPE} CCE_BUILD_TYPE)
 
-if(CCE_BUILD_TYPE MATCHES "debug")
+if("${CCE_BUILD_TYPE}" MATCHES "debug")
    if(NOT MSVC)
-      target_compile_options(cce PRIVATE -Wall;-Wextra)
+      target_compile_options(cce PRIVATE -Wall)
       if(${CMAKE_C_COMPILER_ID} MATCHES "GNU" OR ${CMAKE_C_COMPILER_ID} MATCHES "Clang")
-         target_compile_options(cce PRIVATE -Wshadow)
+         target_compile_options(cce PRIVATE -Wextra;-Wshadow;-Woverflow;-pedantic;-Wstrict-aliasing;-Wstrict-overflow;-Wstringop-overflow;-Wpointer-arith)
       endif()
    else()
       target_compile_options(cce PRIVATE /W4)

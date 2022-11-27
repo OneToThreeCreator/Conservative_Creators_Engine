@@ -75,13 +75,13 @@ struct cce_timer
 // HCL with decimal point at 0.1 [0 - 3599]
 #define CCE_COLOR_HCL 0x60
 
-#define CCE_COLOR_GET_HUE(color) color.hsv.h & 0x1FFF
+#define CCE_COLOR_GET_HUE(color) (color.hsv.h & 0x1FFF)
 // sets hue value of the color in range 0 - 7199 (clamped to 3599), don't disturb type
 #define CCE_COLOR_SET_HUE(color, hue) (color.hsv.h &= ~0x1FFF, color.hsv.h |= (hue & 0x1FFF) - ((hue & 0x1FFF) > 3600) * 3600)
 #define CCE_COLOR_SET_TYPE(color, type) (color.rgb.type &= ~0xE0, color.rgb.type |= type & 0xE0)
 
 #define CCE_COLOR_SET_RGB(r, g, b) (union cce_color) {{CCE_COLOR_RGB, r, g, b}}
-#define CCE__COLOR_SET_HXX(h, x1, x2, type) (union cce_color) {.hsv = {(h & 0x1FFF) - ((h & 0x1FFF) > 3600) * 3600 | (type << 8), x1, x2}}
+#define CCE__COLOR_SET_HXX(h, x1, x2, type) (union cce_color) {.hsv = {((h & 0x1FFF) - ((h & 0x1FFF) > 3600) * 3600) | (type << 8), x1, x2}}
 #define CCE_COLOR_SET_HSV(h, s, v) CCE__COLOR_SET_HXX(h, s, v, CCE_COLOR_HSV)
 #define CCE_COLOR_SET_HSL(h, s, l) CCE__COLOR_SET_HXX(h, s, l, CCE_COLOR_HSL)
 #define CCE_COLOR_SET_HCL(h, c, l) CCE__COLOR_SET_HXX(h, c, l, CCE_COLOR_HCL)

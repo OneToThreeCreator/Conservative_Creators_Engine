@@ -22,8 +22,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 
-#include "../../include/coffeechain/engine_common.h"
-#include "../../include/coffeechain/endianess.h"
+#include "../../include/cce/endianess.h"
 
 #define CCE_UNUSED(x) (void)(x)
 

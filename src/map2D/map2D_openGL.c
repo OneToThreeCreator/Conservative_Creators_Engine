@@ -60,7 +60,6 @@ static GLuint   g_VAO, g_VBO, g_UBO;
 static GLint   *bufferUniformsOffsets;
 static GLint   *uniformLocations;
 static GLint    g_uniformBufferSize;
-static struct Map2DElementData *cce__elementConversionBuffer;
 
 static void cce__openGLErrorPrint (GLenum error, size_t line, const char *file)
 {
@@ -170,7 +169,7 @@ static void setUniformBufferToDefault (GLuint UBO)
       {
          float data[6];
       };
-      struct mat2x3 unitMatrix = {1, 0, 0, 1, 0, 0};
+      struct mat2x3 unitMatrix = {{1, 0, 0, 1, 0, 0}};
       for (struct mat2x3 *iterator = (struct mat2x3*) (uboData + bufferUniformsOffsets[CCE_TRANSFORMGROUP_OFFSET]), *end = iterator + 257; iterator < end; ++iterator)
       {
          *iterator = unitMatrix;
@@ -401,7 +400,8 @@ static void loadTexture__openGL (void *data, uint16_t width, uint16_t height, ui
    if (width > cceTextureSize->x || height > cceTextureSize->y)
    {
       // Texture is truncated downwards, but openGL expects 0 to be at the bottom. So, we move texture parts line by line to the bottom
-      for (struct cce_u8vec4 *iterator = data, *jiterator = data + width * (height - cceTextureSize->y), *jend = data + width * height; jiterator < jend;)
+      for (struct cce_u8vec4 *iterator = data, *jiterator = (struct cce_u8vec4*)data + width * (height - cceTextureSize->y), *jend = (struct cce_u8vec4*)data + width * height;
+           jiterator < jend;)
       {
          for (struct cce_u8vec4 *end = iterator + cceTextureSize->x; iterator < end; ++iterator, ++jiterator)
          {

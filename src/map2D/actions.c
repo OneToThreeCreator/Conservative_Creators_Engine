@@ -39,6 +39,14 @@
 #define CCE_TIMER_START_STOP 0x3
 #define CCE_TIMER_AUTO_RESTART_ON_ALARM 0x4
 
+struct DelayedAction
+{
+   uint64_t initTime;
+   uint32_t delay;
+   uint16_t repeatsLeft;
+   uint8_t  flags;
+};
+
 CCE_ARRAY(actions, static cce_actionfun, static uint32_t);
 static void (**endianSwapActions)(void*);
 static struct DelayedAction *nextDelayedActionWithoutExternalTimer;
@@ -143,19 +151,25 @@ static void runActionsAction (const void *data, uint8_t count)
 static void setTimerStateAction (const void *data, uint8_t count)
 {
    const struct setTimerStateAction *params = data;
-   cceSetTimerState(params->ID, params->state);
+   uint8_t mask = -(count & 2);
+   mask &= ((((params->state & CCE_CHANGETIMERSTATE_SWITCH) + 1) & (CCE_CHANGETIMERSTATE_SWITCH + 1)) - 1) | (params->state & CCE_CHANGETIMERSTATE_SWITCH_AUTO_RESTART_ON_ALARM);
+   // If switch happens twice, it cancels out
+   cceSetTimerState(params->ID, params->state & ~mask);
 }
 
 static void setTimerDelayAction (const void *data, uint8_t count)
 {
    const struct setTimerDelayAction *params = data;
-   cceSetTimerDelay(params->ID, params->delay, params->action);
+   cceSetTimerDelay(params->ID, params->delay * ((count & -(params->action == CCE_ACTION_SHIFT)) + params->action != CCE_ACTION_SHIFT), params->action);
 }
 
 static void delayActionAction (const void *data, uint8_t count)
 {
    const struct delayAction *params = data;
-   cceDelayAction(params->timerInfo.delay, params->repeatsQuantity, params->delayedActionStructSize, ((void*) (params + 1)), params->flags);
+   if (count == 1)
+      cceDelayAction(params->timerInfo.delay, params->repeatsQuantity, params->delayedActionStructSize, ((void*) (params + 1)), params->flags);
+   else
+      cceDelayAction(params->timerInfo.delay / count, params->repeatsQuantity, params->delayedActionStructSize, ((void*) (params + 1)), params->flags); // Integer division is painfully slow
 }
 
 static void transformActionSwapEndian (void *data)
@@ -223,10 +237,10 @@ static void delayActionActionSwapEndian (void *data)
    (*(endianSwapActions + params->actionID))((void*) (params + 1));
 }
 
-void cce__swapActionsEndian (uint16_t *actionSizes, void *actions, uint16_t actionsQuantity)
+void cce__swapActionsEndian (uint16_t *actionSizes, void *actionsToSwap, uint16_t actionsToSwapQuantity)
 {
-   uint16_t *iterator = actionSizes, *end = actionSizes + actionsQuantity;
-   cce_void *jiterator = actions;
+   uint16_t *iterator = actionSizes, *end = actionSizes + actionsToSwapQuantity;
+   cce_void *jiterator = actionsToSwap;
    while (iterator < end)
    {
       *(uint32_t*)jiterator = cceSwapEndianInt32(*(uint32_t*)jiterator);
@@ -235,9 +249,9 @@ void cce__swapActionsEndian (uint16_t *actionSizes, void *actions, uint16_t acti
    }
 }
 
-void cce__runActions (uint16_t *actionSizes, void *actionsToCall, uint16_t actionsQuantity)
+void cce__runActions (uint16_t *actionSizes, void *actionsToCall, uint16_t actionsToCallQuantity)
 {
-   uint16_t *iterator = actionSizes, *end = actionSizes + actionsQuantity;
+   uint16_t *iterator = actionSizes, *end = actionSizes + actionsToCallQuantity;
    cce_void *jiterator = actionsToCall;
    while (iterator < end)
    {
@@ -248,6 +262,8 @@ void cce__runActions (uint16_t *actionSizes, void *actionsToCall, uint16_t actio
 
 static int loadActions (void *buffer, uint8_t sectionSize, struct cce_buffer *info, FILE *file)
 {
+   CCE_UNUSED(info);
+   CCE_UNUSED(sectionSize);
    uint32_t onLoadActionsSize = 0, onFreeActionsSize = 0;
    struct ActionInfo *map = buffer;
    void *onLoadActions;
@@ -258,7 +274,7 @@ static int loadActions (void *buffer, uint8_t sectionSize, struct cce_buffer *in
    CCE__LOAD_ACTIONS(map, file, onLoadActions, map->onFreeActions, onLoadActionsSize, onFreeActionsSize,
                      malloc(onLoadActionsQuantity * sizeof(uint16_t) + onLoadActionsSize), 
                      malloc(map->onFreeActionsQuantity * sizeof(uint16_t) + onFreeActionsSize),
-                     (uint16_t*)(onLoadActions + onLoadActionsSize), (uint16_t*)(map->onFreeActions + onFreeActionsSize));
+                     (uint16_t*)((cce_void*)onLoadActions + onLoadActionsSize), (uint16_t*)((cce_void*)map->onFreeActions + onFreeActionsSize));
    cce__runActions(onLoadActionsSizes, onLoadActions, onLoadActionsQuantity);
    free(onLoadActions); // We no longer need that
    return 0;
@@ -266,6 +282,8 @@ static int loadActions (void *buffer, uint8_t sectionSize, struct cce_buffer *in
 
 static int loadActionsDynamic (void *buffer, uint8_t sectionSize, struct cce_buffer *info, FILE *file)
 {
+   CCE_UNUSED(info);
+   CCE_UNUSED(sectionSize);
    uint32_t onLoadActionsSize = 0, onFreeActionsSize = 0;
    struct DynamicActionInfo *map = buffer;
    CCE__LOAD_ACTION_METADATA(map, file, map->onLoadActions, map->onFreeActions, onLoadActionsSize, onFreeActionsSize);
@@ -282,6 +300,7 @@ static int loadActionsDynamic (void *buffer, uint8_t sectionSize, struct cce_buf
 
 static void createActions (void *buffer, struct cce_buffer *info)
 {
+   CCE_UNUSED(info);
    struct DynamicActionInfo *map = buffer;
    CCE_ALLOC_ARRAY(map->onLoadActionsSizes);
    CCE_ALLOC_ARRAY(map->onFreeActionsSizes);
@@ -291,12 +310,14 @@ static void createActions (void *buffer, struct cce_buffer *info)
 
 static void freeActions (void *buffer, struct cce_buffer *info)
 {
+   CCE_UNUSED(info);
    struct ActionInfo *map = buffer;
    free(map->onFreeActions);
 }
 
 static void freeActionsDynamic (void *buffer, struct cce_buffer *info)
 {
+   CCE_UNUSED(info);
    struct DynamicActionInfo *map = buffer;
    free(map->onLoadActions);
    free(map->onLoadActionsSizes);
@@ -330,6 +351,7 @@ for (cce_void *iterator = (cce_void*) action; sizes < end; iterator += *sizes++)
 
 static uint8_t storeActions (void *buffer, struct cce_buffer *info, FILE *file)
 {
+   CCE_UNUSED(info);
    struct DynamicActionInfo *map = buffer;
    uint16_t tmp = cceHostEndianToLittleEndianInt16(map->onLoadActionsQuantity);
    fwrite(&tmp, sizeof(uint16_t), 1, file);
@@ -387,11 +409,9 @@ void cce__actionsInit (void)
    cceRegisterAction(CCE_OFFSETTEXTURE_ACTION,        offsetTextureAction,        offsetTextureActionSwapEndian);
    cceRegisterAction(CCE_CHANGECOLOR_ACTION,          changeColorAction,          changeColorActionSwapEndian);
    cceRegisterAction(CCE_DELAYACTION_ACTION,          delayActionAction,          delayActionActionSwapEndian);
-   cceRegisterAction(CCE_RUNACTIONS_ACTION,           runActionsAction,          runActionsActionSwapEndian);
-   //cceRegisterAction(CCE_STARTTIMER_ACTION,           startTimerAction,           startTimerActionSwapEndian);
-   //cceRegisterAction(CCE_SETDYNAMICTIMERDELAY_ACTION, setDynamicTimerDelayAction, setDynamicTimerDelayActionSwapEndian);
-   //cceRegisterAction(CCE_SETGRIDSIZE_ACTION,          setGridSizeAction,          setGridSizeActionSwapEndian);
-   //cceRegisterAction(CCE_LOADMAP2D_ACTION,            loadMap2Daction,            loadMap2DActionSwapEndian);
+   cceRegisterAction(CCE_RUNACTIONS_ACTION,           runActionsAction,           runActionsActionSwapEndian);
+   cceRegisterAction(CCE_STARTTIMER_ACTION,           setTimerStateAction,        setTimerStateActionSwapEndian);
+   cceRegisterAction(CCE_SETDYNAMICTIMERDELAY_ACTION, setTimerDelayAction,        setTimerDelayActionSwapEndian);
 }
 
 void cce__actionsTerminate (void)
@@ -542,7 +562,7 @@ CCE_PUBLIC_OPTIONS void cceChangeColorGroup (uint8_t groupID, union cce_color co
    {
       case CCE_ACTION_SHIFT:
       {
-         if (cce__map2Dflags & CCE_STORE_COLOR_IN == CCE_STORE_COLOR_IN_RGB)
+         if ((cce__map2Dflags & CCE_STORE_COLOR_IN) == CCE_STORE_COLOR_IN_RGB)
          {
             cce__transformations.color[groupID].rgb.r += color.rgb.r;
             cce__transformations.color[groupID].rgb.g += color.rgb.g;
@@ -559,7 +579,7 @@ CCE_PUBLIC_OPTIONS void cceChangeColorGroup (uint8_t groupID, union cce_color co
       }
       case CCE_ACTION_SET:
       {
-         if (cce__map2Dflags & CCE_STORE_COLOR_IN == CCE_STORE_COLOR_IN_RGB)
+         if ((cce__map2Dflags & CCE_STORE_COLOR_IN) == CCE_STORE_COLOR_IN_RGB)
          {
             color.rgb.r -= cce__groupsCache.color[groupID].rgb.r;
             color.rgb.g -= cce__groupsCache.color[groupID].rgb.g;
@@ -614,7 +634,7 @@ CCE_PUBLIC_OPTIONS void cceSetTimerState (uint16_t timerID, uint8_t state)
    timers[timerID].flags &= ~(CCE_TIMER_START_STOP | ((state & CCE_CHANGETIMERSTATE_DISABLE_AUTO_RESTART_ON_ALARM) >> 1));
    timers[timerID].flags |= (state & CCE_CHANGETIMERSTATE_SWITCH) ^ (((state & CCE_CHANGETIMERSTATE_SWITCH) == CCE_CHANGETIMERSTATE_SWITCH) << (timers[timerID].initTime == 0));
    timers[timerID].flags |= state & CCE_CHANGETIMERSTATE_ENABLE_AUTO_RESTART_ON_ALARM;
-   timers[timerID].flags ^= (state & CCE_CHANGETIMERSTATE_SWITCH_AUTO_RESTART_ON_ALARM >> 2);
+   timers[timerID].flags ^= ((state & CCE_CHANGETIMERSTATE_SWITCH_AUTO_RESTART_ON_ALARM) >> 2);
    cce__map2Dflags |= CCE_PROCESS_TIMERS;
 }
 
@@ -658,13 +678,12 @@ CCE_PUBLIC_OPTIONS void cceDelayAction (uint16_t repeatsQuantity, uint32_t delay
       head->repeatsLeft = repeatsQuantity;
    head->delay = delayOrID;
    head->initTime = 0;
-   if ((flags & CCE_DELAYACTION_EXTERNAL_TIMER | CCE_DELAYACTION_START_EXTERNAL_TIMER))
+   if (((flags & (CCE_DELAYACTION_EXTERNAL_TIMER | CCE_DELAYACTION_START_EXTERNAL_TIMER)) == (CCE_DELAYACTION_EXTERNAL_TIMER | CCE_DELAYACTION_START_EXTERNAL_TIMER)))
       timers[delayOrID].flags |= CCE_TIMER_START;
          
    head->initTime = cce__currentTime;
    head->flags = flags & (CCE_DELAYACTION_EXTERNAL_TIMER | CCE_DELAYACTION_NEVER_END | CCE_DELAYACTION_EXECUTE_ONCE_PER_TIMER_ALARM | CCE_DELAYACTION_RESTART_EXTERNAL_TIMER_ON_ALARM);
    memcpy(data + sizeof(struct DelayedAction), actionStruct, actionStructSize);
-   
    if (flags & CCE_DELAYACTION_EXTERNAL_TIMER)
    {
       llprependchain(&delayedActions, data);
@@ -699,7 +718,7 @@ void cce__runDelayedActions (void)
          if (timer->initTime == 0 || (timerDiff = cce__currentTime - (timer->initTime + timer->delay)) < 0)
             goto CONTINUE;
          count = 1;
-         if (timerDiff >= timer->delay && !(head->flags & CCE_DELAYACTION_EXECUTE_ONCE_PER_TIMER_ALARM) &&
+         if ((uint32_t)timerDiff >= timer->delay && !(head->flags & CCE_DELAYACTION_EXECUTE_ONCE_PER_TIMER_ALARM) &&
             (timer->flags & CCE_TIMER_AUTO_RESTART_ON_ALARM || head->flags & CCE_DELAYACTION_RESTART_EXTERNAL_TIMER_ON_ALARM) &&
             timer->delay != 0)
          {
@@ -755,7 +774,7 @@ void cce__runDelayedActions (void)
          goto CONTINUE2;
       }
       count = 1;
-      if (timerDiff >= head->delay && !(head->flags & CCE_DELAYACTION_EXECUTE_ONCE_PER_TIMER_ALARM) && head->delay > 0)
+      if ((uint32_t)timerDiff >= head->delay && !(head->flags & CCE_DELAYACTION_EXECUTE_ONCE_PER_TIMER_ALARM) && head->delay > 0)
       {
          count = timerDiff / head->delay + 1;
          count = CCE_MAX(count, head->repeatsLeft | -((head->flags & CCE_DELAYACTION_NEVER_END) > 0));
@@ -797,7 +816,7 @@ void cce__processTimers (void)
       for (struct cce_timer *iterator = timers, *end = timers + timersQuantity; iterator < end; ++iterator)
       {
          diff = cce__currentTime - (iterator->initTime + iterator->delay);
-         if (diff >= 0 && iterator->flags & CCE_TIMER_AUTO_RESTART_ON_ALARM || iterator->flags & CCE_TIMER_START)
+         if (diff >= 0 && ((iterator->flags & CCE_TIMER_AUTO_RESTART_ON_ALARM) || iterator->flags & CCE_TIMER_START))
          {
             diff *= (diff > 0 && iterator->initTime > 0 && iterator->delay > 0);
             if (diff > (int64_t) iterator->delay)

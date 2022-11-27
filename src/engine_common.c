@@ -146,22 +146,22 @@ chroma += lightness; \
 switch (CCE_COLOR_GET_HUE(color) / 600) \
 { \
    case 0: \
-      result = (union cce_color) {CCE_COLOR_RGB, chroma, intermediate, lightness}; \
+      result = (union cce_color) {{CCE_COLOR_RGB, chroma, intermediate, lightness}}; \
       break; \
    case 1: \
-      result = (union cce_color) {CCE_COLOR_RGB, intermediate, chroma, lightness}; \
+      result = (union cce_color) {{CCE_COLOR_RGB, intermediate, chroma, lightness}}; \
       break; \
    case 2: \
-      result = (union cce_color) {CCE_COLOR_RGB, lightness, chroma, intermediate}; \
+      result = (union cce_color) {{CCE_COLOR_RGB, lightness, chroma, intermediate}}; \
       break; \
    case 3: \
-      result = (union cce_color) {CCE_COLOR_RGB, lightness, intermediate, chroma}; \
+      result = (union cce_color) {{CCE_COLOR_RGB, lightness, intermediate, chroma}}; \
       break; \
    case 4: \
-      result = (union cce_color) {CCE_COLOR_RGB, intermediate, lightness, chroma}; \
+      result = (union cce_color) {{CCE_COLOR_RGB, intermediate, lightness, chroma}}; \
       break; \
    default: \
-      result = (union cce_color) {CCE_COLOR_RGB, chroma, lightness, intermediate}; \
+      result = (union cce_color) {{CCE_COLOR_RGB, chroma, lightness, intermediate}}; \
 } \
 
 CCE_PUBLIC_OPTIONS union cce_color cceHSVtoRGB (union cce_color color)
@@ -235,7 +235,7 @@ CCE_PUBLIC_OPTIONS union cce_color cceHSVtoHSL (union cce_color color)
    result.rgb.type = CCE_COLOR_HSL;
    result.hsl.h |= CCE_COLOR_GET_HUE(color);
    {
-      register unsigned tmp = color.hsv.v * (255 - (result.hsv.s >> 1));
+      register unsigned tmp = color.hsv.v * (255 - (color.hsv.s >> 1));
       result.hsl.l = (tmp + (tmp >> 8) + 1) >> 8; // To avoid expensive integer division (by 255)
    }
    if (result.hsl.l == 0 || result.hsl.l == 255)

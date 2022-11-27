@@ -186,7 +186,7 @@ CCE_PUBLIC_OPTIONS struct cce_buffer* cceLoadBinaryCCF (char *path, uint16_t fun
    fread(sectionSizes + 1, sizeof(uint8_t), headSize, file);
    size_t size;
    {
-      uint8_t *iterator = sectionSizes + headSize, *end = sectionSizes;
+      uint8_t *iterator = sectionSizes + headSize;
       size_t *bufferSizes = currentFunctions->readingFunctionsDataBufferSizes + headSize - 1;
       sectionSizes[0] = 1; // Workaround to avoid out-of-bounds check
       size = currentFunctions->bufferSize;
@@ -267,7 +267,7 @@ CCE_PUBLIC_OPTIONS int cceWriteBinaryCCF (struct cce_buffer *buffer, char *path)
    bytesWritten = ftell(file) - (1 + headSize) * sizeof(uint8_t);
    fseek(file, (headSize + 1) * sizeof(uint8_t), SEEK_SET);
    {
-      uint8_t *iterator = sectionSizes + headSize, *end = sectionSizes;
+      uint8_t *iterator = sectionSizes + headSize;
       sectionSizes[0] = 1; // Workaround to avoid out-of-bounds check
       while (*iterator == 0)
       {

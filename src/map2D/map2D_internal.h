@@ -43,7 +43,7 @@ extern "C"
 #define CCE_BASIC_ACTIONS_NOT_SET 0x100
 #define CCE_INIT CCE_BASIC_ACTIONS_NOT_SET
 
-#define CCE_STORE_COLOR_IN CCE_STORE_COLOR_IN_RGB | CCE_STORE_COLOR_IN_HSV | CCE_STORE_COLOR_IN_HSL | CCE_STORE_COLOR_IN_HCL
+#define CCE_STORE_COLOR_IN (CCE_STORE_COLOR_IN_RGB | CCE_STORE_COLOR_IN_HSV | CCE_STORE_COLOR_IN_HSL | CCE_STORE_COLOR_IN_HCL)
 
 #ifndef CCE_PATH_RESERVED
 #define CCE_PATH_RESERVED 16
@@ -55,14 +55,6 @@ union Collider2D
 {
    struct cce_collider_rect2D_16_8 rectangle;
    struct cce_collider_cir2D_16_16 circle;
-};
-
-struct DelayedAction
-{
-   uint64_t initTime;
-   uint32_t delay;
-   uint16_t repeatsLeft;
-   uint8_t  flags;
 };
 
 #define CCE_LOADEDTEXTURES_TOBELOADED 0x1u

@@ -47,8 +47,6 @@
 #include "../platform/platforms.h"
 
 static char                                 *cce__resourcePath;
-static uint8_t                               g_nearestMapsQuantity;
-static uint8_t                               g_nearestMaps[16];
 static struct cce_u32vec2                    g_textureSize;
 CCE_PUBLIC_OPTIONS const struct cce_u32vec2 *cceTextureSize = &g_textureSize;
 CCE_ARRAY(g_textures, static struct LoadedTextures, static uint16_t);
@@ -300,6 +298,7 @@ int stringCompare (const void *a, const void *b)
 // Done this way because we need dependency order in texturesMapDependOn to exactly match the order of paths (used when elements load)
 int cce__loadTextures (void *buffer, struct cce_buffer *info, char **paths)
 {
+   CCE_UNUSED(info);
    struct UsedTexturesInfo *data = buffer;
    size_t pathsLength;
    for (char **iterator = paths;; ++iterator)
@@ -311,8 +310,6 @@ int cce__loadTextures (void *buffer, struct cce_buffer *info, char **paths)
       break;
    }
    char **path;
-   char buf[sizeof(char*) + 1];
-   buf[sizeof(char*)] = '\0';
    data->texturesMapDependsOn = malloc(pathsLength);
    data->texturesMapDependsOnQuantity = pathsLength;
    data->texturesMapDependsOnAllocated = pathsLength;
@@ -328,18 +325,18 @@ int cce__loadTextures (void *buffer, struct cce_buffer *info, char **paths)
          depTextureIt[(path - paths)] = iterator - g_textures + 1;
          if (path > paths)
          {
-            for (char **iterator = path + 1, **end = paths + pathsLength; iterator < end && *iterator == *path; ++iterator)
+            for (char **jiterator = path + 1, **jend = paths + pathsLength; jiterator < jend && *jiterator == *path; ++jiterator)
             {
-               *iterator = path[-1];
+               *jiterator = path[-1];
             }
             *path = path[-1];
          }
          else
          {
             uint16_t repeats = 1;
-            for (char **iterator = path + 1, **end = paths + pathsLength; *iterator == iterator[-1]; ++iterator, ++repeats)
+            for (char **jiterator = path + 1, **jend = paths + pathsLength; *jiterator == jiterator[-1]; ++jiterator, ++repeats)
             {
-               if (iterator >= end)
+               if (jiterator >= jend)
                {
                   return 0;
                }
@@ -373,9 +370,9 @@ int cce__loadTextures (void *buffer, struct cce_buffer *info, char **paths)
          if (*jiterator == jiterator[-1])
          {
             uint16_t repeats = 1;
-            for (char **kiterator = jiterator + 1, **end = paths + pathsLength; *kiterator == kiterator[-1]; ++kiterator, ++repeats)
+            for (char **kiterator = jiterator + 1, **kend = paths + pathsLength; *kiterator == kiterator[-1]; ++kiterator, ++repeats)
             {
-               if (kiterator >= end)
+               if (kiterator >= kend)
                {
                   g_texturesEmptyQuantity = iterator - g_texturesEmpty;
                   return 0;
@@ -420,6 +417,7 @@ int cce__loadTextures (void *buffer, struct cce_buffer *info, char **paths)
 
 void cce__createTextures (void *buffer, struct cce_buffer *info)
 {
+   CCE_UNUSED(info);
    struct UsedTexturesInfo *data = buffer;
    data->texturesMapDependsOn          = NULL;
    data->texturesMapDependsOnQuantity  = 0;
@@ -428,6 +426,7 @@ void cce__createTextures (void *buffer, struct cce_buffer *info)
 
 void cce__releaseTextures (void *buffer, struct cce_buffer *info)
 {
+   CCE_UNUSED(info);
    uint16_t textureID;
    struct UsedTexturesInfo *data = buffer;
    if (data->texturesMapDependsOnQuantity == 0)
@@ -489,6 +488,7 @@ int textureCompare (const void *_a, const void *_b)
 
 char** cce__storeTextures (void *buffer, struct cce_buffer *info)
 {
+   CCE_UNUSED(info);
    struct UsedTexturesInfo *data = buffer;
    qsort(data->texturesMapDependsOn, data->texturesMapDependsOnQuantity, sizeof(uint16_t), textureCompare);
    char **paths = malloc((data->texturesMapDependsOnQuantity + 1) * sizeof(char*));

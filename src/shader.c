@@ -35,7 +35,7 @@ char* cce__prependStringToShader (char *shaderSrc, const char *const shaderAddit
    if (toInsert == NULL)
       toInsert = shaderSrc;
    else
-      toInsert = memchr(toInsert, '\n', shaderSrcLength - (toInsert - shaderSrc)) + 1;
+      toInsert = (char*)memchr(toInsert, '\n', shaderSrcLength - (toInsert - shaderSrc)) + 1;
    
    memmove(toInsert + additionalStringLength + 1, toInsert, shaderSrcLength - (toInsert - shaderSrc) + 1 /*\0*/);
    memcpy(toInsert, shaderAdditionalString, additionalStringLength);

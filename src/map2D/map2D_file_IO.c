@@ -254,6 +254,7 @@ static int loadCollidersDynamic (void *buffer, uint8_t sectionSize, struct cce_b
 
 static void createElements (void *buffer, struct cce_buffer *info)
 {
+   CCE_UNUSED(info);
    struct DynamicRenderingInfo *map = buffer;
    map->elements = NULL;
    map->textureInfo = NULL;
@@ -268,6 +269,7 @@ static void createElements (void *buffer, struct cce_buffer *info)
 
 static void createColliders (void *buffer, struct cce_buffer *info)
 {
+   CCE_UNUSED(info);
    struct DynamicCollisionInfo *map = buffer;
    map->colliders = NULL;
    map->transformGroups = NULL;
@@ -558,7 +560,6 @@ static uint8_t storeResourcesSection (void *buffer, struct cce_buffer *info, FIL
    size_t *sizes = resourceLoadingFunctionsBufferSizes;
    size_t bytesWritten = 0, size;
    cce_void *data = (cce_void*) map->resourceData;
-   uint8_t stored = 0;
    cce_rstorefun *fun = resourceStoringFunctions;
    resourceSizes[0] = 1;
    long beginOffset = ftell(file);
@@ -628,48 +629,48 @@ struct cce_buffer* createFailMap (uint16_t functionSetID)
    struct RenderingInfo *info = (struct RenderingInfo*)((cce_void*) result + g_renderingInfoOffset);
    struct Map2DElementPosition elements[42] = 
    {
-      {-8,  2, 0, 0},
-      {-8,  1, 0, 0},
-      {-8,  0, 0, 0},
-      {-8, -1, 0, 0},
-      {-8, -2, 0, 0},
-      {-7,  2, 0, 0},
-      {-7,  0, 0, 0},
-      {-7, -2, 0, 0},
-      {-5,  2, 0, 0},
-      {-5,  1, 0, 0},
-      {-5,  0, 0, 0},
-      {-5, -1, 0, 0},
-      {-5, -2, 0, 0},
-      {-4, -2, 0, 0},
-      {-2,  1, 0, 0},
-      {-2,  0, 0, 0},
-      {-2, -1, 0, 0},
-      {-1,  2, 0, 0},
-      {-1, -2, 0, 0},
-      { 0,  1, 0, 0},
-      { 0,  0, 0, 0},
-      { 0, -1, 0, 0},
-      { 2,  1, 0, 0},
-      { 2,  0, 0, 0},
-      { 2, -1, 0, 0},
-      { 2, -2, 0, 0},
-      { 3,  2, 0, 0},
-      { 3,  0, 0, 0},
-      { 4,  1, 0, 0},
-      { 4,  0, 0, 0},
-      { 4, -1, 0, 0},
-      { 4, -2, 0, 0},
-      { 6,  2, 0, 0},
-      { 6,  1, 0, 0},
-      { 6,  0, 0, 0},
-      { 6, -1, 0, 0},
-      { 6, -2, 0, 0},
-      { 7, -2, 0, 0},
-      { 7,  2, 0, 0},
-      { 8,  1, 0, 0},
-      { 8,  0, 0, 0},
-      { 8, -1, 0, 0},
+      {{-8,  2}, 0, 0},
+      {{-8,  1}, 0, 0},
+      {{-8,  0}, 0, 0},
+      {{-8, -1}, 0, 0},
+      {{-8, -2}, 0, 0},
+      {{-7,  2}, 0, 0},
+      {{-7,  0}, 0, 0},
+      {{-7, -2}, 0, 0},
+      {{-5,  2}, 0, 0},
+      {{-5,  1}, 0, 0},
+      {{-5,  0}, 0, 0},
+      {{-5, -1}, 0, 0},
+      {{-5, -2}, 0, 0},
+      {{-4, -2}, 0, 0},
+      {{-2,  1}, 0, 0},
+      {{-2,  0}, 0, 0},
+      {{-2, -1}, 0, 0},
+      {{-1,  2}, 0, 0},
+      {{-1, -2}, 0, 0},
+      {{ 0,  1}, 0, 0},
+      {{ 0,  0}, 0, 0},
+      {{ 0, -1}, 0, 0},
+      {{ 2,  1}, 0, 0},
+      {{ 2,  0}, 0, 0},
+      {{ 2, -1}, 0, 0},
+      {{ 2, -2}, 0, 0},
+      {{ 3,  2}, 0, 0},
+      {{ 3,  0}, 0, 0},
+      {{ 4,  1}, 0, 0},
+      {{ 4,  0}, 0, 0},
+      {{ 4, -1}, 0, 0},
+      {{ 4, -2}, 0, 0},
+      {{ 6,  2}, 0, 0},
+      {{ 6,  1}, 0, 0},
+      {{ 6,  0}, 0, 0},
+      {{ 6, -1}, 0, 0},
+      {{ 6, -2}, 0, 0},
+      {{ 7, -2}, 0, 0},
+      {{ 7,  2}, 0, 0},
+      {{ 8,  1}, 0, 0},
+      {{ 8,  0}, 0, 0},
+      {{ 8, -1}, 0, 0},
    }; // ELOAD (should be visible under any user settings)
    struct Map2DElementData data = {{1, 1}, {0, 0, 0, 0}, 0, 0};
    struct cce_texture2D textureInfo = {{0, 0}, {0, 0}, 0};
@@ -699,8 +700,14 @@ struct cce_buffer* createFailMap (uint16_t functionSetID)
    return result;
 }
 
-#define CCE_EXPAND_PATH(path, function, additionalConditions) \
-if (path[0] != '/' && additionalConditions) \
+#ifdef WINDOWS_SYSTEM
+#define PATH_PLATFORM_SPECIFIC_CHECKS path[0] != '\\' && path[1] != ':'
+#else
+#define PATH_PLATFORM_SPECIFIC_CHECKS 1
+#endif
+
+#define CCE_EXPAND_PATH(path, function) \
+if (path[0] != '/' && PATH_PLATFORM_SPECIFIC_CHECKS) \
 { \
    size_t len = strlen(path); \
    if (len > CCE_PATH_RESERVED) \
@@ -726,13 +733,7 @@ else \
 CCE_PUBLIC_OPTIONS struct cce_buffer* cceLoadMap2D(char *path)
 {
    struct cce_buffer *result;
-   CCE_EXPAND_PATH(path, result = cceLoadBinaryCCF(path, cce__staticMapFunctionSet),
-   #ifdef WINDOWS_SYSTEM
-      path[0] != '\\' && path[1] != ':'
-   #else
-      1
-   #endif
-   );
+   CCE_EXPAND_PATH(path, result = cceLoadBinaryCCF(path, cce__staticMapFunctionSet));
    if (result == NULL && ((cce__map2Dflags & (CCE_RETURN_NULL_ON_MAP_LOADING_FAILURE | CCE_RETURN_FALLBACK_ON_MAP_LOADING_FAILURE)) == CCE_RETURN_FALLBACK_ON_MAP_LOADING_FAILURE))
    {
       result = createFailMap(cce__staticMapFunctionSet);
@@ -743,13 +744,7 @@ CCE_PUBLIC_OPTIONS struct cce_buffer* cceLoadMap2D(char *path)
 CCE_PUBLIC_OPTIONS struct cce_buffer* cceLoadMap2Ddynamic(char *path)
 {
    struct cce_buffer *result;
-   CCE_EXPAND_PATH(path, result = cceLoadBinaryCCF(path, cce__dynamicMapFunctionSet),
-   #ifdef WINDOWS_SYSTEM
-      path[0] != '\\' && path[1] != ':'
-   #else
-      1
-   #endif
-   );
+   CCE_EXPAND_PATH(path, result = cceLoadBinaryCCF(path, cce__dynamicMapFunctionSet));
    if (result == NULL && ((cce__map2Dflags & (CCE_RETURN_NULL_ON_MAP_LOADING_FAILURE | CCE_RETURN_FALLBACK_ON_MAP_LOADING_FAILURE)) == CCE_RETURN_FALLBACK_ON_MAP_LOADING_FAILURE))
    {
       result = createFailMap(cce__dynamicMapFunctionSet);
@@ -760,12 +755,6 @@ CCE_PUBLIC_OPTIONS struct cce_buffer* cceLoadMap2Ddynamic(char *path)
 CCE_PUBLIC_OPTIONS int cceWriteMap2Ddynamic (struct cce_buffer *map, char *path)
 {
    int result;
-   CCE_EXPAND_PATH(path, result = cceWriteBinaryCCF(map, path),
-   #ifdef WINDOWS_SYSTEM
-      path[0] != '\\' && path[1] != ':'
-   #else
-      1
-   #endif
-   );
+   CCE_EXPAND_PATH(path, result = cceWriteBinaryCCF(map, path));
    return result;
 }
