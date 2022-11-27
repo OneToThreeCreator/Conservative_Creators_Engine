@@ -687,7 +687,38 @@ static int iniHandler (void *data, const char *section, const char *name, const 
       {
          vals->verticalAxis = cceKeysFromString2(value);
       }
-      else if (CCE_STREQ(buf, "buttona"))
+      else if (CCE_STREQ(buf, "buttona") || CCE_STREQ(buf, "a"))
+      {
+         vals->buttons[0] = cceKeyFromName(value);
+      }
+      else if (CCE_STREQ(buf, "buttonb") || CCE_STREQ(buf, "b"))
+      {
+         vals->buttons[1] = cceKeyFromName(value);
+      }
+      else if (CCE_STREQ(buf, "buttonx") || CCE_STREQ(buf, "x"))
+      {
+         vals->buttons[2] = cceKeyFromName(value);
+      }
+      else if (CCE_STREQ(buf, "buttony") || CCE_STREQ(buf, "y"))
+      {
+         vals->buttons[3] = cceKeyFromName(value);
+      }
+      else if (CCE_STREQ(buf, "leftbutton") || CCE_STREQ(buf, "lb"))
+      {
+         vals->buttons[4] = cceKeyFromName(value);
+      }
+      else if (CCE_STREQ(buf, "rightbutton") || CCE_STREQ(buf, "rb"))
+      {
+         vals->buttons[5] = cceKeyFromName(value);
+      }
+      else if (CCE_STREQ(buf, "lefttrigger") || CCE_STREQ(buf, "lt"))
+      {
+         vals->buttons[6] = cceKeyFromName(value);
+      }
+      else if (CCE_STREQ(buf, "righttrigger") || CCE_STREQ(buf, "rt"))
+      {
+         vals->buttons[7] = cceKeyFromName(value);
+      }
    }
    return 0;
 }
