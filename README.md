@@ -3,7 +3,7 @@
 
 # Building on unix-like system (Linux, probably MacOS):
 Required packages: cmake, python.  
-Can be built against packages: glfw, inih (if any of this packages (including headers) are not present, you must initialize appropriate submodules instead)
+Can be built against packages: glfw (-dev or -devel on some distributions for header files), inih (-dev or -devel) (if any of this packages are not present, you need to initialize appropriate submodules instead)
 ```
 # Change directory to project's directory
 cd [Project dir]
