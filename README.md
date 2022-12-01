@@ -9,6 +9,10 @@ Can be built against packages: glfw (-dev or -devel on some distributions for he
 cd [Project dir]
 # Clone necessary submodules
 git submodule update --init external/listlib/ external/glad2/
+# If inih is not present
+git submodule update --init external/inih/
+# If glfw is not present
+git submodule update --init external/glfw/
 # Build
 cmake -B ./build && cmake --build ./build
 ```
