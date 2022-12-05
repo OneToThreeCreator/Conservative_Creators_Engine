@@ -23,6 +23,11 @@
 #include <stdlib.h>
 #include <stdarg.h>
 #include <string.h>
+#ifndef INIH_LOCAL
+#include <setjmp.h>
+#endif
+
+#include <ini.h>
 
 #include "../include/cce/engine_common.h"
 #include "../include/cce/utils.h"
@@ -30,36 +35,81 @@
 #include "../include/cce/endianess.h"
 
 #include "engine_common_internal.h"
-#include "platform/engine_common_glfw.h"
 
 struct cce_backend_data cce__engineBackend;
 uint64_t cce__currentTime, cce__deltaTime;
 
-static void (*moveCallback)(int8_t, int8_t);
-static void (*buttonCallback)(cce_enum);
-static void (*cursorCallback)(int16_t, int16_t);
+void (*cce__moveCallback)(int16_t, int16_t);
+void (*cce__buttonCallback)(cce_enum, cce_enum);
+void (*cce__cursorCallback)(int16_t, int16_t);
 
-CCE_PUBLIC_OPTIONS void cceRegisterMoveCallback (void (*callback)(int8_t, int8_t))
+CCE_PUBLIC_OPTIONS uint8_t (*cceEngineShouldTerminate) (void);
+CCE_PUBLIC_OPTIONS void (*cceSetEngineShouldTerminate) (uint8_t);
+
+struct cce__string
 {
-   moveCallback = callback;
+   const char *str;
+   size_t size;
+};
+
+struct cce__callbackData
+{
+   struct cce__string *names;
+   int (*fn)(void*, const char*, const char*);
+   int (*init)(void*);
+   void *data;
+   uint16_t namesQuantity;
+   uint8_t flags;
+};
+
+CCE_ARRAY(iniCallbacks, struct cce__callbackData, uint16_t);
+size_t iniCallbackLongestName = 11;
+#ifndef INIH_LOCAL
+jmp_buf g_jumpOnIniFailure;
+#endif
+uint16_t commonIniCallbackID;
+
+CCE_PUBLIC_OPTIONS void cceRegisterMoveCallback (void (*callback)(int16_t, int16_t))
+{
+   cce__moveCallback = callback;
 }
 
-CCE_PUBLIC_OPTIONS void cceRegisterButtonCallback (void (*callback)(cce_enum))
+CCE_PUBLIC_OPTIONS void cceRegisterButtonCallback (void (*callback)(cce_enum, cce_enum))
 {
-   buttonCallback = callback;
+   cce__buttonCallback = callback;
 }
 
 CCE_PUBLIC_OPTIONS void cceRegisterCursorCallback (void (*callback)(int16_t, int16_t))
 {
-   cursorCallback = callback;
+   cce__cursorCallback = callback;
 }
 
-uint64_t cceGetDeltaTime (void)
+CCE_PUBLIC_OPTIONS uint16_t cceRegisterIniCallback (const char **lowercasenames, void *data, int (*callback)(void*, const char*, const char*), int (*init)(void*), uint8_t flags)
+{
+   CCE_REALLOC_ARRAY(iniCallbacks, iniCallbacksQuantity + 1);
+   iniCallbacks[iniCallbacksQuantity].data          = data;
+   iniCallbacks[iniCallbacksQuantity].fn            = callback;
+   iniCallbacks[iniCallbacksQuantity].namesQuantity = 0;
+   for (const char **it = lowercasenames; *it != NULL; ++it, ++iniCallbacks[iniCallbacksQuantity].namesQuantity) {}
+   iniCallbacks[iniCallbacksQuantity].names = malloc(iniCallbacks[iniCallbacksQuantity].namesQuantity * sizeof(struct cce__string));
+   iniCallbacks[iniCallbacksQuantity].flags = flags | (-(init == NULL) & CCE_INI_CALLBACK_DO_NOT_INIT);
+   iniCallbacks[iniCallbacksQuantity].init = init;
+   struct cce__string *jit = iniCallbacks[iniCallbacksQuantity].names;
+   for (const char **it = lowercasenames, **end = lowercasenames + iniCallbacks[iniCallbacksQuantity].namesQuantity; it < end; ++it, ++jit)
+   {
+      jit->str = *it;
+      jit->size = strlen(*it);
+      iniCallbackLongestName = CCE_MAX(jit->size, iniCallbackLongestName);
+   }
+   return iniCallbacksQuantity++;
+}
+
+CCE_PUBLIC_OPTIONS uint64_t cceGetDeltaTime (void)
 {
    return cce__deltaTime;
 }
 
-uint64_t cceGetCurrentTime (void)
+CCE_PUBLIC_OPTIONS uint64_t cceGetTime (void)
 {
    return cce__currentTime;
 }
@@ -67,17 +117,143 @@ uint64_t cceGetCurrentTime (void)
 void calculateInternalDeltaTime (void)
 {
    uint64_t currentTime = cce__engineBackend.getTime();
-   cce__deltaTime = currentTime - cce__currentTime;
-   cce__currentTime = currentTime;
+   cce__deltaTime       = currentTime - cce__currentTime;
+   cce__currentTime     = currentTime;
 }
 
-int cce__initEngine (const char *label)
+#define CCE_MEMEQ(x, y) (memcmp(x, y, strlen(y)) == 0)
+
+static int iniCallback (void *data, const char *name, const char *value)
 {
+   char buf[17];
+   strncpy(buf, name, 17);
+   cceMemoryToLowercase(buf, 16);
+   const char *it = buf + (-CCE_MEMEQ(buf, "cur") & 3) + (-CCE_MEMEQ(buf + 3, "rent") & 4);
+   if (CCE_STREQ(it, "path") || CCE_STREQ(it, "dir") || CCE_STREQ(it, "directory"))
+   {
+      strncpy(buf, value, 17);
+      cceMemoryToLowercase(buf, 16);
+      it = buf + cceIsCharDelimiter(buf[3]) + cceIsCharDelimiter(buf[4]) + 3;
+      if ((CCE_MEMEQ(buf, "ini") && (buf[3] == '\0' || CCE_STREQ(it, "file"))) || (CCE_MEMEQ(buf, "game") && CCE_STREQ(it + 1, "ini")))
+      {
+         const char *path = data;
+         size_t len = strlen(path);
+         it = path + len;
+         while (it > path)
+         {
+            --it;
+            if (cceIsPathDelimiter(*it))
+               break;
+            --len;
+         }
+         char *tmp = malloc((len + 1) * sizeof(char));
+         memcpy(tmp, path, len);
+         tmp[len] = '\0';
+         cceSetCurrentPath(tmp);
+         free(tmp);
+      }
+      else if (!CCE_STREQ(buf, "unchanged"))
+      {
+         cceSetCurrentPath(value);
+      }
+   }
+   return 0;
+}
+
+#define CCE_INI_CALLBACK_TO_BE_INITIALIZED 0x4
+
+static int iniHandler (void *data, const char *section, const char *name, const char *value)
+{
+   char *buf = data;
+   if (section == NULL)
+      return iniCallback(iniCallbacks[commonIniCallbackID].data, name, value);
+   strncpy(buf, section, iniCallbackLongestName + 1);
+   cceMemoryToLowercase(buf, iniCallbackLongestName);
+   for (struct cce__callbackData *it = iniCallbacks, *end = iniCallbacks + iniCallbacksQuantity; it < end; ++it)
+   {
+      for (struct cce__string *jit = it->names, *jend = it->names + it->namesQuantity; jit < jend; ++jit)
+      {
+         if (memcmp(buf, jit->str, jit->size + 1) == 0)
+         {
+            strncpy(buf, name, 11);
+            cceMemoryToLowercase(buf, 10);
+            if (CCE_STREQ(buf, "init") || CCE_STREQ(buf, "initialize"))
+            {
+               it->flags &= ~CCE_INI_CALLBACK_DO_NOT_INIT;
+               it->flags |= ((cceStringToBool(value) && it->init != NULL) - 1) & CCE_INI_CALLBACK_DO_NOT_INIT;
+               return 0;
+            }
+            else
+            {
+               it->flags |= CCE_INI_CALLBACK_TO_BE_INITIALIZED;
+               if (it->fn(it->data, name, value) != 0)
+               {
+                  #ifdef INIH_LOCAL
+                  return -1;
+                  #else
+                  longjmp(g_jumpOnIniFailure, -1);
+                  #endif
+               }
+               return 0;
+            }
+         }
+      }
+   }
+   fprintf(stderr, "ENGINE::INI_PARSE_ERROR:\nUnregistered section %s\n", section);
+   return 0;
+}
+
+static int parseGameINI (const char *path)
+{
+   int result = 0;
+   char *buf = malloc(iniCallbackLongestName + 1);
+   const char *names[3] = {"commonproperties", "baseproperties", NULL};
+   commonIniCallbackID = cceRegisterIniCallback((void*)names, (void*)path, iniCallback, NULL, 0);
+#ifndef INIH_LOCAL
+   if (setjmp(g_jumpOnIniFailure) == 0)
+   {
+      ini_parse(path, iniHandler, buf);
+#else
+   if (ini_parse(path, iniHandler, buf) == 0)
+   {
+#endif
+      for (struct cce__callbackData *it = iniCallbacks, *end = iniCallbacks + iniCallbacksQuantity; it < end; ++it)
+      {
+         if ((it->flags & (CCE_INI_CALLBACK_DO_NOT_INIT | CCE_INI_CALLBACK_TO_BE_INITIALIZED)) == CCE_INI_CALLBACK_TO_BE_INITIALIZED)
+            it->init(it->data);
+         
+         if (it->flags & CCE_INI_CALLBACK_FREE_DATA)
+            free(it->data);
+      }
+   }
+   else
+   {
+      result  = -1;
+      fprintf(stderr, "ENGINE::INI::PARSING_FAILURE: function indicated critical error while parsing\n");
+      for (struct cce__callbackData *it = iniCallbacks, *end = iniCallbacks + iniCallbacksQuantity; it < end; ++it)
+      {
+         if (it->flags & CCE_INI_CALLBACK_FREE_DATA)
+            free(it->data);
+      }
+   }
+   free(buf);
+   return result;
+}
+
+void loadBackend__glfw (void);
+
+int cce__initEngine (const char *path)
+{
+   cce__moveCallback = NULL;
+   cce__buttonCallback = NULL;
+   cce__cursorCallback = NULL;
    // We have only one api yet
-   if (cce__initEngine__glfw(label, &cce__engineBackend) != 0)
+   cceInitEndianConversion();
+   loadBackend__glfw();
+   
+   if (parseGameINI(path) != 0)
       return -1;
 
-   cceInitEndianConversion();
    return 0;
 }
 
@@ -90,6 +266,10 @@ void cce__terminateEngine (void)
 {
    cce__engineBackend.terminateEngine();
    cceTerminateTemporaryDirectory();
+   free(iniCallbacks);
+   iniCallbacksQuantity   = 0;
+   iniCallbacksAllocated  = 0;
+   iniCallbackLongestName = 11;
 }
 
 void cce__doNothing (void)

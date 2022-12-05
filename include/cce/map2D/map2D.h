@@ -87,18 +87,19 @@ CCE_PUBLIC_OPTIONS uint32_t cceRegisterMapCustomResourceCallback (cce_rloadfun o
 CCE_PUBLIC_OPTIONS void cceSetMap2Dpath (const char *path);
 CCE_PUBLIC_OPTIONS int cceInitEngine2D (const char *gameINIpath);
 CCE_PUBLIC_OPTIONS void cceSetTexturesPath (const char *path);
-CCE_PUBLIC_OPTIONS void cceLayerSetMap2D (uint8_t layer, uint8_t mapLayer, struct cce_buffer *map);
+CCE_PUBLIC_OPTIONS void cceRenderingLayerSetMap2D (uint8_t layer, uint8_t mapLayer, struct cce_buffer *map);
 CCE_PUBLIC_OPTIONS void cceRenderMap2D (void);
 CCE_PUBLIC_OPTIONS void cceUpdateEngineMap2D (void);
 CCE_PUBLIC_OPTIONS int cceEngine2D (void);
 CCE_PUBLIC_OPTIONS void cceSetLoadedMap2D (uint16_t number, struct cce_i32vec2 globalPosition);
-CCE_PUBLIC_OPTIONS extern const uint16_t *const cceLoadedMap2Dnumber;
-CCE_PUBLIC_OPTIONS extern const struct cce_u32vec2 *cceTextureSize;
 CCE_PUBLIC_OPTIONS const char* cceGetResourcePath (void);
 CCE_PUBLIC_OPTIONS uint16_t cceLoadTexture (char *path);
 CCE_PUBLIC_OPTIONS struct cce_buffer* cceLoadMap2D(char *path);
 CCE_PUBLIC_OPTIONS struct cce_buffer* cceLoadMap2Ddynamic(char *path);
 CCE_PUBLIC_OPTIONS int cceWriteMap2Ddynamic (struct cce_buffer *map, char *path);
+
+CCE_PUBLIC_OPTIONS extern const struct cce_u16vec2 *const cceTextureSize;
+
 #define cceFreeMap2D(map)        cceFreeBuffer(map)
 #define cceFreeMap2Ddynamic(map) cceFreeBuffer(map)
 

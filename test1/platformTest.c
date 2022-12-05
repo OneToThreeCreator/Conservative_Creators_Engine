@@ -22,6 +22,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <cce/os_interaction.h>
+#include <cce/utils.h>
 
 static uint8_t createTestFile (char *path)
 {

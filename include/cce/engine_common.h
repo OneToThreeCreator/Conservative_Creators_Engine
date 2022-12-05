@@ -77,11 +77,11 @@ struct cce_timer
 
 #define CCE_COLOR_GET_HUE(color) (color.hsv.h & 0x1FFF)
 // sets hue value of the color in range 0 - 7199 (clamped to 3599), don't disturb type
-#define CCE_COLOR_SET_HUE(color, hue) (color.hsv.h &= ~0x1FFF, color.hsv.h |= (hue & 0x1FFF) - ((hue & 0x1FFF) > 3600) * 3600)
+#define CCE_COLOR_SET_HUE(color, hue) (color.hsv.h &= ~0x1FFF, color.hsv.h |= (hue & 0x1FFF) - (-((hue & 0x1FFF) > 3600) & 3600))
 #define CCE_COLOR_SET_TYPE(color, type) (color.rgb.type &= ~0xE0, color.rgb.type |= type & 0xE0)
 
 #define CCE_COLOR_SET_RGB(r, g, b) (union cce_color) {{CCE_COLOR_RGB, r, g, b}}
-#define CCE__COLOR_SET_HXX(h, x1, x2, type) (union cce_color) {.hsv = {((h & 0x1FFF) - ((h & 0x1FFF) > 3600) * 3600) | (type << 8), x1, x2}}
+#define CCE__COLOR_SET_HXX(h, x1, x2, type) (union cce_color) {.hsv = {((h & 0x1FFF) - (-((h & 0x1FFF) > 3600) & 3600)) | (type << 8), x1, x2}}
 #define CCE_COLOR_SET_HSV(h, s, v) CCE__COLOR_SET_HXX(h, s, v, CCE_COLOR_HSV)
 #define CCE_COLOR_SET_HSL(h, s, l) CCE__COLOR_SET_HXX(h, s, l, CCE_COLOR_HSL)
 #define CCE_COLOR_SET_HCL(h, c, l) CCE__COLOR_SET_HXX(h, c, l, CCE_COLOR_HCL)
@@ -164,7 +164,12 @@ struct cce_collider_cirND_X_Y
 #define CCE_POW4(x) (CCE_POW2(x))*(CCE_POW2(x))
 
 CCE_PUBLIC_OPTIONS uint64_t cceGetDeltaTime    (void);
-CCE_PUBLIC_OPTIONS uint64_t cceGetCurrentTime  (void);
+CCE_PUBLIC_OPTIONS uint64_t cceGetTime  (void);
+
+#define CCE_INI_CALLBACK_FREE_DATA 0x1
+#define CCE_INI_CALLBACK_DO_NOT_INIT 0x2
+
+CCE_PUBLIC_OPTIONS uint16_t cceRegisterIniCallback (const char **lowercasenames, void *data, int (*callback)(void*, const char*, const char*), int (*init)(void*), uint8_t flags);
 // CCE_PUBLIC_OPTIONS void cceStartTimer          (struct cce_timer *timer);
 // CCE_PUBLIC_OPTIONS uint8_t cceIsTimerExpired   (const struct cce_timer *timer);
 // CCE_PUBLIC_OPTIONS void cceResetTimerDelayCompensation (void);
@@ -227,7 +232,8 @@ CCE_PUBLIC_OPTIONS union cce_color cceRGBtoHCL (union cce_color color);
 (((type & 0xE0) == CCE_COLOR_RGB) ? cceColorToRGB(color) : ((type & 0xE0) == CCE_COLOR_HSV) ? cceColorToHSV(color) : \
  ((type & 0xE0) == CCE_COLOR_HSL) ? cceColorToHSL(color) : cceColorToHCL(color))
 
-CCE_PUBLIC_OPTIONS extern void (*cceSetWindowParameters) (cce_enum parameter, uint32_t a, uint32_t b);
+CCE_PUBLIC_OPTIONS extern uint8_t (*cceEngineShouldTerminate) (void);
+CCE_PUBLIC_OPTIONS extern void (*cceSetEngineShouldTerminate) (uint8_t);
 
 #ifdef __cplusplus
 }

@@ -18,6 +18,4 @@
     USA
 */
 
-#include <stdint.h>
-
-int cce__initEngine__glfw (const char *label, struct cce_backend_data *functions);
+void cceLoadPlugins (void);

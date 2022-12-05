@@ -26,21 +26,11 @@
 #define CCE_DUMMY_TEXTURE_SECONDARY_COLOR 0,0,0
 #endif // CCE_DUMMY_TEXTURE_SECONDARY_COLOR
 
-#include "../platform/platforms.h"
-
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stddef.h>
 #include <string.h>
-
-#ifdef POSIX_SYSTEM
-#include <strings.h>
-#else
-#include <ctype.h>
-#endif
-#include <stdarg.h>
-
 
 #include "../../include/cce/engine_common.h"
 #include "../../include/cce/engine_common_IO.h"
@@ -50,27 +40,91 @@
 #include "../engine_common_internal.h"
 #include "../external/stb_image.h"
 #include "../../include/cce/map2D/map2D.h"
-#include "../platform/engine_common_keyboard.h"
+#include "plugins.h"
 #include "map2D_internal.h"
 
-static char                                 *cce__resourcePath;
-static struct cce_u32vec2                    g_textureSize;
-CCE_PUBLIC_OPTIONS const struct cce_u32vec2 *cceTextureSize = &g_textureSize;
+static struct cce_u16vec2                          g_textureSize;
+CCE_PUBLIC_OPTIONS const struct cce_u16vec2 *const cceTextureSize = &g_textureSize;
 CCE_ARRAY(g_textures, static struct LoadedTextures, static uint16_t);
-static uint16_t g_textureBufferSize;
+static uint16_t               g_textureBufferSize;
 CCE_ARRAY(g_texturesEmpty, static struct LoadedTextures*, static uint16_t);
 static struct RenderingData **g_layers;
 static uint8_t                g_layersQuantity;
-static ptrdiff_t g_renderingBufferOffset;
-static size_t g_renderingDataSize;
-struct TransformationValues cce__groupsCache;
-struct TransformationValues cce__transformations;
-struct RendereringFunctions cce__renderingFunctions;
+static ptrdiff_t              g_renderingBufferOffset;
+static size_t                 g_renderingDataSize;
+struct TransformationValues   cce__groupsCache;
+struct TransformationValues   cce__transformations;
+struct RendereringFunctions   cce__renderingFunctions;
 
 static char *texturesPath = NULL;
-static size_t texturesPathLength;
+static size_t texturesPathLength = 0;
 
 cce_flag cce__map2Dflags;
+
+static int loadCallback (void *data, const char *name, const char *value)
+{
+   CCE_UNUSED(data);
+   char buf[24] = {0};
+   strncpy(buf, name, 24);
+   cceMemoryToLowercase(buf, 23);
+   if (CCE_STREQ(buf, "renderinglayers") || CCE_STREQ(buf, "renderinglayersquantity"))
+   {
+      g_layersQuantity = atoi(value);
+   }
+   else if (CCE_STREQ(buf, "texsize") || CCE_STREQ(buf, "texturesize"))
+   {
+      g_textureSize = cceStringToU16Vec2(value);
+   }
+   else if (CCE_STREQ(buf, "texpath") || CCE_STREQ(buf, "texturepath"))
+   {
+      cceSetTexturesPath(value);
+   }
+   else if (CCE_STREQ(buf, "mapspath") || CCE_STREQ(buf, "mappath"))
+   {
+      cceSetMap2Dpath(value);
+   }
+   else if (CCE_STREQ(buf, "colorformat"))
+   {
+      strncpy(buf, value, 4);
+      cceMemoryToLowercase(buf, 3);
+      cce__map2Dflags &= ~CCE_STORE_COLOR_IN;
+      if (CCE_STREQ(buf, "rgb"))
+      {
+         cce__map2Dflags |= CCE_STORE_COLOR_IN_RGB;
+      }
+      else if (CCE_STREQ(buf, "hsv"))
+      {
+         cce__map2Dflags |= CCE_STORE_COLOR_IN_HSV;
+      }
+      else if (CCE_STREQ(buf, "hsl"))
+      {
+         cce__map2Dflags |= CCE_STORE_COLOR_IN_HSL;
+      }
+      else if (CCE_STREQ(buf, "hcl") || CCE_STREQ(buf, "lch"))
+      {
+         cce__map2Dflags |= CCE_STORE_COLOR_IN_HCL;
+      }
+   }
+   else if (CCE_STREQ(buf, "collidertype") || CCE_STREQ(buf, "collider"))
+   {
+      strncpy(buf, value, 10);
+      cceMemoryToLowercase(buf, 9);
+      cce__map2Dflags &= ~(CCE_RECTANGLE_COLLIDER | CCE_CIRCLE_COLLIDER);
+      if (CCE_STREQ(buf, "rect") || CCE_STREQ(buf, "rectangle"))
+      {
+         cce__map2Dflags |= CCE_RECTANGLE_COLLIDER;
+      }
+      else if (CCE_STREQ(buf, "cir") || CCE_STREQ(buf, "circle"))
+      {
+         cce__map2Dflags |= CCE_CIRCLE_COLLIDER;
+      }
+   }
+   else if (CCE_STREQ(buf, "usefallbackmap") || CCE_STREQ(buf, "genfallbackmaponfailure") || CCE_STREQ(buf, "genmaponfailure"))
+   {
+      cce__map2Dflags ^= (cce__map2Dflags & CCE_RETURN_NULL_ON_MAP_LOADING_FAILURE) ^ ((cceStringToBool(value) - 1) & CCE_RETURN_NULL_ON_MAP_LOADING_FAILURE);
+   }
+   return 0;
+}
 
 CCE_PUBLIC_OPTIONS void cceRenderingLayerSetMap2D (uint8_t layer, uint8_t mapLayer, struct cce_buffer *map)
 {
@@ -90,16 +144,9 @@ CCE_PUBLIC_OPTIONS void cceUpdateEngineMap2D (void)
    cce__engineUpdate();
 }
 
-CCE_PUBLIC_OPTIONS const char* cceGetResourcePath (void)
-{
-   return cce__resourcePath;
-}
-
 CCE_PUBLIC_OPTIONS void cceSetTexturesPath (const char *path)
 {
-   free(texturesPath);
-   texturesPath = cceCreateNewPathFromOldPath(path, "", CCE_PATH_RESERVED);
-   texturesPathLength = strlen(texturesPath);
+   CCE_SET_PATH(texturesPath, texturesPathLength, path);
 }
 
 static int loadTexture (char *path, uint16_t position)
@@ -565,226 +612,57 @@ cce_ubyte cce__fourthLogicTypeFuncMap2D(uint16_t ID, va_list argp)
 }
 */
 
-
-struct iniValues
-{
-   struct cce_u16vec2 gameResolution;
-   uint8_t layersQuantity;
-   struct cce_u16vec2 textureSize;
-   char *windowName;
-   char *texturePath;
-   char *mapPath;
-   cce_enum colorFormat;
-   cce_enum colliderType;
-   uint8_t useFallbackMap;
-   struct cce_u8vec2 horizontalAxis;
-   struct cce_u8vec2 verticalAxis;
-   uint8_t buttons[8]; // A, B, X, Y, LB, RB, LT, RT
-};
-
-#ifndef POSIX_SYSTEM
-// s2 must be lowercase (easy to provide most of the time)
-static int strcasecmp(const char *s1, const char *s2)
-{
-   int diff;
-   for (; *s1 != '\0' && *s2 != '\0', ++s1, ++s2)
-   {
-      if ((diff = tolower(*s1) - *s2) != 0)
-         return diff;
-   }
-   return 0;
-}
-#endif
-
-#define CCE_STREQ(x,y) (memcmp(x, y, strlen(y) + 1) == 0)
-
-static int iniHandler (void *data, const char *section, const char *name, const char *value)
-{
-   struct iniValues *vals = data;
-   char buf[24] = {0};
-   size_t len = CCE_MAX(strlen(name), 23);
-   memcpy(buf, name, len + 1);
-   cceMemoryToLowercase(buf, len);
-   if (strcasecmp(section, "properties") == 0)
-   {
-      if (CCE_STREQ(buf, "gameres") || CCE_STREQ(buf, "res") || CCE_STREQ(buf, "gameresolution") || CCE_STREQ(buf, "resolution"))
-      {
-         vals->gameResolution = cceStringToU16Vec2(value);
-      }
-      else if (CCE_STREQ(buf, "layers") || CCE_STREQ(buf, "layersquantity"))
-      {
-         vals->layersQuantity = atoi(value);
-      }
-      else if (CCE_STREQ(buf, "texsize") || CCE_STREQ(buf, "texturesize"))
-      {
-         vals->textureSize = cceStringToU16Vec2(value);
-      }
-      else if (CCE_STREQ(buf, "windowname") || CCE_STREQ(buf, "name"))
-      {
-         size_t len = strlen(value);
-         vals->windowName = malloc((len + 1) * sizeof(char));
-         memcpy(vals->windowName, value, len + 1);
-      }
-      else if (CCE_STREQ(buf, "texpath") || CCE_STREQ(buf, "texturepath"))
-      {
-         size_t len = strlen(value);
-         vals->texturePath = malloc((len + 1) * sizeof(char));
-         memcpy(vals->texturePath, value, len + 1);
-      }
-      else if (CCE_STREQ(buf, "mapspath") || CCE_STREQ(buf, "mappath"))
-      {
-         size_t len = strlen(value);
-         vals->mapPath = malloc((len + 1) * sizeof(char));
-         memcpy(vals->mapPath, value, len + 1);
-      }
-      else if (CCE_STREQ(buf, "colorformat"))
-      {
-         strncpy(buf, value, 4);
-         cceMemoryToLowercase(buf, 3);
-         if (CCE_STREQ(buf, "rgb"))
-         {
-            vals->colorFormat = CCE_COLOR_RGB;
-         }
-         else if (CCE_STREQ(buf, "hsv"))
-         {
-            vals->colorFormat = CCE_COLOR_HSV;
-         }
-         else if (CCE_STREQ(buf, "hsl"))
-         {
-            vals->colorFormat = CCE_COLOR_HSL;
-         }
-         else if (CCE_STREQ(buf, "hcl") || CCE_STREQ(buf, "lch"))
-         {
-            vals->colorFormat = CCE_COLOR_HCL;
-         }
-      }
-      else if (CCE_STREQ(buf, "collidertype") || CCE_STREQ(buf, "collider"))
-      {
-         strncpy(buf, value, 10);
-         cceMemoryToLowercase(buf, 9);
-         if (CCE_STREQ(buf, "rect") || CCE_STREQ(buf, "rectangle"))
-         {
-            vals->colliderType = CCE_RECTANGLE_COLLIDER;
-         }
-         else if (CCE_STREQ(buf, "cir") || CCE_STREQ(buf, "circle"))
-         {
-            vals->colliderType = CCE_CIRCLE_COLLIDER;
-         }
-      }
-      else if (CCE_STREQ(buf, "usefallbackmap") || CCE_STREQ(buf, "genfallbackmaponfailure") || CCE_STREQ(buf, "genmaponfailure"))
-      {
-         vals->useFallbackMap = cceStringToBool(value);
-      }
-      return 0;
-   }
-   if (strcasecmp(section, "keybinds") == 0)
-   {
-      if (CCE_STREQ(buf, "horizontalmove") || CCE_STREQ(buf, "horizontalaxis") || CCE_STREQ(buf, "horizontal"))
-      {
-         vals->horizontalAxis = cceKeysFromString2(value);
-      }
-      else if (CCE_STREQ(buf, "verticalmove") || CCE_STREQ(buf, "verticalaxis") || CCE_STREQ(buf, "vertical"))
-      {
-         vals->verticalAxis = cceKeysFromString2(value);
-      }
-      else if (CCE_STREQ(buf, "buttona") || CCE_STREQ(buf, "a"))
-      {
-         vals->buttons[0] = cceKeyFromName(value);
-      }
-      else if (CCE_STREQ(buf, "buttonb") || CCE_STREQ(buf, "b"))
-      {
-         vals->buttons[1] = cceKeyFromName(value);
-      }
-      else if (CCE_STREQ(buf, "buttonx") || CCE_STREQ(buf, "x"))
-      {
-         vals->buttons[2] = cceKeyFromName(value);
-      }
-      else if (CCE_STREQ(buf, "buttony") || CCE_STREQ(buf, "y"))
-      {
-         vals->buttons[3] = cceKeyFromName(value);
-      }
-      else if (CCE_STREQ(buf, "leftbutton") || CCE_STREQ(buf, "lb"))
-      {
-         vals->buttons[4] = cceKeyFromName(value);
-      }
-      else if (CCE_STREQ(buf, "rightbutton") || CCE_STREQ(buf, "rb"))
-      {
-         vals->buttons[5] = cceKeyFromName(value);
-      }
-      else if (CCE_STREQ(buf, "lefttrigger") || CCE_STREQ(buf, "lt"))
-      {
-         vals->buttons[6] = cceKeyFromName(value);
-      }
-      else if (CCE_STREQ(buf, "righttrigger") || CCE_STREQ(buf, "rt"))
-      {
-         vals->buttons[7] = cceKeyFromName(value);
-      }
-   }
-   return 0;
-}
-
-static void parseGameINI (const char *path)
-{
-   
-}
-
-int initMap2DRenderer__openGL (char *cce__resourcePath, const struct LoadedTextures **textures, struct RendereringFunctions *funcStruct);
+int initMap2DRenderer__openGL (const struct LoadedTextures **textures, struct RendereringFunctions *funcStruct);
 
 CCE_PUBLIC_OPTIONS int cceInitEngine2D (const char *gameINIpath)
 {
-   {
-      char *path = getenv("CCE_RESOURCE_PATH");
-      if (path != NULL && *path != '\0')
-         resourcePath = path;
-   }
-   if (resourcePath == NULL || *resourcePath == '\0')
-   {
-      fputs("ENGINE::INIT::NO_RESOURCE_PATH:\nEngine could not load the game without knowing where it is", stderr);
-      return -1;
-   }
-   size_t pathLength = strlen(resourcePath) + 1u;
-   cce__resourcePath = malloc((pathLength + 11u) * sizeof(char));
-   memcpy(cce__resourcePath, resourcePath, pathLength);
-   
    cce__map2Dflags = CCE_INIT;
-   if (cce__initEngine(windowLabel) != 0)
+   g_textureSize = (struct cce_u16vec2){0, 0};
    {
-      free(cce__resourcePath);
+      const char *names[5] = {"map2d", "map2dproperties", "engine2d", "engine2dproperties", NULL};
+      cceRegisterIniCallback(names, NULL, loadCallback, NULL, CCE_DEFAULT);
+   }
+   cceLoadPlugins();
+   {
+      char *path = getenv("CCE_GAME_PATH");
+      if (path != NULL && *path != '\0')
+         gameINIpath = path;
+   }
+   if (gameINIpath == NULL || *gameINIpath == '\0')
+   {
+      fputs("ENGINE::INIT::NO_GAME_PATH:\nEngine could not load the game without knowing where it is", stderr);
       return -1;
    }
+   if (cce__initEngine(gameINIpath) != 0)
+      return -1;
+   
    cce__initMap2DLoaders();
-   g_textureSize.x = textureMaxWidth;
-   g_textureSize.y = textureMaxHeight;
    g_renderingBufferOffset = cceGetFunctionBufferOffset(1, cce__staticMapFunctionSet);
-   if (initMap2DRenderer__openGL(cce__resourcePath, (const struct LoadedTextures**) &g_textures, &cce__renderingFunctions) != 0)
+   if (initMap2DRenderer__openGL((const struct LoadedTextures**) &g_textures, &cce__renderingFunctions) != 0)
    {
       fputs("ENGINE::INIT::BACKEND_FAILURE:\nCan't initialize engine without backend\n", stderr);
       return -1;
    }
    g_renderingDataSize = cce__getRenderingDataSize();
-   cceAppendPath(cce__resourcePath, pathLength + 11, "maps");
-   cceSetMap2Dpath(cce__resourcePath);
-   *(cce__resourcePath + pathLength) = '\0';
    
    CCE_ALLOC_ARRAY_ZEROED(g_textures);
    CCE_ALLOC_ARRAY(g_texturesEmpty);
    g_textureBufferSize = 0;
-   cceAppendPath(cce__resourcePath, pathLength + 11, "textures");
-   cceSetTexturesPath(resourcePath);
-   *(cce__resourcePath + pathLength) = '\0';
    cce__actionsInit();
    cce__map2Dflags &= ~CCE_INIT;
-   g_layers = calloc(layersQuantity, sizeof(struct cce_buffer*));
-   g_layerZero = g_layers + layerZeroOffset;
-   g_layersQuantity = layersQuantity;
+   g_layers = calloc(g_layersQuantity, sizeof(struct cce_buffer*));
    return 0;
 }
 
 void cce__terminateEngine2D (void)
 {
    cce__terminateMap2DRenderer();
+   cce__terminateMap2DLoaders();
    free(g_textures);
    free(texturesPath);
+   free(g_layers);
+   texturesPath = NULL;
+   texturesPathLength = 0;
    cce__actionsTerminate();
    cce__terminateEngine();
 }

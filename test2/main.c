@@ -43,40 +43,18 @@ int main (int argc, char **argv)
          printf("Usage: %s [PATH_TO_ENGINE_RESOURCES]\nWhen PATH_TO_ENGINE_RESOURCES is not provided, current directory is assumed.", argv[0]);
          exit(argc > 2);
       }
-      if (argv[1][0] == '/' || argv[1][0] == '\\' || argv[1][1] == ':')
-      {
-         pathLength = strlen(argv[1]);
-         path = malloc(pathLength + 16);
-         memcpy(path, argv[1], pathLength + 1);
-      }
-      else
-      {
-         char *appendString = argv[1];
-         appendString += (*appendString == '.');
-         size_t appendLength = strlen(appendString);
-         path = cceGetCurrentPath(appendLength + 16);
-         pathLength = strlen(path);
-         if (*appendString == '.')
-         {
-            appendString += 2;
-            appendLength -= 2;
-            pathLength -= 2 - (pathLength < 2);
-            for (char *iterator = (path + pathLength), *end = path; iterator >= end && *iterator != '/' && *iterator != '\\'; --iterator, --pathLength) {}
-         }
-         memcpy(path + pathLength + 1, appendString, appendLength + 1);
-         pathLength += appendLength;
-      }
+      cceSetCurrentPath(argv[0]);
    }
-   if (cceInitEngine2D(48, 48, "CCE TEST", path, 1, 0, CCE_DEFAULT) != 0)
+   if (cceInitEngine2D("./test2/game.ini") != 0)
    {
       free(path);
       printf("Initialization failure\n");
       return -1;
    }
    struct cce_buffer *map = cceLoadMap2Ddynamic("/NULL.c2m");
-   cceLayerSetMap2D(0, 0, map);
+   cceRenderingLayerSetMap2D(0, 0, map);
    printf("Initialization complete\n");
-   for (;;)
+   while (cceEngineShouldTerminate() == 0)
    {
       cceRenderMap2D();
       cceUpdateEngineMap2D();

@@ -35,7 +35,7 @@
 #include "../platform/platforms.h"
 
 static char *mapPath = NULL;
-static size_t mapPathLength;
+static size_t mapPathLength = 0;
 uint16_t cce__staticMapFunctionSet, cce__dynamicMapFunctionSet;
 static ptrdiff_t g_resourceLoadersOffset, g_renderingInfoOffset;
 
@@ -49,11 +49,7 @@ static size_t *resourceLoadingFunctionsBufferSizes;
 
 CCE_PUBLIC_OPTIONS void cceSetMap2Dpath (const char *path)
 {
-   if (path == NULL || *path == '\0')
-      return;
-   free(mapPath);
-   mapPath = cceCreateNewPathFromOldPath(path, "", CCE_PATH_RESERVED);
-   mapPathLength = strlen(mapPath);
+   CCE_SET_PATH(mapPath, mapPathLength, path);
 }
 
 CCE_PUBLIC_OPTIONS uint32_t cceRegisterMapCustomResourceCallback (cce_rloadfun onLoad, cce_dataparsefun onFree, cce_dataparsefun onCreate, cce_rstorefun onStore, size_t bufferSize)
@@ -605,6 +601,8 @@ static uint8_t storeResourcesSection (void *buffer, struct cce_buffer *info, FIL
 
 void cce__initMap2DLoaders (void)
 {
+   if (mapPath == NULL)
+      cceSetMap2Dpath("./maps"); // Default
    resourceSpaceToBeAllocated = 0;
    CCE_ALLOC_ARRAY(resourceLoadingFunctions);
    resourceUnloadingFunctions = malloc(resourceLoadingFunctionsAllocated * sizeof(cce_dataparsefun*));
@@ -621,6 +619,19 @@ void cce__initMap2DLoaders (void)
    cceRegisterFileIOcallbacks(cce__dynamicMapFunctionSet, loadResourcesSection, freeResourcesSection, createResourcesSection, storeResourcesSection, sizeof(struct ResourceInfo));
    cceRegisterFileIOcallbacks(cce__dynamicMapFunctionSet, loadElementsDynamic,  freeElementsDynamic,  createElements,         storeElements,         sizeof(struct DynamicRenderingInfo));
    cceRegisterFileIOcallbacks(cce__dynamicMapFunctionSet, loadCollidersDynamic, freeCollidersDynamic, createColliders,        storeColliders,        sizeof(struct DynamicCollisionInfo));
+}
+
+void cce__terminateMap2DLoaders (void)
+{
+   free(resourceLoadingFunctions);
+   resourceLoadingFunctionsQuantity = 0;
+   free(resourceUnloadingFunctions);
+   free(resourceCreatingFunctions);
+   free(resourceStoringFunctions);
+   free(resourceLoadingFunctionsBufferSizes);
+   free(mapPath);
+   mapPath = NULL;
+   mapPathLength = 0;
 }
 
 struct cce_buffer* createFailMap (uint16_t functionSetID)

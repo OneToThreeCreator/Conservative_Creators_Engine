@@ -28,14 +28,14 @@
 #include "../include/cce/utils.h"
 
 
-const uint8_t cce__charFlags[128] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                                     CCE__CHAR_WHITESPACE_LIKE, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, CCE__CHAR_DELIMITER, CCE__CHAR_WHITESPACE_LIKE, 0, 0,
-                                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, CCE__CHAR_DELIMITER, CCE__CHAR_DELIMITER, 0, 0, 0, 0,
-                                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, CCE__CHAR_WHITESPACE_LIKE,
-                                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                                     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+const uint8_t cce__charType[128] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                                    CCE__CHAR_WHITESPACE_LIKE, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, CCE__CHAR_DELIMITER, CCE__CHAR_WHITESPACE_LIKE, 0, 0,
+                                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, CCE__CHAR_DELIMITER, CCE__CHAR_DELIMITER, 0, 0, 0, 0,
+                                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, CCE__CHAR_WHITESPACE_LIKE,
+                                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 // Generated
 const uint8_t cce__debruijnToBitPosition64[64] = {63, 0,  47, 1,  56, 48, 27, 2,  60, 57, 49, 41, 37, 28, 16, 3,
                                                   61, 54, 58, 35, 52, 50, 42, 21, 44, 38, 32, 29, 23, 17, 11, 4,
@@ -288,17 +288,18 @@ CCE_PUBLIC_OPTIONS void cceMemoryToUppercase (char *str, size_t size)
 
 CCE_PUBLIC_OPTIONS uint8_t cceStringToBool (const char *str)
 {
-   char buf[6] = {0};
-   strncpy(buf, str, 6);
-   cceMemoryToLowercase(buf, 5);
-   if (memcmp(buf, "true", 5) == 0 || memcmp(buf, "yes", 4) == 0 || memcmp(buf, "+", 2) == 0)
-   {
-      return 1;
-   }
-   if (memcmp(buf, "false", 6) == 0 || memcmp(buf, "no", 3) == 0 || memcmp(buf, "-", 2) == 0)
-   {
+   if (str == NULL)
       return 0;
-   }
+   char buf[8] = {0};
+   strncpy(buf, str, 8);
+   cceMemoryToLowercase(buf, 7);
+   
+   if (CCE_STREQ(buf, "true") || CCE_STREQ(buf, "yes") || CCE_STREQ(buf, "enable") || CCE_STREQ(buf, "allow") || CCE_STREQ(buf, "+"))
+      return 1;
+   
+   if (CCE_STREQ(buf, "false") || CCE_STREQ(buf, "no") || CCE_STREQ(buf, "disable") || CCE_STREQ(buf, "deny") || CCE_STREQ(buf, "-"))
+      return 0;
+   
    return atoi(str) > 0;
 }
 
@@ -350,7 +351,6 @@ CCE_PUBLIC_OPTIONS float cceFastSinInt8 (uint8_t x)
 
 #define STRTOVEC(st, type, comp, strtoXl) \
 type vector[comp] = {0}; \
-char *firstIncorrect; \
 for (type *it = vector, *end = vector + comp; it < end; ++it) \
 { \
    for (;; ++st) \
@@ -358,11 +358,9 @@ for (type *it = vector, *end = vector + comp; it < end; ++it) \
       if (isdigit(*st) || *st == '+' || *st == '-') \
          break; \
       if (*st == '\0' || *st == '\n') \
-      { \
          goto RETURN; \
-      } \
    } \
-   *it = strtoXl(st, &firstIncorrect, 10); \
+   *it = strtoXl(st, (char**)&st, 10); \
 } \
 RETURN:
 

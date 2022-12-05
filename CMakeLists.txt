@@ -20,7 +20,7 @@
 
 cmake_minimum_required(VERSION 3.0)
 
-project(CCE VERSION 0.6.0 DESCRIPTION "open 2D engine for creating games - shared library" LANGUAGES C)
+project(CCE VERSION 0.6.1 DESCRIPTION "open 2D engine for creating games - shared library" LANGUAGES C)
 
 if (NOT DEFINED CCE_BUILD_TESTING)
    option(CCE_BUILD_TESTING "Build Conservative Creator's Engine test program" ON)
@@ -55,7 +55,8 @@ add_library(cce ${CCE_LIB_TYPE}
    src/utils.c
    include/cce/utils.h
    src/platform/engine_common_glfw.c
-   src/platform/engine_common_glfw.h
+   src/platform/engine_common_keyboard.c
+   src/platform/engine_common_keyboard.h
    src/platform/os_interaction.c
    include/cce/os_interaction.h
    src/platform/platforms.h
@@ -71,6 +72,8 @@ add_library(cce ${CCE_LIB_TYPE}
    src/map2D/map2D_file_IO.c
    src/map2D/log.c
    src/map2D/log.h
+   src/map2D/plugins.c
+   src/map2D/plugins.h
    #src/plugins/text_rendering.c
    #src/plugins/open_world.c
    src/external/stb_libs.c
@@ -121,7 +124,7 @@ if (NOT ListLib_FOUND)
 endif()
 
 add_subdirectory(external/glad2/cmake)
-glad_add_library(glad STATIC LOADER API gl:core=3.2 EXTENSIONS GL_NV_copy_image)
+glad_add_library(glad STATIC API gl:core=3.2 EXTENSIONS GL_NV_copy_image)
 set_property(TARGET glad PROPERTY POSITION_INDEPENDENT_CODE ON)
 
 target_link_libraries(cce PRIVATE list ${INIH_LIBRARIES} glfw glad)

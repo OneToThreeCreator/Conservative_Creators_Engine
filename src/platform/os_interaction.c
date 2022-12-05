@@ -36,8 +36,8 @@
 
 #else
 
-#define CCE_TMPDIR_NAME_TEMPLATE "CoffeeChain-tmpdir-XXXXXX"
-#define CCE_TMPDIR_NAME_TEMPLATE_SIZE 25u
+#define CCE_TMPDIR_NAME_TEMPLATE "CCE-tmpdir-XXXXXX"
+#define CCE_TMPDIR_NAME_TEMPLATE_SIZE 17u
 
 #endif // defined(CCE_TMPDIR_NAME_TEMPLATE)
 
@@ -65,7 +65,7 @@ CCE_PUBLIC_OPTIONS char* cceCreateNewPathFromOldPath (const char *oldPath, const
 
 CCE_PUBLIC_OPTIONS char* cceAppendPath (char *buffer, size_t bufferSize, const char *append)
 {
-   size_t oldPathLength = strnlen(buffer, bufferSize);
+   size_t oldPathLength = strlen(buffer);
    size_t appendPathLength = strlen(append);
    if (bufferSize <= oldPathLength + appendPathLength + 1u)
    {
@@ -108,6 +108,19 @@ CCE_PUBLIC_OPTIONS void cceTerminateTemporaryDirectory (void)
 CCE_PUBLIC_OPTIONS void cceTruncateFile (FILE *file, size_t size)
 {
    ftruncate(fileno(file), size);
+}
+
+CCE_PUBLIC_OPTIONS char* cceGetAbsolutePath (const char *path, size_t spaceToLeave)
+{
+   char *result = realpath(path, NULL);
+   if (result == NULL)
+      return NULL;
+   return realloc(result, strlen(result) + 1 + spaceToLeave);
+}
+
+CCE_PUBLIC_OPTIONS int cceSetCurrentPath (const char *path)
+{
+   return chdir(path);
 }
 
 CCE_PUBLIC_OPTIONS char* cceGetCurrentPath (size_t spaceToLeave)
@@ -363,12 +376,33 @@ CCE_PUBLIC_OPTIONS void cceTruncateFile (FILE *file, size_t size)
    fseek(file, position, SEEK_SET);
 }
 
+CCE_PUBLIC_OPTIONS char* cceGetAbsolutePath (const char *path, size_t spaceToLeave)
+{
+   char *result = malloc(MAX_PATH * sizeof(char));
+   size_t len = GetFullPathNameA(path, MAX_PATH, result, NULL);
+   if (len == 0)
+   {
+      free(result);
+      return NULL;
+   }
+   return realloc(result, len + 1 + spaceToLeave);
+}
+
+CCE_PUBLIC_OPTIONS int cceSetCurrentPath (const char *path)
+{
+   return -(!SetCurrentDirectoryA(path));
+}
+
 CCE_PUBLIC_OPTIONS char* cceGetCurrentPath (size_t spaceToLeave)
 {
-   size_t size = (spaceToLeave + MAX_PATH) * sizeof(char);
-   char *path = malloc(size);
-   GetCurrentDirectoryA(size, path);
-   return realloc(path, strnlen(path, size) + 1 + spaceToLeave);
+   char *path = malloc(MAX_PATH * sizeof(char));
+   size_t len = GetCurrentDirectoryA(size, path);
+   if (len == 0)
+   {
+      free(path);
+      return NULL;
+   }
+   return realloc(path, len + 1 + spaceToLeave);
 }
 
 CCE_PUBLIC_OPTIONS char* cceGetDirectory (char *path, size_t bufferSize)
@@ -466,26 +500,7 @@ CCE_PUBLIC_OPTIONS char* cceGetTemporaryDirectory (size_t spaceToLeave)
          fprintf(stderr, "DIRECTORY::TEMPORARY::FAILED_TO_GET_TEMPORARY_PATH");
          return NULL;
       }
-      char *path = malloc(MAX_PATH * sizeof(char));
-      tmpPathLength = GetLongPathNameA(tmpPath, path, MAX_PATH);
-      if (!tmpPathLength)
-      {
-         free(tmpPath);
-         fprintf(stderr, "DIRECTORY::TEMPORARY::FAILED_TO_GET_LONG_PATH");
-         return NULL;
-      }
-      
-      if (tmpPathLength > MAX_PATH)
-      {
-         free(path);
-         tmpPath = realloc(tmpPath, tmpPathLength + CCE_TMPDIR_NAME_TEMPLATE_SIZE + 2u);
-         GetLongPathNameA(tmpPath, tmpPath, tmpPathLength + 1u);
-      }
-      else
-      {
-         free(tmpPath);
-         tmpPath = realloc(path, tmpPathLength + CCE_TMPDIR_NAME_TEMPLATE_SIZE + 2u);
-      }
+      tmpPath = realloc(tmpPath, tmpPathLength + CCE_TMPDIR_NAME_TEMPLATE_SIZE + 2u);
       memcpy(tmpPath + tmpPathLength, CCE_TMPDIR_NAME_TEMPLATE, CCE_TMPDIR_NAME_TEMPLATE_SIZE);
       tmpPathLength += CCE_TMPDIR_NAME_TEMPLATE_SIZE;
       

@@ -21,6 +21,7 @@
 #ifndef ENGINE_COMMON_KEYBOARD_H
 #define ENGINE_COMMON_KEYBOARD_H
 
+#define CCE_KEY_NOKEY         0x00
 #define CCE_KEY_PAGEUP        0x01
 #define CCE_KEY_END           0x03
 #define CCE_KEY_MENU          0x05
@@ -34,11 +35,11 @@
 #define CCE_KEY_ESCAPE        0x1B
 
 #define CCE_KEY_SPACE         0x20
-#define CCE_KEY_APOSTROPHE    0x27
-#define CCE_KEY_COMMA         0x2C
-#define CCE_KEY_MINUS         0x2D
-#define CCE_KEY_PERIOD        0x2E
-#define CCE_KEY_SLASH         0x2F
+#define CCE_KEY_APOSTROPHE    0x27 /*'*/
+#define CCE_KEY_COMMA         0x2C /*,*/
+#define CCE_KEY_MINUS         0x2D /*-*/
+#define CCE_KEY_PERIOD        0x2E /*.*/
+#define CCE_KEY_SLASH         0x2F /*/*/
 #define CCE_KEY_0             0x30
 #define CCE_KEY_1             0x31
 #define CCE_KEY_2             0x32
@@ -49,7 +50,7 @@
 #define CCE_KEY_7             0x37
 #define CCE_KEY_8             0x38
 #define CCE_KEY_9             0x39
-#define CCE_KEY_SEMICOLON     0x3B
+#define CCE_KEY_SEMICOLON     0x3B /*;*/
 #define CCE_KEY_EQUAL         0x3D
 #define CCE_KEY_UNKNOWN       0x3F
 #define CCE_KEY_A             0x41
@@ -79,15 +80,15 @@
 #define CCE_KEY_Y             0x59
 #define CCE_KEY_Z             0x5A
 #define CCE_KEY_LEFT_BRACKET  0x5B
-#define CCE_KEY_BACKSLASH     0x5C
+#define CCE_KEY_BACKSLASH     0x5C /*\*/
 #define CCE_KEY_RIGHT_BRACKET 0x5D
-#define CCE_KEY_ACCENT        0x60
+#define CCE_KEY_GRAVE_ACCENT  0x60 /*`*/
 #define CCE_KEY_DELETE        0x7F
 
-#define CCE_KEY_ARROW_LEFT    0x3C
-#define CCE_KEY_ARROW_RIGHT   0x3E
-#define CCE_KEY_ARROW_UP      0x5E
-#define CCE_KEY_ARROW_DOWN    0x76
+#define CCE_KEY_LEFT_ARROW    0x3C
+#define CCE_KEY_RIGHT_ARROW   0x3E
+#define CCE_KEY_UP_ARROW      0x5E
+#define CCE_KEY_DOWN_ARROW    0x76
 
 #define CCE_KEY_LSHIFT        0x28
 #define CCE_KEY_RSHIFT        0x29
@@ -104,11 +105,11 @@
 #define CCE_KEY_SCROLLLOCK    0x5F
 
 #define CCE_KEY_KP_ENTER      0x8A
-#define CCE_KEY_KP_DIVIDE     0xAF
-#define CCE_KEY_KP_MULTIPLY   0xAA
+#define CCE_KEY_KP_DIVIDE     0xAF /*/*/
+#define CCE_KEY_KP_MULTIPLY   0xAA /***/
 #define CCE_KEY_KP_PLUS       0xAB
-#define CCE_KEY_KP_COMMA      0xAC
-#define CCE_KEY_KP_MINUS      0xAD
+#define CCE_KEY_KP_COMMA      0xAC /*,*/
+#define CCE_KEY_KP_MINUS      0xAD /*-*/
 
 #define CCE_KEY_KP_0          0xB0
 #define CCE_KEY_KP_1          0xB1
@@ -147,24 +148,54 @@
 #define CCE_KEY_F24           0xD8
 #define CCE_KEY_F25           0xD9
 
-#define CCE_KEY_BREAK      CCE_KEY_PAUSE
-#define CCE_KEY_PRSCN      CCE_KEY_PRINTSCREEN
-#define CCE_KEY_SYSRQ      CCE_KEY_PRINTSCREEN
-#define CCE_KEY_ESC        CCE_KEY_ESCAPE
-#define CCE_KEY_HYPHEN     CCE_KEY_MINUS
-#define CCE_KEY_DEL        CCE_KEY_DELETE
-#define CCE_KEY_LCTRL      CCE_KEY_LCONTROL
-#define CCE_KEY_RCTRL      CCE_KEY_RCONTROL
-#define CCE_KEY_ALTGR      CCE_KEY_RALT
-#define CCE_KEY_LBRACKET   CCE_KEY_LEFT_BRACKET
-#define CCE_KEY_RBRACKET   CCE_KEY_RIGHT_BRACKET
-#define CCE_KEY_KP_NUMLOCK CCE_KEY_NUMLOCK
+#define CCE_KEY_LAST          CCE_KEY_F25
+
+#define CCE_KEY_BREAK         CCE_KEY_PAUSE
+#define CCE_KEY_PRSCN         CCE_KEY_PRINTSCREEN
+#define CCE_KEY_SYSRQ         CCE_KEY_PRINTSCREEN
+#define CCE_KEY_ESC           CCE_KEY_ESCAPE
+#define CCE_KEY_HYPHEN        CCE_KEY_MINUS
+#define CCE_KEY_DEL           CCE_KEY_DELETE
+#define CCE_KEY_LCTRL         CCE_KEY_LCONTROL
+#define CCE_KEY_RCTRL         CCE_KEY_RCONTROL
+#define CCE_KEY_ALTGR         CCE_KEY_RALT
+#define CCE_KEY_LBRACKET      CCE_KEY_LEFT_BRACKET
+#define CCE_KEY_RBRACKET      CCE_KEY_RIGHT_BRACKET
+#define CCE_KEY_KP_NUMLOCK    CCE_KEY_NUMLOCK
+#define CCE_KEY_LEFT_ALT      CCE_KEY_LALT
+#define CCE_KEY_RIGHT_ALT     CCE_KEY_RALT
+#define CCE_KEY_LEFT_CONTROL  CCE_KEY_LCONTROL
+#define CCE_KEY_RIGHT_CONTROL CCE_KEY_RCONTROL
+#define CCE_KEY_LEFT_SUPER    CCE_KEY_LSUPER
+#define CCE_KEY_RIGHT_SUPER   CCE_KEY_RSUPER
+#define CCE_KEY_LEFT_SHIFT    CCE_KEY_LSHIFT
+#define CCE_KEY_RIGHT_SHIFT   CCE_KEY_RSHIFT
 
 #include <stdint.h>
 
+#include "../../include/cce/engine_common.h"
+
+struct cce_keys
+{
+   struct cce_u8vec2 horizontalAxis;
+   struct cce_u8vec2 verticalAxis;
+   struct cce_u8vec2 buttonA;
+   struct cce_u8vec2 buttonB;
+   struct cce_u8vec2 buttonX;
+   struct cce_u8vec2 buttonY;
+   struct cce_u8vec2 buttonL;
+   struct cce_u8vec2 buttonR;
+   struct cce_u8vec2 triggerL;
+   struct cce_u8vec2 triggerR;
+   struct cce_u8vec2 select;
+   struct cce_u8vec2 start;
+};
+
 uint8_t cceKeyFromName (const char *name);
-struct cce_u8vec2 cceKeysFromString2 (const char *str);
-struct cce_u8vec3 cceKeysFromString3 (const char *str);
-struct cce_u8vec4 cceKeysFromString4 (const char *str);
+#define cceStringToKey(str) cceKeyFromName(str)
+#define cceStringToKeys1(str) ((struct cce_u8vec1){cceKeyFromName(str)})
+struct cce_u8vec2 cceStringToKeys2 (const char *str);
+struct cce_u8vec3 cceStringToKeys3 (const char *str);
+struct cce_u8vec4 cceStringToKeys4 (const char *str);
 
 #endif // ENGINE_COMMON_KEYBOARD_H

@@ -33,6 +33,8 @@
 #define CCE__MACRO_TO_STR(x) #x 
 #define CCE_MACRO_TO_STR(x) CCE__MACRO_TO_STR(x)
 
+#define CCE_STREQ(x,literal) (memcmp(x, literal, strlen(literal) + 1) == 0)
+
 #define CCE_CEIL_TO_POWER_OF_TWO(x, result) \
 (result = (x) - ((x) != 0), \
 (result) |= (result) >> 1, \
@@ -45,12 +47,12 @@
 ((result) += ((result) >> (sizeof(result) * 8 - 1)) == 0))
 
 #define CCE_KEEP_HIGH_BIT(x, result) \
-((result) |= (result) >> 1, \
-(result) |= (result) >> 2, \
-(result) |= (result) >> 4, \
-(sizeof(result) >= 2) ? (result) |= (result) >> 8  : 0, \
-(sizeof(result) >= 4) ? (result) |= (result) >> 16 : 0, \
-(sizeof(result) >= 8) ? (result) |= (result) >> 32 : 0, \
+((result) |= (x) >> 1, \
+(result) |= (x) >> 2, \
+(result) |= (x) >> 4, \
+(sizeof(result) >= 2) ? (result) |= ((uint16_t)x) >> 8  : 0, \
+(sizeof(result) >= 4) ? (result) |= ((uint32_t)x) >> 16 : 0, \
+(sizeof(result) >= 8) ? (result) |= ((uint64_t)x) >> 32 : 0, \
 (result) -= (result) >> 1)
 
 #define CCE__CHAR_DELIMITER 0x1
@@ -62,8 +64,8 @@ extern const uint8_t  cce__debruijnToBitPosition32[32];
 extern const uint64_t cce__debruijnNumberLS6;
 extern const uint32_t cce__debruijnNumberLS5;
 
-#define CCE_CHAR_IS_WHITESPACE_LIKE(ch) (((unsigned)ch) < 128u ? (cce__charType[(unsigned) ch] & CCE__CHAR_WHITESPACE_LIKE) == CCE__CHAR_WHITESPACE_LIKE : 0)
-#define CCE_CHAR_IS_DELIMITER(ch)       (((unsigned)ch) < 128u ? (cce__charType[(unsigned) ch] & CCE__CHAR_DELIMITER) == CCE__CHAR_DELIMITER : 0)
+#define cceIsCharWhitespaceLike(ch) (((unsigned)ch) < 128u ? (cce__charType[(unsigned) ch] & CCE__CHAR_WHITESPACE_LIKE) == CCE__CHAR_WHITESPACE_LIKE : 0)
+#define cceIsCharDelimiter(ch)      (((unsigned)ch) < 128u ? (cce__charType[(unsigned) ch] & CCE__CHAR_DELIMITER)       == CCE__CHAR_DELIMITER : 0)
 
 #define CCE_LOWEST_BIT_INDEX(x) \
 ((sizeof(x) == 8) ? cce__debruijnToBitPosition64[(uint64_t)(((x) & -(x)) * cce__debruijnNumberLS6) >> 58] : cce__debruijnToBitPosition32[(uint32_t)((x & -x) * cce__debruijnNumberLS5) >> 27])
@@ -87,9 +89,13 @@ extern "C"
 #include <stdlib.h>
 #include <string.h>
 
-#define CCE_MAX(x,y) (((x)>(y))?(x):(y))
-#define CCE_MIN(x,y) (((x)<(y))?(x):(y))
+#define CCE_MAX(x,y) (((x)>(y))?(x): (y))
+#define CCE_MIN(x,y) (((x)<(y))?(x): (y))
 #define CCE_ABS(x)   (((x)>=0) ?(x):(-x))
+
+// Bitfield size cannot be negative. Positive is jist fine
+#define CCE_UNSIGNED_ONLY(t) struct CCE_MACRO_CONCAT(CCE__ERROR_TYPE_MUST_BE_UNSIGNED_L, __LINE__) {int CHECK : ((((t) -1) < 0) * -2 + 1);}
+#define CCE_SIGNED_ONLY(t)   struct CCE_MACRO_CONCAT(CCE__ERROR_TYPE_MUST_BE_SIGNED_L,   __LINE__) {int CHECK : ((((t) -1) > 0) * -2 + 1);}
 
 // sizeType MUST be unsigned
 #define CCE_ARRAY(name, type, sizeType) \
@@ -156,6 +162,7 @@ CCE_PUBLIC_OPTIONS uint16_t cceKeepHighBitInt16 (uint16_t x);
 CCE_PUBLIC_OPTIONS uint32_t cceKeepHighBitInt32 (uint32_t x);
 CCE_PUBLIC_OPTIONS uint64_t cceKeepHighBitInt64 (uint64_t x);
 CCE_PUBLIC_OPTIONS float cceFastSinInt8 (uint8_t x);
+CCE_PUBLIC_OPTIONS char* cceConvertIntToBase64String (size_t number, char *buffer, uint8_t symbolsQuantity);
 
 CCE_PUBLIC_OPTIONS size_t cceStringToLowercase (char *str);
 CCE_PUBLIC_OPTIONS void cceMemoryToLowercase (char *str, size_t size);

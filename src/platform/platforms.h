@@ -30,7 +30,7 @@
     defined(sun) || defined(__sun) || defined (sinux) || defined(__minix)
 
 #define POSIX_SYSTEM
-#define _POSIX_C_SOURCE 200109L
+#define _POSIX_C_SOURCE 200809L
 #define _XOPEN_SOURCE 500L
 
 #elif defined(_WIN32) || defined(__WIN32__) || defined(_WIN64) || defined(__TOS_WIN__) || defined(__WINDOWS__) || \

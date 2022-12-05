@@ -24,6 +24,7 @@
 #include "../../include/cce/engine_common.h"
 #include "../../include/cce/utils.h"
 #include "../../include/cce/map2D/map2D.h"
+#include "../../include/cce/os_interaction.h"
 
 #include "log.h"
 #include <listlib.h>
@@ -233,7 +234,18 @@ cce__renderingFunctions.map2DElementsToRenderingBuffer(elements, layersQuantity,
 #define cce__removeOldArray() cce__renderingFunctions.removeOldArray()
 #define cce__terminateMap2DRenderer() cce__renderingFunctions.terminateMap2DRenderer()
 
+#define CCE_SET_PATH(pathVar, lengthVar, newPath) \
+newPath = cceGetAbsolutePath(newPath, CCE_PATH_RESERVED + 1); \
+if (newPath == NULL) \
+   return; \
+pathVar = (char*)newPath; \
+lengthVar = strlen(pathVar); \
+lengthVar += cceIsPathDelimiter(pathVar[lengthVar]); \
+pathVar[lengthVar - 1] = cceNativePathDelimiter; \
+pathVar[lengthVar] = '\0'
+
 void cce__initMap2DLoaders (void);
+void cce__terminateMap2DLoaders (void);
 void cce__setCurrentArrayOfMaps (const struct Map2Darray *maps);
 
 void cce__setAttribPointerVAO (void);

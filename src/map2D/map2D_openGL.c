@@ -433,23 +433,11 @@ void terminateMap2DRenderer__openGL (void)
    glDeleteVertexArrays(1, &g_VAO);
    glDeleteTextures(1, &glTexturesArray);
    glDeleteProgram(shaderProgram);
-   gladLoaderUnloadGL();
 }
 
-int initMap2DRenderer__openGL (char *cce__resourcePath, const struct LoadedTextures **textures, struct RendereringFunctions *funcStruct)
+int initMap2DRenderer__openGL (const struct LoadedTextures **textures, struct RendereringFunctions *funcStruct)
 {
-   if (!gladLoaderLoadGL())
    {
-      fprintf(stderr, "GLAD::INITIALIZATION::FAILED:\nOpenGL could not be loaded by GLAD.\n");
-      return -1;
-   }
-   if (!GLAD_GL_VERSION_3_2)
-   {
-      fprintf(stderr, "GLAD::INITIALIZATION::FAILED:\nOpenGL 3.2 (minimum required) could not be loaded by GLAD.\n");
-      return -1;
-   }
-   {
-      size_t pathLength = strlen(cce__resourcePath) + 1u;
       /*strlen("define CCE_GLOBAL_OFFSET_MASK 0xXXXXXXXX\n") == 42*/
       /*strlen("const uvec2 textureSize = uvec2(0.XXXXXXXX, 0.XXXXXXXX);") == 56*/
       char vertexShaderAdditionalString[42 + 56 + 1] = "#define CCE_GLOBAL_OFFSET_MASK " CCE_MACRO_TO_STR(CCE_GLOBAL_OFFSET_MASK) "\nconst vec2 inverseTextureSize = vec2(";
@@ -460,19 +448,12 @@ int initMap2DRenderer__openGL (char *cce__resourcePath, const struct LoadedTextu
       if (shaderProgram == 0u)
       #endif // SYSTEM_RESOURCE_PATH
       {
-         cceAppendPath(cce__resourcePath, pathLength + 11u, "shaders");
-         char *vertexPath   = cceCreateNewPathFromOldPath(cce__resourcePath, "vertex_shader.glsl",   0u);
-         char *fragmentPath = cceCreateNewPathFromOldPath(cce__resourcePath, "fragment_shader.glsl", 0u);
-         shaderProgram = cce__makeVFshaderProgram(vertexPath, fragmentPath, vertexShaderAdditionalString, NULL);
-         free(vertexPath);
-         free(fragmentPath);
-         *(cce__resourcePath + pathLength) = '\0';
+         shaderProgram = cce__makeVFshaderProgram("./shaders/vertex_shader.glsl", "./shaders/fragment_shader.glsl", vertexShaderAdditionalString, NULL);
       }
    }
    if (!shaderProgram)
    {
       fputs("ENGINE::INIT::SHADERS_CANNOT_BE_LOADED", stderr);
-      free(cce__resourcePath);
       return -1;
    }
    uniformLocations = malloc(1 * sizeof(GLint));

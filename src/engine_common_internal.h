@@ -62,6 +62,10 @@ cce__engineBackend;
 #define cce__toWindow() cce__engineBackend.toWindow()
 #define cce__screenUpdate() cce__engineBackend.screenUpdate()
 
+extern void (*cce__moveCallback)(int16_t, int16_t);
+extern void (*cce__buttonCallback)(cce_enum, cce_enum);
+extern void (*cce__cursorCallback)(int16_t, int16_t);
+
 #ifdef __cplusplus
 }
 #endif // __cplusplus
