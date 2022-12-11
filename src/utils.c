@@ -48,85 +48,6 @@ const uint8_t cce__debruijnToBitPosition32[32] = {31, 0,  22, 1,  28, 23, 13, 2,
 const uint64_t cce__debruijnNumberLS6 = 0x7ef3ae369961512;
 const uint32_t cce__debruijnNumberLS5 = 0xfb9ac52;
 
-CCE_PUBLIC_OPTIONS const void* cceBinarySearchFirstAscending (const void *array, size_t arraySize, size_t typeSize, size_t step, size_t value)
-{
-   if (!arraySize)
-      return 0;
-      
-   const uint8_t *iterator = (const uint8_t*) array;
-   const uint8_t *end = ((const uint8_t*) array) + arraySize * step;
-   size_t remain = arraySize * step;
-   size_t logstep = CCE_HIGHEST_BIT_INDEX(step) + 1;
-   size_t typeMask;
-   if (typeSize >= sizeof(size_t))
-   {
-      typeMask = SIZE_MAX;
-   }
-   else
-   {
-      typeMask = (((size_t) 1u) << typeSize * 8u) - 1u;
-   }
-   do
-   {
-      remain >>= logstep;
-      if (iterator + remain + step > end)
-         continue;
-      iterator = (((*((size_t*) (iterator + remain))) & typeMask) < value) ? iterator + remain + step : iterator;
-   }
-   while (remain > 0u); /* Checking for last valid value, because it is impossible to detect underflow of unsigned variable */
-   return iterator;
-}
-
-CCE_PUBLIC_OPTIONS const void* cceBinarySearchFirstDescending (const void *array, size_t arraySize, size_t typeSize, size_t step, size_t value)
-{
-   if (!arraySize)
-      return 0;
-      
-   const uint8_t *iterator = (const uint8_t*) array;
-   const uint8_t *end = ((const uint8_t*) array) + arraySize * step;
-   size_t remain = arraySize * step;
-   size_t logstep = CCE_HIGHEST_BIT_INDEX(step) + 1;
-   size_t typeMask;
-   if (typeSize >= sizeof(size_t))
-   {
-      typeMask = SIZE_MAX;
-   }
-   else
-   {
-      typeMask = (((size_t) 1u) << typeSize * 8u) - 1u;
-   }
-   do
-   {
-      remain >>= logstep;
-      if (iterator + remain + step > end)
-         continue;
-      iterator = (((*((size_t*) (iterator + remain))) & typeMask) > value) ? iterator + remain + step : iterator;
-   }
-   while (remain > 0u); /* Checking for last valid value, because it is impossible to detect underflow of unsigned variable */
-   return iterator;
-}
-
-CCE_PUBLIC_OPTIONS const void* cceBinarySearchCMP (const void *array, size_t arraySize, size_t step, int (*cmp)(const void*, const void*), const void *value)
-{
-   if (!arraySize)
-      return 0;
-      
-   const uint8_t *iterator = (const uint8_t*) array;
-   const uint8_t *end = ((const uint8_t*) array) + arraySize * step;
-   size_t remain = arraySize * step;
-   size_t logstep = CCE_HIGHEST_BIT_INDEX(step) + 1;
-   do
-   {
-      remain >>= logstep;
-      if (iterator + remain + step > end)
-         continue;
-      
-      iterator = (cmp(iterator, value) < 0) ? iterator + remain + step : iterator;
-   }
-   while (remain > 0u); /* Checking for last valid value, because it is impossible to detect underflow of unsigned variable */
-   return iterator;
-}
-
 CCE_PUBLIC_OPTIONS char* cceReverseMemory (char *memory, size_t size)
 {
    size_t wordHalfQuantity = size / (sizeof(size_t) * 2);
@@ -155,6 +76,32 @@ CCE_PUBLIC_OPTIONS char* cceReverseMemory (char *memory, size_t size)
    }
    return memory;
 }
+
+#define CCE_POW(base, exponent, type) \
+{ \
+   type result = 1; \
+   for (;;) \
+   { \
+      if (exponent & 0x1) \
+         result *= base; \
+      exponent >>= 1; \
+      if (exponent == 0) \
+         return result; \
+      base *= base; \
+   } \
+}
+
+CCE_PUBLIC_OPTIONS uint8_t cceU8Pow (uint8_t base, uint8_t exponent)
+   CCE_POW(base, exponent, uint8_t)
+   
+CCE_PUBLIC_OPTIONS uint16_t cceU16Pow (uint16_t base, uint16_t exponent)
+   CCE_POW(base, exponent, uint16_t)
+
+CCE_PUBLIC_OPTIONS uint32_t cceU32Pow (uint32_t base, uint32_t exponent)
+   CCE_POW(base, exponent, uint32_t)
+   
+CCE_PUBLIC_OPTIONS uint64_t cceU64Pow (uint64_t base, uint64_t exponent)
+   CCE_POW(base, exponent, uint64_t)
 
 // First utf-8 byte encodes it's length. 110XXXXX - length 2, 1110XXXX - length 3, 11110XXX - length 4 (max). This is branchless way of extracting this bits
 #define GET_CHAR_LENGTH_UTF8LE(ch) (((*(ch) & 0x30) >> 4) + ((*(ch) & 0x30) == 0) + 1)

@@ -170,9 +170,9 @@ CCE_PUBLIC_OPTIONS uint64_t cceGetTime  (void);
 #define CCE_INI_CALLBACK_DO_NOT_INIT 0x2
 
 CCE_PUBLIC_OPTIONS uint16_t cceRegisterIniCallback (const char **lowercasenames, void *data, int (*callback)(void*, const char*, const char*), int (*init)(void*), uint8_t flags);
-// CCE_PUBLIC_OPTIONS void cceStartTimer          (struct cce_timer *timer);
-// CCE_PUBLIC_OPTIONS uint8_t cceIsTimerExpired   (const struct cce_timer *timer);
-// CCE_PUBLIC_OPTIONS void cceResetTimerDelayCompensation (void);
+CCE_PUBLIC_OPTIONS void cceSetAxisChangeCallback (void (*callback)(int8_t, int8_t), cce_enum axePair);
+CCE_PUBLIC_OPTIONS void cceSetButtonCallback (void (*callback)(uint16_t buttonState, uint16_t diff));
+CCE_PUBLIC_OPTIONS void cceSetKeyCallback (void (*callback)(cce_enum key, cce_enum state));
 CCE_PUBLIC_OPTIONS union cce_color cceHSVtoRGB (union cce_color color);
 CCE_PUBLIC_OPTIONS union cce_color cceHSLtoRGB (union cce_color color);
 CCE_PUBLIC_OPTIONS union cce_color cceHCLtoRGB (union cce_color color);
@@ -234,6 +234,29 @@ CCE_PUBLIC_OPTIONS union cce_color cceRGBtoHCL (union cce_color color);
 
 CCE_PUBLIC_OPTIONS extern uint8_t (*cceEngineShouldTerminate) (void);
 CCE_PUBLIC_OPTIONS extern void (*cceSetEngineShouldTerminate) (uint8_t);
+
+#define CCE_BUTTON_A 0x1
+#define CCE_BUTTON_B 0x2
+#define CCE_BUTTON_X 0x4
+#define CCE_BUTTON_Y 0x8
+#define CCE_BUTTON_L 0x10
+#define CCE_BUTTON_R 0x20
+#define CCE_BUTTON_STICK_L 0x40
+#define CCE_BUTTON_STICK_R 0x80
+#define CCE_BUTTON_BACK 0x100
+#define CCE_BUTTON_START 0x200
+//#define CCE_BUTTON_GUIDE (Should never be used by any game)
+#define CCE_TRIGGER_L 0x400
+#define CCE_TRIGGER_R 0x800
+#define CCE_BUTTON_DPAD_LEFT 0x1000
+#define CCE_BUTTON_DPAD_RIGHT 0x2000
+#define CCE_BUTTON_DPAD_DOWN 0x4000
+#define CCE_BUTTON_DPAD_UP 0x8000
+
+#define CCE_AXISPAIR_LSTICK 0
+#define CCE_AXISPAIR_DPAD 1
+#define CCE_AXISPAIR_RSTICK 2
+#define CCE_AXISPAIR_TRIGGERS 3
 
 #ifdef __cplusplus
 }

@@ -18,7 +18,7 @@
     USA
 */
 
-#define TESTS_QUANTITY 4lu
+#define TESTS_QUANTITY 3lu
 
 #include <stdint.h>
 #include <stdio.h>
@@ -27,7 +27,6 @@ uint8_t tmpDirTest (void);
 uint8_t appDataDirTest (void);
 uint8_t utf8Test (void);
 uint8_t test4 (void);
-uint8_t binarySearchTest (void);
 
 int main (int argc, char **argv)
 {
@@ -40,6 +39,5 @@ int main (int argc, char **argv)
    testsPassed += tmpDirTest();
    testsPassed += appDataDirTest();
    testsPassed += utf8Test();
-   testsPassed += binarySearchTest();
    return testsPassed != TESTS_QUANTITY;
 }

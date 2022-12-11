@@ -22,10 +22,11 @@
 #include <stdint.h>
 #include <string.h>
 #include <stdio.h>
+#include <locale.h>
 
 #include "../../include/cce/engine_common.h"
 #include "../../include/cce/utils.h"
-#include "engine_common_keyboard.h"
+#include "../../include/cce/engine_common_keyboard.h"
 
 // If y is string literal, all optimizing compilers will optimize strlen call away
 #define CCE_MEMEQ(x,y) (memcmp(x, y, strlen(y)) == 0)
@@ -33,11 +34,9 @@
 #define CCE_LEFT_RIGHT_CHOOSE(str, l, r) (str[0] == 'l' && (str[1] == '\0' || CCE_STREQ(str + 1, "eft"))  ? l : \
                                           str[0] == 'r' && (str[1] == '\0' || CCE_STREQ(str + 1, "ight")) ? r : CCE_KEY_UNKNOWN)
 
-static const char *const keypad = "keypad";
-static const char *const nter   = "nter";
-
 // HUGE mess. But a lot of name variants are supported. And really fast (at least should be)
-// buf MUST have size at least 16
+// buf MUST have size at least 19
+// Good luck to anyone wanting to write unit-tests for that
 static uint8_t cce__keyFromName (char *buf)
 {
    char *it;
@@ -168,7 +167,7 @@ static uint8_t cce__keyFromName (char *buf)
                   return CCE_KEY_GRAVE_ACCENT;
                return CCE_KEY_UNKNOWN;
             case 'd':
-               if (buf[2] == 'd' && (CCE_STREQ(it = buf + 3 + cceIsCharWhitespaceLike(buf[3]), "kp") || CCE_STREQ(it, keypad)))
+               if (buf[2] == 'd' && (CCE_STREQ(it = buf + 3 + cceIsCharWhitespaceLike(buf[3]), "kp") || CCE_STREQ(it, "keypad")))
                   return CCE_KEY_KP_PLUS;
                return CCE_KEY_UNKNOWN;
             case 'l':
@@ -245,7 +244,7 @@ static uint8_t cce__keyFromName (char *buf)
                      if (*it == '\0')
                         return CCE_KEY_COMMA;
                      it += cceIsCharWhitespaceLike(*it);
-                     if (CCE_STREQ(it, "kp") || CCE_STREQ(it, keypad))
+                     if (CCE_STREQ(it, "kp") || CCE_STREQ(it, "keypad"))
                         return CCE_KEY_KP_COMMA;
                      return CCE_KEY_UNKNOWN;
                   case 'n':
@@ -280,7 +279,7 @@ CONTROL_KEY:
                if (*it == '\0')
                   return CCE_KEY_SLASH;
                it += cceIsCharWhitespaceLike(*it);
-               if (CCE_STREQ(it, "kp") || CCE_STREQ(it, keypad))
+               if (CCE_STREQ(it, "kp") || CCE_STREQ(it, "keypad"))
                   return CCE_KEY_KP_DIVIDE;
                return CCE_KEY_UNKNOWN;
             case 'o':
@@ -296,7 +295,7 @@ CONTROL_KEY:
             case 'n':
                if (CCE_STREQ(buf + 2, "d")) // end
                   return CCE_KEY_END;
-               if (CCE_MEMEQ(buf + 2, nter + 1)) // enter
+               if (CCE_MEMEQ(buf + 2, "ter")) // enter
                {
                   it = buf + 5;
                   switch (*it)
@@ -311,7 +310,7 @@ CONTROL_KEY:
                         // fallthrough
                      case 'k':
                         ++it;
-                        if (CCE_STREQ(it, "p") || CCE_STREQ(it, keypad + 1))
+                        if (CCE_STREQ(it, "p") || CCE_STREQ(it, "eypad"))
                            return CCE_KEY_KP_ENTER;
                         return CCE_KEY_UNKNOWN;
                }
@@ -429,13 +428,19 @@ CONTROL_KEY:
       case 'i':
          if (CCE_MEMEQ(buf + 1, "ns") && (buf[3] == '\0' || CCE_STREQ(buf + 3, "ert"))) // ins or insert
             return CCE_KEY_INSERT;
+         it = buf + 1 + (-CCE_MEMEQ(buf + 1, "nternational") & 12);
+         it += cceIsCharWhitespaceLike(*it);
+         if (*it == '\0' || CCE_STREQ(it, "1"))
+            return CCE_KEY_WORLD1;
+         if (CCE_STREQ(it, "2"))
+            return CCE_KEY_WORLD2;
          return CCE_KEY_UNKNOWN;
       case 'k':
          it = buf + 2;
          switch (buf[1])
          {
             case 'e':
-               if (!CCE_MEMEQ(it, keypad + 2)) // keypad
+               if (!CCE_MEMEQ(it, "ypad")) // keypad
                   return CCE_KEY_UNKNOWN;
                it = buf + 6;
                // fallthrough
@@ -496,7 +501,7 @@ CONTROL_KEY:
                         return CCE_KEY_KP_DIVIDE;
                      return CCE_KEY_UNKNOWN;
                   case 'e':
-                     if (CCE_STREQ(it + 1, nter))
+                     if (CCE_STREQ(it + 1, "nter"))
                         return CCE_KEY_KP_ENTER;
                      return CCE_KEY_UNKNOWN;
                   case 'h':
@@ -579,7 +584,7 @@ SIDE_KEY:
                if (buf[6] == '\0')
                   return CCE_KEY_ENTER;
                it = buf + 6 + cceIsCharWhitespaceLike(buf[6]);
-               if (CCE_STREQ(it, "kp") || CCE_STREQ(it, keypad))
+               if (CCE_STREQ(it, "kp") || CCE_STREQ(it, "keypad"))
                   return CCE_KEY_KP_ENTER;
                return CCE_KEY_UNKNOWN;
             case 's':
@@ -612,6 +617,18 @@ SIDE_KEY:
       case 'n':
          if (CCE_MEMEQ(buf + 1, "um") && (buf[3] == '\0' || CCE_STREQ(buf + 3 + cceIsCharWhitespaceLike(buf[3]), "lock")))
             return CCE_KEY_NUMLOCK;
+         if (CCE_MEMEQ(buf + 1, "non") || CCE_MEMEQ(buf + 1, "not"))
+         {
+            it = buf + 3 + cceIsCharWhitespaceLike(buf[3]);
+            it += (-CCE_MEMEQ(it, "std") & 3) | (-CCE_MEMEQ(it, "standard") & 8) | (-CCE_MEMEQ(it, "standartized") & 12);
+            if (it <= buf + 4)
+               return CCE_KEY_UNKNOWN;
+            it += cceIsCharWhitespaceLike(buf[3]);
+            if (*it == '\0' || CCE_STREQ(it, "1"))
+               return CCE_KEY_WORLD1;
+            if (CCE_STREQ(it, "2"))
+               return CCE_KEY_WORLD2;
+         }
          return CCE_KEY_UNKNOWN;
       case 'p':
          switch (buf[1])
@@ -674,7 +691,7 @@ SIDE_KEY:
                   if (buf[8] == '\0')
                      return CCE_KEY_MINUS;
                   it = buf + 8 + cceIsCharWhitespaceLike(buf[8]);
-                  if (CCE_STREQ(it, "kp") || CCE_STREQ(it, keypad))
+                  if (CCE_STREQ(it, "kp") || CCE_STREQ(it, "keypad"))
                      return CCE_KEY_KP_MINUS;
                }
                return CCE_KEY_UNKNOWN;
@@ -698,26 +715,35 @@ SIDE_KEY:
             return CCE_KEY_UP_ARROW;
          return CCE_KEY_UNKNOWN;
       case 'w':
-         if (!CCE_MEMEQ(buf + 1, "in")) // win
-            return CCE_KEY_UNKNOWN;
-         it = buf + 3 + CCE_MEMEQ(buf + 3, "dows"); // windows
+         
+         if (CCE_MEMEQ(buf + 1, "in")) // win
+         {
+            it = buf + 3 + (-CCE_MEMEQ(buf + 3, "dows") & 4); // windows
+            it += cceIsCharWhitespaceLike(*it);
+            return CCE_LEFT_RIGHT_CHOOSE(it, CCE_KEY_LSUPER, CCE_KEY_RSUPER);
+         }
+         it = buf + 1 + (-CCE_MEMEQ(buf + 1, "orld") & 4);
          it += cceIsCharWhitespaceLike(*it);
-         return CCE_LEFT_RIGHT_CHOOSE(it, CCE_KEY_LSUPER, CCE_KEY_RSUPER);
+         if (*it == '\0' || CCE_STREQ(it, "1"))
+            return CCE_KEY_WORLD1;
+         if (CCE_STREQ(it, "2"))
+            return CCE_KEY_WORLD2;
+         return CCE_KEY_UNKNOWN;
       default:
          return CCE_KEY_UNKNOWN;
    }
 }
 
-uint8_t cceKeyFromName (const char *name)
+CCE_PUBLIC_OPTIONS uint8_t cceKeyFromName (const char *name)
 {
-   char buf[16];
-   strncpy(buf, name, 16);
-   cceMemoryToLowercase(buf, 15);
+   char buf[19];
+   strncpy(buf, name, 19);
+   cceMemoryToLowercase(buf, 18);
    return cce__keyFromName(buf);
 }
 
 #define KEYS_FROM_STRING_N(str, n) \
-char buf[16]; \
+char buf[19]; \
 uint8_t result[n] = {0}; \
 for (uint8_t *resptr = result, *end = result + n; resptr < end; ++resptr) \
 { \
@@ -747,60 +773,64 @@ for (uint8_t *resptr = result, *end = result + n; resptr < end; ++resptr) \
          break; \
       } \
    } \
-   memset(buf, 0, CCE_MAX(it - str, 16)); \
-   memcpy(buf, str, CCE_MAX(it - str, 16)); \
-   cceMemoryToLowercase(buf, CCE_MAX(it - str, 16) - 1); \
-   if (it - str < 16) \
-      buf[(it - str) - 1] = '\0'; \
+   memset(buf, 0, 19); \
+   memcpy(buf, str, CCE_MIN(it - str, 19)); \
+   cceMemoryToLowercase(buf, CCE_MIN(it - str, 19) - 1); \
+   if (it - str < 19) \
+      buf[(it - str)] = '\0'; \
    *resptr = cce__keyFromName(buf); \
    str = it + 1; \
 }
 
-struct cce_u8vec2 cceStringToKeys2 (const char *str)
+CCE_PUBLIC_OPTIONS struct cce_u8vec2 cceStringToKeys2 (const char *str)
 {
    KEYS_FROM_STRING_N(str, 2)
    return (struct cce_u8vec2) {result[0], result[1]};
 }
 
-struct cce_u8vec3 cceStringToKeys3 (const char *str)
+CCE_PUBLIC_OPTIONS struct cce_u8vec3 cceStringToKeys3 (const char *str)
 {
    KEYS_FROM_STRING_N(str, 3)
    return (struct cce_u8vec3) {result[0], result[1], result[2]};
 }
 
-struct cce_u8vec4 cceStringToKeys4 (const char *str)
+CCE_PUBLIC_OPTIONS struct cce_u8vec4 cceStringToKeys4 (const char *str)
 {
    KEYS_FROM_STRING_N(str, 4)
    return (struct cce_u8vec4) {result[0], result[1], result[2], result[3]};
 }
 
-int keyIniCallback(void *data, const char *name, const char *value)
+int cce__keyIniCallback(void *data, const char *name, const char *value)
 {
    struct cce_keys *vals = data;
    char buf[15];
    strncpy(buf, name, 15);
    cceMemoryToLowercase(buf, 14);
-   if (CCE_STREQ(buf, "horizontalmove") || CCE_STREQ(buf, "horizontalaxis") || CCE_STREQ(buf, "horizontal"))
+   if (CCE_STREQ(buf, "leftstick") || CCE_STREQ(buf, "lstick") || CCE_STREQ(buf, "ls") || CCE_STREQ(buf, "lcs") || CCE_STREQ(buf, "stick0"))
    {
-      vals->horizontalAxis = cceStringToKeys2(value);
+      vals->stickL = cceStringToKeys4(value);
    }
-   else if (CCE_STREQ(buf, "verticalmove") || CCE_STREQ(buf, "verticalaxis") || CCE_STREQ(buf, "vertical"))
+   else if (CCE_STREQ(buf, "dpad") || CCE_STREQ(buf, "directionalpad") || CCE_STREQ(buf, "digitalpad"))
    {
-      vals->verticalAxis = cceStringToKeys2(value);
+      vals->dpad = cceStringToKeys4(value);
    }
-   else if (CCE_STREQ(buf, "buttona") || CCE_STREQ(buf, "a"))
+   else if (CCE_STREQ(buf, "rightstick") || CCE_STREQ(buf, "rstick") || CCE_STREQ(buf, "rs") || CCE_STREQ(buf, "rcs") || CCE_STREQ(buf, "stick1"))
+   {
+      vals->stickR = cceStringToKeys4(value);
+   }
+   else if (CCE_STREQ(buf, "buttona") || CCE_STREQ(buf, "a") || CCE_STREQ(buf, "cross"))
    {
       vals->buttonA = cceStringToKeys2(value);
    }
-   else if (CCE_STREQ(buf, "buttonb") || CCE_STREQ(buf, "b"))
+   else if (CCE_STREQ(buf, "buttonb") || CCE_STREQ(buf, "b") || CCE_STREQ(buf, "circle"))
    {
       vals->buttonB = cceStringToKeys2(value);
    }
-   else if (CCE_STREQ(buf, "buttonx") || CCE_STREQ(buf, "x"))
+   else if (CCE_STREQ(buf, "buttonx") || CCE_STREQ(buf, "x") || CCE_STREQ(buf, "square"))
    {
       vals->buttonX = cceStringToKeys2(value);
    }
-   else if (CCE_STREQ(buf, "buttony") || CCE_STREQ(buf, "y"))
+   else if (CCE_STREQ(buf, "buttony") || CCE_STREQ(buf, "y") || CCE_STREQ(buf, "triangle"))
    {
       vals->buttonY = cceStringToKeys2(value);
    }
@@ -820,13 +850,28 @@ int keyIniCallback(void *data, const char *name, const char *value)
    {
       vals->triggerR = cceStringToKeys2(value);
    }
-   else if (CCE_STREQ(buf, "select") || CCE_STREQ(buf, "sel"))
+   else if (CCE_STREQ(buf, "back") || CCE_STREQ(buf, "select") || CCE_STREQ(buf, "sel") || CCE_STREQ(buf, "view"))
    {
-      vals->select = cceStringToKeys2(value);
+      vals->back = cceStringToKeys2(value);
    }
-   else if (CCE_STREQ(buf, "start"))
+   else if (CCE_STREQ(buf, "start") || CCE_STREQ(buf, "menu"))
    {
       vals->start = cceStringToKeys2(value);
+   }
+   else if (CCE_STREQ(buf, "deadzone"))
+   {
+      const char *last;
+      vals->deadzone = strtof(value, (char**) &last);
+      if (*last == '.') // Workaround for systems with decimal separator not being the point
+      {
+         const char *last2;
+         long tmp = strtol(last, (char**) &last2, 10);
+         vals->deadzone += (float)tmp / cceU32Pow(10, last2 - last);
+      }
+   }
+   else if (CCE_STREQ(buf, "keyaxis") || CCE_STREQ(buf, "keyweight"))
+   {
+      vals->keyAxisValue = strtol(value, NULL, 0);
    }
    else
    {

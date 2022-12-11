@@ -371,7 +371,7 @@ int cce__loadTextures (void *buffer, struct cce_buffer *info, char **paths)
    {
       if (iterator->dependantMapsQuantity == 0)
          continue;
-      path = (char**) cceBinarySearchCMP(paths, pathsLength, sizeof(char*), stringCompare, iterator->path);
+      path = (char**) bsearch(&iterator->path, paths, pathsLength, sizeof(char*), stringCompare);
       if (strcmp(*path, iterator->path) == 0)
       {
          setTextureAttributes(iterator - g_textures);
@@ -477,6 +477,16 @@ void cce__createTextures (void *buffer, struct cce_buffer *info)
    data->texturesMapDependsOnAllocated = 0;
 }
 
+const void **lastChecked;
+
+int ptrcomp (const void *__a, const void *__b)
+{
+   const void *a = *(const void**)__a;
+   const void *b = *(const void**)__b;
+   lastChecked = (const void**)__b;
+   return (a > b) - (a < b);
+}
+
 void cce__releaseTextures (void *buffer, struct cce_buffer *info)
 {
    CCE_UNUSED(info);
@@ -501,7 +511,9 @@ void cce__releaseTextures (void *buffer, struct cce_buffer *info)
             
          if (g_texturesEmptyQuantity >= g_texturesEmptyAllocated)
             CCE_REALLOC_ARRAY(g_texturesEmpty, g_texturesEmptyQuantity + 1);
-         struct LoadedTextures **pos = (struct LoadedTextures**) cceBinarySearchFirstDescending(g_texturesEmpty, g_texturesEmptyQuantity, sizeof(struct LoadedTextures*), sizeof(struct LoadedTextures*), (size_t)(g_textures + textureID - 1));
+         void *tofind = g_textures + textureID - 1;
+         (void)bsearch(&tofind, g_texturesEmpty, g_texturesEmptyQuantity, sizeof(struct LoadedTextures*), ptrcomp); // Returns NULL if no matches found (= always in this case)
+         struct LoadedTextures **pos = (struct LoadedTextures**) lastChecked;
          memmove(pos + 1, pos, g_texturesEmptyQuantity - (pos - g_texturesEmpty));
          *pos = g_textures + textureID;
       }
@@ -525,7 +537,9 @@ void cce__releaseTexture (uint16_t textureID)
       }
       if (g_texturesEmptyQuantity >= g_texturesEmptyAllocated)
          CCE_REALLOC_ARRAY(g_texturesEmpty, g_texturesEmptyQuantity + 1);
-      struct LoadedTextures **pos = (struct LoadedTextures**) cceBinarySearchFirstDescending(g_texturesEmpty, g_texturesEmptyQuantity, sizeof(struct LoadedTextures*), sizeof(struct LoadedTextures*), (size_t)(g_textures + textureID - 1));
+      void *tofind = g_textures + textureID - 1;
+      (void)bsearch(&tofind, g_texturesEmpty, g_texturesEmptyQuantity, sizeof(struct LoadedTextures*), ptrcomp); // Returns NULL if no matches found (= always in this case)
+      struct LoadedTextures **pos = (struct LoadedTextures**) lastChecked;
       memmove(pos + 1, pos, g_texturesEmptyQuantity - (pos - g_texturesEmpty));
       *pos = g_textures + textureID;
    }

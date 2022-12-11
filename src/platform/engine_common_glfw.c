@@ -20,16 +20,16 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <math.h>
 
 #include <glad/gl.h>
 #include <GLFW/glfw3.h>
 
 #include "../../include/cce/engine_common.h"
 #include "../../include/cce/utils.h"
+#include "../../include/cce/engine_common_keyboard.h"
 
 #include "../engine_common_internal.h"
-
-#include "engine_common_keyboard.h"
 
 #define CCE_FULLSCREEN 0x10
 #define CCE_MOVE_EVENT 0x20
@@ -42,10 +42,10 @@
 #define CCE_RESIZABLE 0x4
 #define CCE_VERTICAL_SYNC 0x8
 
-
 GLFWwindow *g_window;
 struct cce_i32vec2 g_windowResolution;
 struct cce_i32vec2 g_windowBaseResolution;
+struct cce_i32vec2 g_windowLastPos;
 uint8_t g_flags;
 
 struct glfw_properties
@@ -54,6 +54,49 @@ struct glfw_properties
    struct cce_u16vec2 resolution;
    uint8_t flags;
 };
+
+struct key_glfw
+{
+   int16_t key;
+   uint8_t fn;
+};
+
+#define BUTTON_A 0
+#define BUTTON_B 1
+#define BUTTON_X 2
+#define BUTTON_Y 3
+#define BUTTON_L 4
+#define BUTTON_R 5
+#define BUTTON_STICK_L 6
+#define BUTTON_STICK_R 7
+#define BUTTON_BACK 8
+#define BUTTON_START 9
+#define TRIGGER_L 10
+#define TRIGGER_R 11
+
+#define LEFT_STICK_LEFT   13
+#define LEFT_STICK_RIGHT  14
+#define LEFT_STICK_DOWN   15
+#define LEFT_STICK_UP     16
+#define DPAD_LEFT         17
+#define DPAD_RIGHT        18
+#define DPAD_DOWN         19
+#define DPAD_UP           20
+#define RIGHT_STICK_LEFT  21
+#define RIGHT_STICK_RIGHT 22
+#define RIGHT_STICK_DOWN  23
+#define RIGHT_STICK_UP    24
+#define KEY_FULLSCREEN    25
+
+struct key_glfw *g_keys;
+uint8_t          g_keysQuantity;
+
+uint8_t g_gamepads;
+uint16_t g_lastButtonsState;
+int8_t gamepadAxes[6];
+uint8_t dpadState;
+float g_deadzone, g_maxValueDeadzoneCorrected;
+int8_t g_keyWeight;
 
 static uint8_t cceKeyFromGLFWkey (int16_t key);
 static int16_t cceKeyToGLFWkey (uint8_t key);
@@ -65,9 +108,91 @@ static uint64_t getTime__glfw (void)
    return currentTime;
 }
 
+static int keycompare (const void *__a, const void *__b)
+{
+   const struct key_glfw *a = __a;
+   const struct key_glfw *b = __b;
+   return (a->key > b->key) - (a->key < b->key);
+}
+
+// Accounts for deadzone
+#define getGamepadAxisValue(val) ((CCE_ABS(val) > g_deadzone) ? ((val - (1 - ((signbit(val) != 0) << 1)) * g_deadzone) * g_maxValueDeadzoneCorrected) : 0)
+
+// Gamepad input in glfw is terrible
+static void processGamepads (void)
+{
+   GLFWgamepadstate gamepad;
+   memset(gamepad.axes, 0, 6 * sizeof(float));
+   uint16_t buttonsState = 0;
+   for (uint8_t gamepadNum = 0, i = GLFW_JOYSTICK_1; gamepadNum < g_gamepads; ++i)
+   {
+      const uint16_t bits[15] = {CCE_BUTTON_A, CCE_BUTTON_B, CCE_BUTTON_X, CCE_BUTTON_Y, CCE_BUTTON_L, CCE_BUTTON_R, CCE_BUTTON_BACK, CCE_BUTTON_START,
+                                 0, CCE_BUTTON_STICK_L, CCE_BUTTON_STICK_R, CCE_BUTTON_DPAD_UP, CCE_BUTTON_DPAD_RIGHT, CCE_BUTTON_DPAD_DOWN, CCE_BUTTON_DPAD_LEFT}; // guide button is ignored
+      const uint16_t *bit = bits;
+      GLFWgamepadstate tmp;
+      if (glfwGetGamepadState(GLFW_JOYSTICK_1, &tmp) == GLFW_FALSE)
+         continue;
+      ++gamepadNum;
+      for (unsigned char *it = tmp.buttons, *end = tmp.buttons + GLFW_GAMEPAD_BUTTON_LAST + 1; it < end; ++it, ++bit)
+      {
+         buttonsState |= -(*it) & *bit;
+      }
+      for (float *it = tmp.axes, *jit = gamepad.axes, *end = tmp.axes + GLFW_GAMEPAD_AXIS_LAST + 1; it < end; ++it, ++jit)
+      {
+         *jit += *it;
+      }
+   }
+   const uint8_t offsets[6] = {0, 1, 4, 5, 6, 7};
+   const uint8_t *offset = offsets;
+   int8_t *lastAxeIt = gamepadAxes;
+   int8_t axis;
+   const uint16_t bits[2] = {CCE_TRIGGER_L, CCE_TRIGGER_R};
+   const uint16_t *bit = bits;
+   // GLFW for some reason treats down as 1, and up as -1 respectively (opposite is expected)
+   gamepad.axes[1] *= -1;
+   gamepad.axes[3] *= -1;
+   for (float *it = gamepad.axes, *end = gamepad.axes + 4; it < end; ++it, ++offset, ++lastAxeIt)
+   {
+      axis = getGamepadAxisValue(*it);
+      if (axis == *lastAxeIt)
+         continue;
+      cce__axes[*offset] = axis;
+      cce__axesPairChanged |= 1 << (*offset >> 1);
+      *lastAxeIt = axis;
+   }
+   if ((buttonsState ^ g_lastButtonsState) & (CCE_BUTTON_DPAD_UP | CCE_BUTTON_DPAD_RIGHT | CCE_BUTTON_DPAD_DOWN | CCE_BUTTON_DPAD_LEFT))
+   {
+      cce__axes[2] = (-((buttonsState & CCE_BUTTON_DPAD_LEFT) == CCE_BUTTON_DPAD_LEFT) & -g_keyWeight) + (-((buttonsState & CCE_BUTTON_DPAD_RIGHT) == CCE_BUTTON_DPAD_RIGHT) & g_keyWeight);
+      cce__axes[3] = (-((buttonsState & CCE_BUTTON_DPAD_DOWN) == CCE_BUTTON_DPAD_DOWN) & -g_keyWeight) + (-((buttonsState & CCE_BUTTON_DPAD_UP)    == CCE_BUTTON_DPAD_UP)    & g_keyWeight);
+      cce__axesPairChanged |= 0x2;
+   }
+   for (float *it = gamepad.axes + 4, *end = gamepad.axes + 6; it < end; ++it, ++offset, ++lastAxeIt, ++bit)
+   {
+      axis = *it * INT8_MAX;
+      buttonsState |= -(axis > 0) & *bit;
+      if (axis == *lastAxeIt)
+         continue;
+      cce__axes[*offset] = axis;
+      cce__axesPairChanged |= 1 << (*offset >> 1);
+      *lastAxeIt = axis;
+   }
+   cce__buttonsBitFieldDiff |= buttonsState ^ g_lastButtonsState;
+   g_lastButtonsState = buttonsState;
+}
+
+static void joystickCallback__glfw (int jid, int event)
+{
+   if (glfwJoystickIsGamepad(jid) == GLFW_TRUE)
+   {
+      g_gamepads += (((event & (GLFW_CONNECTED | GLFW_DISCONNECTED)) << 1) - 3);
+   }
+}
+
 static void engineUpdate__glfw (void)
 {
    glfwPollEvents();
+   if (g_gamepads > 0)
+      processGamepads();
 }
 
 static uint8_t engineShouldTerminate__glfw (void)
@@ -221,7 +346,7 @@ static struct cce_u8vec2 getAspectRatio (uint16_t width, uint16_t height)
    }
 }
 
-GLFWmonitor* getClosestMonitor (void)
+static GLFWmonitor* getClosestMonitor (void)
 {
    struct cce_i32vec4 windowProps;
    struct cce_i32vec4 monitorPos;
@@ -251,6 +376,7 @@ static void toFullscreen__glfw (void)
 {
    GLFWmonitor *monitor = getClosestMonitor();
    const GLFWvidmode *vidMode = glfwGetVideoMode(monitor);
+   glfwGetWindowPos(g_window, &g_windowLastPos.x, &g_windowLastPos.y);
    glfwGetWindowSize(g_window, &g_windowResolution.x, &g_windowResolution.y);
    switch (g_flags & CCE_SCALING)
    {
@@ -274,12 +400,9 @@ static void toFullscreen__glfw (void)
 
 static void toWindow__glfw (void)
 {
-   glfwSetWindowMonitor(g_window, NULL, 0, 0, g_windowResolution.x, g_windowResolution.y, GLFW_DONT_CARE);
+   glfwSetWindowMonitor(g_window, NULL, g_windowLastPos.x, g_windowLastPos.y, g_windowResolution.x, g_windowResolution.y, GLFW_DONT_CARE);
    g_flags &= ~CCE_FULLSCREEN;
 }
-
-static int8_t verticalControlAxis;
-static int8_t horizontalControlAxis;
 
 static void keyCallback (GLFWwindow *window, int key, int scancode, int action, int modifiers)
 {
@@ -288,44 +411,63 @@ static void keyCallback (GLFWwindow *window, int key, int scancode, int action, 
    CCE_UNUSED(scancode);
    if (action == GLFW_REPEAT)
       return;
-   switch (key)
+   struct key_glfw tofind = {key, 0};
+   struct key_glfw *keySt = (struct key_glfw*)bsearch(&tofind, g_keys, g_keysQuantity, sizeof(struct key_glfw), keycompare);
+   if (keySt != NULL)
    {
-      case GLFW_KEY_UP:
-      case GLFW_KEY_DOWN:
-         verticalControlAxis = (key * 2 - GLFW_KEY_DOWN * 2 - 1) * (action == GLFW_PRESS);
-         g_flags |= CCE_MOVE_EVENT;
-         break;
-      case GLFW_KEY_LEFT:
-      case GLFW_KEY_RIGHT:
-         horizontalControlAxis = (GLFW_KEY_RIGHT * 2 - key * 2 + 1) * (action == GLFW_PRESS);
-         g_flags |= CCE_MOVE_EVENT;
-         break;
-      case GLFW_KEY_ENTER:
-      case GLFW_KEY_X:
-         break;
-      case GLFW_KEY_RIGHT_SHIFT:
-      case GLFW_KEY_Z:
-         break;
-      case GLFW_KEY_RIGHT_CONTROL:
-      case GLFW_KEY_C:
-         break;
-      case GLFW_KEY_DELETE:
-      case GLFW_KEY_V:
-         break;
-      case GLFW_KEY_SPACE:
-         break;
-      case GLFW_KEY_TAB:
-      case GLFW_KEY_D:
-         break;
-      case GLFW_KEY_F4:
-      case GLFW_KEY_F11:
-         if (action != GLFW_PRESS)
+      uint16_t buttonfn = keySt->fn;
+      switch (buttonfn)
+      {
+         case KEY_FULLSCREEN:
+            if (action == GLFW_RELEASE)
+               return;
+            if (g_flags & CCE_FULLSCREEN)
+               toWindow__glfw();
+            else
+               toFullscreen__glfw();
             break;
-         if (g_flags & CCE_FULLSCREEN)
-            toWindow__glfw();
-         else
-            toFullscreen__glfw();
-         break;
+         case TRIGGER_L:
+         case TRIGGER_R:
+            cce__axes[6 + (buttonfn - TRIGGER_L)] = (-action & (g_keyWeight * 2)) - g_keyWeight;
+            cce__axesPairChanged |= 0x8;
+            // fallthrough
+         case BUTTON_A:
+         case BUTTON_B:
+         case BUTTON_X:
+         case BUTTON_Y:
+         case BUTTON_L:
+         case BUTTON_R:
+         case BUTTON_STICK_L:
+         case BUTTON_STICK_R:
+         case BUTTON_BACK:
+         case BUTTON_START:
+            cce__buttonsBitFieldDiff &= ~(1 << buttonfn);
+            cce__buttonsBitFieldDiff |= (-action & (1 << buttonfn)) ^ cce__buttonsBitField;
+            break;
+         case DPAD_LEFT:
+         case DPAD_RIGHT:
+         case DPAD_DOWN:
+         case DPAD_UP:
+            cce__buttonsBitFieldDiff &= ~(1 << (buttonfn - 5));
+            cce__buttonsBitFieldDiff |= (-action & (1 << (buttonfn - 5))) ^ cce__buttonsBitField;
+            // fallthrough
+         case LEFT_STICK_LEFT:
+         case LEFT_STICK_RIGHT:
+         case LEFT_STICK_DOWN:
+         case LEFT_STICK_UP:
+         case RIGHT_STICK_LEFT:
+         case RIGHT_STICK_RIGHT:
+         case RIGHT_STICK_DOWN:
+         case RIGHT_STICK_UP:
+            cce__axes[((buttonfn + 1) >> 1) - 7] = ((1 - ((buttonfn & 1) << 1)) * g_keyWeight) & -action;
+            cce__axesPairChanged |= 1 << ((((buttonfn + 1) >> 1) - 7) >> 1);
+            break;
+      }
+   }
+   if (cce__keyCallback != NULL)
+   {
+      uint8_t ccekey = cceKeyFromGLFWkey(key);
+      cce__keyCallback(ccekey, action);
    }
 }
 
@@ -355,7 +497,7 @@ int initEngine__glfw (void *data)
    glfwWindowHint(GLFW_COCOA_MENUBAR,         GLFW_FALSE);
 #endif
    if (vals->flags & CCE_SCALING)
-      glfwWindowHint(GLFW_SCALE_TO_MONITOR, GLFW_TRUE);
+      glfwWindowHint(GLFW_SCALE_TO_MONITOR,   GLFW_TRUE);
 #if defined(NDEBUG)
    glfwWindowHint(GLFW_CONTEXT_NO_ERROR,      GLFW_TRUE);
 #else
@@ -426,6 +568,8 @@ int initEngine__glfw (void *data)
    glViewport(0, 0, fbSize.x, fbSize.y);
    glfwSetKeyCallback(g_window, keyCallback);
    glfwSwapInterval((vals->flags & CCE_VERTICAL_SYNC) > 0);
+   glfwSetJoystickCallback(joystickCallback__glfw);
+   g_gamepads = 0;
    
    cce__engineBackend.screenUpdate = swapBuffers__glfw;
    cce__engineBackend.toWindow = toWindow__glfw;
@@ -435,8 +579,6 @@ int initEngine__glfw (void *data)
    cce__engineBackend.getTime = getTime__glfw;
    cceEngineShouldTerminate = engineShouldTerminate__glfw;
    cceSetEngineShouldTerminate = setEngineShouldTerminate__glfw;
-   verticalControlAxis = 0;
-   horizontalControlAxis = 0;
    return 0;
 }
 
@@ -499,7 +641,8 @@ static int iniCallback__glfw (void *data, const char *name, const char *value)
       vals->flags &= ~CCE_RESIZABLE;
       vals->flags |= -cceStringToBool(value) & CCE_RESIZABLE;
    } // vertical syncronization
-   else if (CCE_STREQ(buf, "vsync") || (CCE_MEMEQ(buf, "vertical") && (buf[8] == '\0' || (CCE_MEMEQ(it = buf + 8 + cceIsCharWhitespaceLike(buf[8]), "sync") && (it[4] == '\0' || CCE_STREQ(it + 4, "ronization"))))))
+   else if (CCE_STREQ(buf, "vsync") || (CCE_MEMEQ(buf, "vertical") && (buf[8] == '\0' || 
+           (CCE_MEMEQ(it = buf + 8 + cceIsCharWhitespaceLike(buf[8]), "sync") && (it[4] == '\0' || CCE_STREQ(it + 4, "ronization"))))))
    {
       vals->flags &= ~CCE_VERTICAL_SYNC;
       vals->flags |= -cceStringToBool(value) & CCE_VERTICAL_SYNC;
@@ -512,14 +655,77 @@ ERROR:
    return 0;
 }
 
+static int loadKeys__glfw (void *data)
+{
+   struct cce_keys *keys = data;
+   g_keysQuantity = 0;
+   for (uint8_t *it = (uint8_t*)&keys->stickL.x, *end = (uint8_t*)&keys->start.y + 1; it < end; ++it)
+   {
+      g_keysQuantity += (*it != CCE_KEY_UNKNOWN && *it != 0);
+   }
+   g_keysQuantity += 2;
+   g_keys = malloc((g_keysQuantity) * sizeof(struct key_glfw));
+   struct key_glfw *jit = g_keys;
+   uint8_t *key;
+   {
+      uint8_t keyButtons[] = {LEFT_STICK_LEFT,  LEFT_STICK_RIGHT,  LEFT_STICK_DOWN,  LEFT_STICK_UP, DPAD_LEFT, DPAD_RIGHT, DPAD_DOWN, DPAD_UP,
+                              RIGHT_STICK_LEFT, RIGHT_STICK_RIGHT, RIGHT_STICK_DOWN, RIGHT_STICK_UP};
+      key = keyButtons;
+      for (uint8_t *it = (uint8_t*)&keys->stickL.x, *end = (uint8_t*)&keys->buttonA.x; it < end; ++key, ++it)
+      {
+         if (*it == CCE_KEY_UNKNOWN || *it == 0)
+            continue;
+         jit->key = cceKeyToGLFWkey(*it);
+         jit->fn = *key;
+         ++jit;
+      }
+   }
+   uint8_t keyButtons[] = {BUTTON_A, BUTTON_B, BUTTON_X, BUTTON_Y, BUTTON_L, BUTTON_R, TRIGGER_L, TRIGGER_R, BUTTON_STICK_L, BUTTON_STICK_R, BUTTON_BACK, BUTTON_START};
+   key = keyButtons;
+   for (uint8_t *it = (uint8_t*)&keys->buttonA.x, *end = (uint8_t*)&keys->start.y + 1; it < end; ++key)
+   {
+      for (uint8_t *end2 = it + 2; it < end2; ++it)
+      {
+         if (*it == CCE_KEY_UNKNOWN || *it == 0)
+            continue;
+         jit->key = cceKeyToGLFWkey(*it);
+         jit->fn = *key;
+         ++jit;
+      }
+   }
+   g_keys[g_keysQuantity - 2] = (struct key_glfw){GLFW_KEY_F4, KEY_FULLSCREEN};
+   g_keys[g_keysQuantity - 1] = (struct key_glfw){GLFW_KEY_F11, KEY_FULLSCREEN};
+   qsort(g_keys, g_keysQuantity, sizeof(struct key_glfw), keycompare);
+   printf("Key values:\n");
+   for (struct key_glfw *it = g_keys, *end = g_keys + g_keysQuantity; it < end; ++it)
+   {
+      printf("  GLFW key %i, buttonfn %u\n", it->key, it->fn);
+   }
+   g_keyWeight = keys->keyAxisValue;
+   g_deadzone = keys->deadzone;
+   g_maxValueDeadzoneCorrected = INT8_MAX / (1.0f - keys->deadzone);
+   for (int it = GLFW_JOYSTICK_1, end = GLFW_JOYSTICK_LAST + 1; it < end; ++it)
+   {
+      g_gamepads += glfwJoystickIsGamepad(it) == GLFW_TRUE;
+   }
+   return 0;
+}
+
 void loadBackend__glfw (void)
 {
-   struct glfw_properties *props = malloc(sizeof(struct glfw_properties));
+   struct cce_keys *keys = malloc(sizeof(struct cce_keys) + sizeof(struct glfw_properties));
+   struct glfw_properties *props = (struct glfw_properties*)(keys + 1);
    props->windowName = NULL;
    props->resolution = (struct cce_u16vec2){640, 480};
    props->flags = 0;
    const char *names[4] = {"window", "windowprops", "windowproperties", NULL};
-   cceRegisterIniCallback(names, props, iniCallback__glfw, initEngine__glfw, CCE_INI_CALLBACK_FREE_DATA);
+   cceRegisterIniCallback(names, props, iniCallback__glfw, initEngine__glfw, 0);
+   memset(&keys->stickL.x, 0, (uint8_t*)&keys->start.y - (uint8_t*)&keys->stickL.x + 1);
+   keys->deadzone = 0.2f;
+   keys->keyAxisValue = INT8_MAX;
+   names[0] = "controls";
+   names[1] = NULL;
+   cceRegisterIniCallback(names, keys, cce__keyIniCallback, loadKeys__glfw, CCE_INI_CALLBACK_FREE_DATA);
 }
 
 static int16_t cceKeyToGLFWkey (uint8_t key)
@@ -536,6 +742,10 @@ static int16_t cceKeyToGLFWkey (uint8_t key)
          return GLFW_KEY_HOME;
       case CCE_KEY_END:
          return GLFW_KEY_END;
+      case CCE_KEY_TAB:
+         return GLFW_KEY_TAB;
+      case CCE_KEY_ESCAPE:
+         return GLFW_KEY_ESCAPE;
       case CCE_KEY_INSERT:
          return GLFW_KEY_INSERT;
       case CCE_KEY_DELETE:
@@ -660,6 +870,10 @@ static int16_t cceKeyToGLFWkey (uint8_t key)
          return GLFW_KEY_LEFT_SUPER;
       case CCE_KEY_RIGHT_SUPER:
          return GLFW_KEY_RIGHT_SUPER;
+      case CCE_KEY_LCONTROL:
+         return GLFW_KEY_LEFT_CONTROL;
+      case CCE_KEY_RCONTROL:
+         return GLFW_KEY_RIGHT_CONTROL;
       case CCE_KEY_NUMLOCK:
          return GLFW_KEY_NUM_LOCK;
       case CCE_KEY_CAPSLOCK:
@@ -668,6 +882,10 @@ static int16_t cceKeyToGLFWkey (uint8_t key)
          return GLFW_KEY_SCROLL_LOCK;
       case CCE_KEY_PRINTSCREEN:
          return GLFW_KEY_PRINT_SCREEN;
+      case CCE_KEY_PAUSE:
+         return GLFW_KEY_PAUSE;
+      case CCE_KEY_MENU:
+         return GLFW_KEY_MENU;
       case CCE_KEY_KP_ENTER:
          return GLFW_KEY_KP_ENTER;
       case CCE_KEY_KP_DIVIDE:
@@ -678,6 +896,8 @@ static int16_t cceKeyToGLFWkey (uint8_t key)
          return GLFW_KEY_KP_SUBTRACT;
       case CCE_KEY_KP_PLUS:
          return GLFW_KEY_KP_ADD;
+      case CCE_KEY_KP_COMMA:
+         return GLFW_KEY_KP_DECIMAL;
       case CCE_KEY_KP_0:
          return GLFW_KEY_KP_0;
       case CCE_KEY_KP_1:
@@ -748,6 +968,10 @@ static int16_t cceKeyToGLFWkey (uint8_t key)
          return GLFW_KEY_F24;
       case CCE_KEY_F25:
          return GLFW_KEY_F25;
+      case CCE_KEY_WORLD1:
+         return GLFW_KEY_WORLD_1;
+      case CCE_KEY_WORLD2:
+         return GLFW_KEY_WORLD_2;
       default:
          return GLFW_KEY_UNKNOWN;
    }
@@ -767,6 +991,10 @@ static uint8_t cceKeyFromGLFWkey (int16_t key)
          return CCE_KEY_HOME;
       case GLFW_KEY_END:
          return CCE_KEY_END;
+      case GLFW_KEY_TAB:
+         return CCE_KEY_TAB;
+      case GLFW_KEY_ESCAPE:
+         return CCE_KEY_ESCAPE;
       case GLFW_KEY_INSERT:
          return CCE_KEY_INSERT;
       case GLFW_KEY_DELETE:
@@ -891,6 +1119,10 @@ static uint8_t cceKeyFromGLFWkey (int16_t key)
          return CCE_KEY_LEFT_SUPER;
       case GLFW_KEY_RIGHT_SUPER:
          return CCE_KEY_RIGHT_SUPER;
+      case GLFW_KEY_LEFT_CONTROL:
+         return CCE_KEY_LCONTROL;
+      case GLFW_KEY_RIGHT_CONTROL:
+         return CCE_KEY_RCONTROL;
       case GLFW_KEY_NUM_LOCK:
          return CCE_KEY_NUMLOCK;
       case GLFW_KEY_CAPS_LOCK:
@@ -899,6 +1131,10 @@ static uint8_t cceKeyFromGLFWkey (int16_t key)
          return CCE_KEY_SCROLLLOCK;
       case GLFW_KEY_PRINT_SCREEN:
          return CCE_KEY_PRINTSCREEN;
+      case GLFW_KEY_PAUSE:
+         return CCE_KEY_PAUSE;
+      case GLFW_KEY_MENU:
+         return CCE_KEY_MENU;
       case GLFW_KEY_KP_ENTER:
          return CCE_KEY_KP_ENTER;
       case GLFW_KEY_KP_DIVIDE:
@@ -909,6 +1145,8 @@ static uint8_t cceKeyFromGLFWkey (int16_t key)
          return CCE_KEY_KP_MINUS;
       case GLFW_KEY_KP_ADD:
          return CCE_KEY_KP_PLUS;
+      case GLFW_KEY_KP_DECIMAL:
+         return CCE_KEY_KP_COMMA;
       case GLFW_KEY_KP_0:
          return CCE_KEY_KP_0;
       case GLFW_KEY_KP_1:
@@ -979,6 +1217,10 @@ static uint8_t cceKeyFromGLFWkey (int16_t key)
          return CCE_KEY_F24;
       case GLFW_KEY_F25:
          return CCE_KEY_F25;
+      case GLFW_KEY_WORLD_1:
+         return CCE_KEY_WORLD1;
+      case GLFW_KEY_WORLD_2:
+         return CCE_KEY_WORLD2;
       default:
          return CCE_KEY_UNKNOWN;
    }

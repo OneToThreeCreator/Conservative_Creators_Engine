@@ -46,6 +46,7 @@ void cce__terminateEngine (void);
 void cce__engineUpdate (void);
 void cce__doNothing (void);
 void cce__shortToString (char *str, const unsigned short number, const char *strEnd);
+int cce__keyIniCallback(void *data, const char *name, const char *value);
 
 extern struct cce_backend_data
 {
@@ -62,9 +63,11 @@ cce__engineBackend;
 #define cce__toWindow() cce__engineBackend.toWindow()
 #define cce__screenUpdate() cce__engineBackend.screenUpdate()
 
-extern void (*cce__moveCallback)(int16_t, int16_t);
-extern void (*cce__buttonCallback)(cce_enum, cce_enum);
-extern void (*cce__cursorCallback)(int16_t, int16_t);
+extern uint8_t  cce__axesPairChanged;
+extern int8_t   cce__axes[8];
+extern uint16_t cce__buttonsBitField;
+extern uint16_t cce__buttonsBitFieldDiff;
+extern void (*cce__keyCallback)(cce_enum key, cce_enum state);
 
 #ifdef __cplusplus
 }

@@ -39,9 +39,13 @@
 struct cce_backend_data cce__engineBackend;
 uint64_t cce__currentTime, cce__deltaTime;
 
-void (*cce__moveCallback)(int16_t, int16_t);
-void (*cce__buttonCallback)(cce_enum, cce_enum);
-void (*cce__cursorCallback)(int16_t, int16_t);
+uint16_t cce__buttonsBitFieldDiff;
+uint16_t cce__buttonsBitField;
+uint8_t  cce__axesPairChanged;
+int8_t   cce__axes[8];
+static void (*moveCallbacks[4])(int8_t, int8_t);
+static void (*buttonsCallback)(uint16_t, uint16_t);
+void (*cce__keyCallback)(cce_enum key, cce_enum state);
 
 CCE_PUBLIC_OPTIONS uint8_t (*cceEngineShouldTerminate) (void);
 CCE_PUBLIC_OPTIONS void (*cceSetEngineShouldTerminate) (uint8_t);
@@ -69,19 +73,19 @@ jmp_buf g_jumpOnIniFailure;
 #endif
 uint16_t commonIniCallbackID;
 
-CCE_PUBLIC_OPTIONS void cceRegisterMoveCallback (void (*callback)(int16_t, int16_t))
+CCE_PUBLIC_OPTIONS void cceSetAxisChangeCallback (void (*callback)(int8_t, int8_t), cce_enum axePair)
 {
-   cce__moveCallback = callback;
+   moveCallbacks[axePair] = callback;
 }
 
-CCE_PUBLIC_OPTIONS void cceRegisterButtonCallback (void (*callback)(cce_enum, cce_enum))
+CCE_PUBLIC_OPTIONS void cceSetButtonCallback (void (*callback)(uint16_t buttonState, uint16_t diff))
 {
-   cce__buttonCallback = callback;
+   buttonsCallback = callback;
 }
 
-CCE_PUBLIC_OPTIONS void cceRegisterCursorCallback (void (*callback)(int16_t, int16_t))
+CCE_PUBLIC_OPTIONS void cceSetKeyCallback (void (*callback)(cce_enum key, cce_enum state))
 {
-   cce__cursorCallback = callback;
+   cce__keyCallback = callback;
 }
 
 CCE_PUBLIC_OPTIONS uint16_t cceRegisterIniCallback (const char **lowercasenames, void *data, int (*callback)(void*, const char*, const char*), int (*init)(void*), uint8_t flags)
@@ -181,21 +185,19 @@ static int iniHandler (void *data, const char *section, const char *name, const 
             {
                it->flags &= ~CCE_INI_CALLBACK_DO_NOT_INIT;
                it->flags |= ((cceStringToBool(value) && it->init != NULL) - 1) & CCE_INI_CALLBACK_DO_NOT_INIT;
-               return 0;
+               return 1;
             }
-            else
+            it->flags |= CCE_INI_CALLBACK_TO_BE_INITIALIZED;
+            if (it->fn(it->data, name, value) != 0)
             {
-               it->flags |= CCE_INI_CALLBACK_TO_BE_INITIALIZED;
-               if (it->fn(it->data, name, value) != 0)
-               {
-                  #ifdef INIH_LOCAL
-                  return -1;
-                  #else
-                  longjmp(g_jumpOnIniFailure, -1);
-                  #endif
-               }
+               printf("nonzero value returned by %s\n", it->names[0].str);
+               #ifdef INIH_LOCAL
                return 0;
+               #else
+               longjmp(g_jumpOnIniFailure, -1);
+               #endif
             }
+            return 1;
          }
       }
    }
@@ -206,22 +208,26 @@ static int iniHandler (void *data, const char *section, const char *name, const 
 static int parseGameINI (const char *path)
 {
    int result = 0;
-   char *buf = malloc(iniCallbackLongestName + 1);
    const char *names[3] = {"commonproperties", "baseproperties", NULL};
    commonIniCallbackID = cceRegisterIniCallback((void*)names, (void*)path, iniCallback, NULL, 0);
-#ifndef INIH_LOCAL
-   if (setjmp(g_jumpOnIniFailure) == 0)
+   FILE* file = fopen(path, "r");
+   if (file == NULL)
    {
-      ini_parse(path, iniHandler, buf);
+      fprintf(stderr, "ENGINE::INI::FILE_NOT_FOUND:\n%s - file can't be opened with fopen\n", path);
+      return -1;
+   }
+   char* buf = malloc(iniCallbackLongestName + 1);
+#ifndef INIH_LOCAL
+   if (setjmp(g_jumpOnIniFailure) == 0 && ini_parse_file(file, iniHandler, buf) == 0)
+   {
 #else
-   if (ini_parse(path, iniHandler, buf) == 0)
+   if (ini_parse_file(file, iniHandler, buf) == 0)
    {
 #endif
       for (struct cce__callbackData *it = iniCallbacks, *end = iniCallbacks + iniCallbacksQuantity; it < end; ++it)
       {
          if ((it->flags & (CCE_INI_CALLBACK_DO_NOT_INIT | CCE_INI_CALLBACK_TO_BE_INITIALIZED)) == CCE_INI_CALLBACK_TO_BE_INITIALIZED)
             it->init(it->data);
-         
          if (it->flags & CCE_INI_CALLBACK_FREE_DATA)
             free(it->data);
       }
@@ -237,6 +243,7 @@ static int parseGameINI (const char *path)
       }
    }
    free(buf);
+   fclose(file);
    return result;
 }
 
@@ -244,9 +251,13 @@ void loadBackend__glfw (void);
 
 int cce__initEngine (const char *path)
 {
-   cce__moveCallback = NULL;
-   cce__buttonCallback = NULL;
-   cce__cursorCallback = NULL;
+   moveCallbacks[0] = NULL;
+   moveCallbacks[1] = NULL;
+   moveCallbacks[2] = NULL;
+   moveCallbacks[3] = NULL;
+   buttonsCallback = NULL;
+   cce__buttonsBitField = 0;
+   cce__buttonsBitFieldDiff = 0;
    // We have only one api yet
    cceInitEndianConversion();
    loadBackend__glfw();
@@ -260,6 +271,20 @@ int cce__initEngine (const char *path)
 void cce__engineUpdate (void)
 {
    cce__engineBackend.engineUpdate();
+   if (cce__buttonsBitFieldDiff != 0)
+   {
+      cce__buttonsBitField ^= cce__buttonsBitFieldDiff;
+      if (buttonsCallback != NULL)
+         buttonsCallback(cce__buttonsBitField, cce__buttonsBitFieldDiff);
+      cce__buttonsBitFieldDiff = 0;
+   }
+   if (cce__axesPairChanged != 0)
+   {
+      void (**moveCallbackIt)(int8_t, int8_t) = moveCallbacks;
+      for (int8_t *it = cce__axes, *end = cce__axes + 8; it < end; it += 2, ++moveCallbackIt, cce__axesPairChanged >>= 1)
+         if ((cce__axesPairChanged & 1) && *moveCallbackIt != NULL)
+            (*moveCallbackIt)(it[0], it[1]);
+   }
 }
 
 void cce__terminateEngine (void)

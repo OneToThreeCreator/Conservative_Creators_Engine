@@ -104,6 +104,9 @@
 #define CCE_KEY_CAPSLOCK      0x40
 #define CCE_KEY_SCROLLLOCK    0x5F
 
+#define CCE_KEY_WORLD1        0x69
+#define CCE_KEY_WORLD2        0x77
+
 #define CCE_KEY_KP_ENTER      0x8A
 #define CCE_KEY_KP_DIVIDE     0xAF /*/*/
 #define CCE_KEY_KP_MULTIPLY   0xAA /***/
@@ -177,8 +180,11 @@
 
 struct cce_keys
 {
-   struct cce_u8vec2 horizontalAxis;
-   struct cce_u8vec2 verticalAxis;
+   float deadzone;
+   int8_t keyAxisValue;
+   struct cce_u8vec4 stickL;
+   struct cce_u8vec4 dpad;
+   struct cce_u8vec4 stickR;
    struct cce_u8vec2 buttonA;
    struct cce_u8vec2 buttonB;
    struct cce_u8vec2 buttonX;
@@ -187,15 +193,15 @@ struct cce_keys
    struct cce_u8vec2 buttonR;
    struct cce_u8vec2 triggerL;
    struct cce_u8vec2 triggerR;
-   struct cce_u8vec2 select;
+   struct cce_u8vec2 back;
    struct cce_u8vec2 start;
 };
 
-uint8_t cceKeyFromName (const char *name);
+CCE_PUBLIC_OPTIONS uint8_t cceKeyFromName (const char *name);
 #define cceStringToKey(str) cceKeyFromName(str)
 #define cceStringToKeys1(str) ((struct cce_u8vec1){cceKeyFromName(str)})
-struct cce_u8vec2 cceStringToKeys2 (const char *str);
-struct cce_u8vec3 cceStringToKeys3 (const char *str);
-struct cce_u8vec4 cceStringToKeys4 (const char *str);
+CCE_PUBLIC_OPTIONS struct cce_u8vec2 cceStringToKeys2 (const char *str);
+CCE_PUBLIC_OPTIONS struct cce_u8vec3 cceStringToKeys3 (const char *str);
+CCE_PUBLIC_OPTIONS struct cce_u8vec4 cceStringToKeys4 (const char *str);
 
 #endif // ENGINE_COMMON_KEYBOARD_H

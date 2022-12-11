@@ -396,7 +396,7 @@ CCE_PUBLIC_OPTIONS int cceSetCurrentPath (const char *path)
 CCE_PUBLIC_OPTIONS char* cceGetCurrentPath (size_t spaceToLeave)
 {
    char *path = malloc(MAX_PATH * sizeof(char));
-   size_t len = GetCurrentDirectoryA(size, path);
+   size_t len = GetCurrentDirectoryA(MAX_PATH, path);
    if (len == 0)
    {
       free(path);

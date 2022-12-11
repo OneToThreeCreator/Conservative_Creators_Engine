@@ -27,6 +27,16 @@
 #include <cce/map2D/map2D.h>
 #include <cce/os_interaction.h>
 
+void axisCallback (int8_t horizontal, int8_t vertical)
+{
+   printf("Left stick position changed to %i %i\n", horizontal, vertical);
+}
+
+void buttonCallback (uint16_t buttonsSet, uint16_t diff)
+{
+   printf("Set buttons 0x%x (diff 0x%x)\n", buttonsSet, diff);
+}
+
 int main (int argc, char **argv)
 {
    char *path;
@@ -45,7 +55,7 @@ int main (int argc, char **argv)
       }
       cceSetCurrentPath(argv[0]);
    }
-   if (cceInitEngine2D("./test2/game.ini") != 0)
+   if (cceInitEngine2D("test2/game.ini") != 0)
    {
       free(path);
       printf("Initialization failure\n");
@@ -53,6 +63,8 @@ int main (int argc, char **argv)
    }
    struct cce_buffer *map = cceLoadMap2Ddynamic("/NULL.c2m");
    cceRenderingLayerSetMap2D(0, 0, map);
+   cceSetAxisChangeCallback(axisCallback, CCE_AXISPAIR_LSTICK);
+   cceSetButtonCallback(buttonCallback);
    printf("Initialization complete\n");
    while (cceEngineShouldTerminate() == 0)
    {

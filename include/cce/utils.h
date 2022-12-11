@@ -145,9 +145,6 @@ struct UnicodeCharWithSize
    uint32_t size;
 };
 
-CCE_PUBLIC_OPTIONS const void* cceBinarySearchFirstAscending  (const void *array, size_t arraySize, size_t typeSize, size_t step, size_t value);
-CCE_PUBLIC_OPTIONS const void* cceBinarySearchFirstDescending (const void *array, size_t arraySize, size_t typeSize, size_t step, size_t value);
-CCE_PUBLIC_OPTIONS const void* cceBinarySearchCMP             (const void *array, size_t arraySize, size_t step, int (*cmp)(const void*, const void*), const void *value);
 CCE_PUBLIC_OPTIONS char*    cceReverseMemory (char *memory, size_t size);
 CCE_PUBLIC_OPTIONS uint32_t cceGetCharSizeUTF8 (const unsigned char *ch);
 CCE_PUBLIC_OPTIONS uint32_t cceGetCharUTF8 (const unsigned char *ch);
@@ -157,6 +154,10 @@ CCE_PUBLIC_OPTIONS uint8_t  cceCeilToPowerOfTwoInt8 (uint8_t x);
 CCE_PUBLIC_OPTIONS uint16_t cceCeilToPowerOfTwoInt16 (uint16_t x);
 CCE_PUBLIC_OPTIONS uint32_t cceCeilToPowerOfTwoInt32 (uint32_t x);
 CCE_PUBLIC_OPTIONS uint64_t cceCeilToPowerOfTwoInt64 (uint64_t x);
+CCE_PUBLIC_OPTIONS uint8_t  cceU8Pow  (uint8_t base,  uint8_t exponent);
+CCE_PUBLIC_OPTIONS uint16_t cceU16Pow (uint16_t base, uint16_t exponent);
+CCE_PUBLIC_OPTIONS uint32_t cceU32Pow (uint32_t base, uint32_t exponent);
+CCE_PUBLIC_OPTIONS uint64_t cceU64Pow (uint64_t base, uint64_t exponent);
 CCE_PUBLIC_OPTIONS uint8_t  cceKeepHighBitInt8 (uint8_t x);
 CCE_PUBLIC_OPTIONS uint16_t cceKeepHighBitInt16 (uint16_t x);
 CCE_PUBLIC_OPTIONS uint32_t cceKeepHighBitInt32 (uint32_t x);

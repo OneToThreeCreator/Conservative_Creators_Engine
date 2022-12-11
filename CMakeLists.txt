@@ -56,7 +56,7 @@ add_library(cce ${CCE_LIB_TYPE}
    include/cce/utils.h
    src/platform/engine_common_glfw.c
    src/platform/engine_common_keyboard.c
-   src/platform/engine_common_keyboard.h
+   include/cce/engine_common_keyboard.h
    src/platform/os_interaction.c
    include/cce/os_interaction.h
    src/platform/platforms.h
