@@ -27,6 +27,7 @@ ctest --test-dir ./build
 
 # Building on Windows:
 Required programs: cmake, python, git, any compiler (be it gcc, clang, msvc...)
+Windows SDK must be installed (From Windows 7 up to Windows 11). You can install it from visual studio or separately.
 ```
 # Initialize submodules
 git submodule update --init
