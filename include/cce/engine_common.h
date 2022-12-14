@@ -53,13 +53,6 @@ CCE_VEC_STS(cce_u64, uint64_t);
 CCE_VEC_STS(cce_i64, int64_t);
 CCE_VEC_STS(cce_f64, double);
 
-struct cce_texture2D
-{
-   struct cce_u16vec2 position;
-   struct cce_u16vec2 size;
-   uint16_t ID; /* 0 is no texture */
-};
-
 struct cce_timer
 {
    uint64_t initTime;

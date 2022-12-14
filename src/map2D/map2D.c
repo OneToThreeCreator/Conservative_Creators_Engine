@@ -135,12 +135,12 @@ CCE_PUBLIC_OPTIONS void cceRenderingLayerSetMap2D (uint8_t layer, uint8_t mapLay
 
 CCE_PUBLIC_OPTIONS void cceRenderMap2D (void)
 {
+   cce__screenUpdate(); // Sync only between draw calls
    cce__drawMap2D(g_layers, g_layersQuantity);
 }
 
 CCE_PUBLIC_OPTIONS void cceUpdateEngineMap2D (void)
 {
-   cce__screenUpdate();
    cce__engineUpdate();
 }
 

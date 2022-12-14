@@ -282,7 +282,7 @@ CCE_PUBLIC_OPTIONS int cceWriteBinaryCCF (struct cce_buffer *buffer, char *path)
    }
    fseek(file, 0, SEEK_SET);
    fwrite(&headSize, sizeof(uint8_t), 1, file);
-   fwrite(sectionSizes, sizeof(uint8_t), buffer->sectionsQuantity, file);
+   fwrite(sectionSizes + 1, sizeof(uint8_t), buffer->sectionsQuantity, file);
    fclose(file);
    return 0;
 }

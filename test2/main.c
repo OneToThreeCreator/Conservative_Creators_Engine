@@ -62,6 +62,10 @@ int main (int argc, char **argv)
       return -1;
    }
    struct cce_buffer *map = cceLoadMap2Ddynamic("/NULL.c2m");
+   cceWriteMap2Ddynamic(map, "/tmp/test.c2m");
+   cceFreeMap2Ddynamic(map);
+   map = cceLoadMap2D("/tmp/test.c2m");
+   remove("/tmp/test.c2m");
    cceRenderingLayerSetMap2D(0, 0, map);
    cceSetAxisChangeCallback(axisCallback, CCE_AXISPAIR_LSTICK);
    cceSetButtonCallback(buttonCallback);

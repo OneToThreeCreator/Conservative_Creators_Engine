@@ -22,14 +22,12 @@ char     soundNames     [soundsNamesSize]
 GAME-SPECIFIC_RESOURCES [SPECIFIC_RESOURCES_NAMES_SIZE]
 
 RENDERING_INFORMATION:
-uint16_t elementDataQuantity
-uint16_t textureDataQuantity
+uint16_t elementInfoQuantity
 uint32_t elementsTotal
 uint32_t elementsQuantity               [renderingInformationHeadSize]
 
+struct ElementInfo          elementInfo [elementInfoQuantity]
 struct Map2DElementPosition elements    [elementsQuantity][headSize]
-struct Map2DElementData     elementData [elementDataQuantity]
-struct Texture2D            textureData [textureDataQuantity]
 
 COLLIDER_INFORMATION:
 uint32_t              collidersQuantity

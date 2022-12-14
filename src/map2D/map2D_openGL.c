@@ -48,7 +48,6 @@ struct RenderingData
    GLuint metaDataTexture;
    uint32_t elementBufferSize;
    uint16_t textureInfoQuantity;
-   uint16_t elementDataQuantity;
 };
 
 static const struct LoadedTextures **g_textures;
@@ -56,10 +55,8 @@ static GLuint   glTexturesArray;
 static GLuint   glOldTexturesArray;
 static GLuint   glTemporaryFBO;
 static GLuint   shaderProgram;
-static GLuint   g_VAO, g_VBO, g_UBO;
-static GLint   *bufferUniformsOffsets;
+static GLuint   g_VAO, g_VBO;
 static GLint   *uniformLocations;
-static GLint    g_uniformBufferSize;
 
 static void cce__openGLErrorPrint (GLenum error, size_t line, const char *file)
 {
@@ -127,8 +124,6 @@ static void drawMap2D__openGL (struct RenderingData **maps, uint32_t mapsQuantit
    GL_CHECK_ERRORS;
    glBindVertexArray(g_VAO);
    GL_CHECK_ERRORS;
-   glBindBufferRange(GL_UNIFORM_BUFFER, 1u, g_UBO, 0u, g_uniformBufferSize);
-   GL_CHECK_ERRORS;
    glActiveTexture(GL_TEXTURE0);
    GL_CHECK_ERRORS;
    glBindTexture(GL_TEXTURE_2D_ARRAY, glTexturesArray);
@@ -149,34 +144,6 @@ static void drawMap2D__openGL (struct RenderingData **maps, uint32_t mapsQuantit
       glDrawArraysInstanced(GL_TRIANGLE_STRIP, 0, 4, (**iterator).elementBufferSize);
       GL_CHECK_ERRORS;
    }
-}
-
-static void setUniformBufferToDefault (GLuint UBO)
-{
-   glBindBuffer(GL_UNIFORM_BUFFER, UBO);
-   do
-   {
-      GL_CHECK_ERRORS;
-      cce_void *uboData = glMapBuffer(GL_UNIFORM_BUFFER, GL_WRITE_ONLY);
-      GL_CHECK_ERRORS;
-      memset(uboData + bufferUniformsOffsets[CCE_TEXTUREOFFSET_OFFSET], 0, sizeof(GLint) * 2 * 256);
-      memset(uboData + bufferUniformsOffsets[CCE_OFFSET_OFFSET], 0, sizeof(GLint) * 2 * 256);
-      for (struct cce_f32vec4 *iterator = (struct cce_f32vec4*)(uboData + bufferUniformsOffsets[CCE_COLORGROUP_OFFSET]), *end = iterator + 128; iterator < end; ++iterator)
-      {
-         *iterator = (struct cce_f32vec4) {1.0f, 1.0f, 1.0f, 1.0f};
-      }
-      struct mat2x4
-      {
-         float data[8];
-      };
-      struct mat2x4 unitMatrix = {{1, 0, 0, 0, 0, 1, 0, 0}};
-      for (struct mat2x4 *iterator = (struct mat2x4*) (uboData + bufferUniformsOffsets[CCE_TRANSFORMGROUP_OFFSET]), *end = iterator + 257; iterator < end; ++iterator)
-      {
-         *iterator = unitMatrix;
-      }
-   }
-   while (glUnmapBuffer(GL_UNIFORM_BUFFER) == GL_FALSE);
-   GL_CHECK_ERRORS;
 }
 
 static GLuint createTextureArray (uint16_t newSize)
@@ -247,8 +214,7 @@ static void resizeTextureArrayEnd__openGL_no_ext (void)
 }
 
 static struct RenderingData* map2DElementsToRenderingBuffer__openGL (const struct Map2DElementPositionArray *elements, uint8_t layersQuantity,
-                                                                     const struct cce_texture2D *textureInfo, uint16_t textureInfoQuantity,
-                                                                     const struct Map2DElementData *elementData, uint16_t elementDataQuantity)
+                                                                     const struct ElementInfo *info, uint16_t textureInfoQuantity)
 {
    GLuint elementsBuffers[256];
    GLuint textures[256];
@@ -262,7 +228,7 @@ static struct RenderingData* map2DElementsToRenderingBuffer__openGL (const struc
    {
       glBindBuffer(GL_TEXTURE_BUFFER, *ebiterator);
       GL_CHECK_ERRORS;
-      glBufferData(GL_TEXTURE_BUFFER, elements->dataQuantity * sizeof(struct Map2DElementPosition), NULL, GL_STATIC_DRAW);
+      glBufferData(GL_TEXTURE_BUFFER, elements->dataQuantity * sizeof(struct Map2DElementPosition), NULL, GL_DYNAMIC_DRAW); // Expected to be modified
       GL_CHECK_ERRORS;
       do
       {
@@ -272,8 +238,8 @@ static struct RenderingData* map2DElementsToRenderingBuffer__openGL (const struc
          {
             iterator->x = element->position.x;
             iterator->y = element->position.y;
-            iterator->z = element->elementDataID - (1 << (sizeof(uint16_t) * 8 - 1)); // We need to get it back as unsigned in glsl (simple reinterpret cast don't work - glsl don't have 16-bit types)
-            iterator->w = element->textureDataID - (1 << (sizeof(uint16_t) * 8 - 1));
+            iterator->z = (element->rotation | (element->textureDataOffsetGroup << 8)) - (1 << (sizeof(uint16_t) * 8 - 1));
+            iterator->w = element->textureDataID - (1 << (sizeof(uint16_t) * 8 - 1)); // We need to get it back as unsigned in glsl (simple reinterpret cast won't work - glsl doesn't have 16-bit types)
          }
       }
       while (glUnmapBuffer(GL_TEXTURE_BUFFER) == GL_FALSE);
@@ -283,7 +249,6 @@ static struct RenderingData* map2DElementsToRenderingBuffer__openGL (const struc
       GL_CHECK_ERRORS;
       diterator->elementBufferSize = elements->dataQuantity;
       diterator->textureInfoQuantity = textureInfoQuantity;
-      diterator->elementDataQuantity = elementDataQuantity;
       diterator->elementBuffer = *ebiterator;
       diterator->elementTexture = *titerator;
       diterator->metaDataBuffer = elementsBuffers[0];
@@ -292,34 +257,32 @@ static struct RenderingData* map2DElementsToRenderingBuffer__openGL (const struc
    
    glBindBuffer(GL_TEXTURE_BUFFER, elementsBuffers[0]);
    GL_CHECK_ERRORS;
-   glBufferData(GL_TEXTURE_BUFFER, (textureInfoQuantity + elementDataQuantity) * 8, NULL, GL_STATIC_DRAW);
+   glBufferData(GL_TEXTURE_BUFFER, (textureInfoQuantity) * 8, NULL, GL_STATIC_DRAW); // Rarely modified
    GL_CHECK_ERRORS;
-   uint16_t  positionY;
-   uint16_t *iterator;
-   if (textureInfoQuantity + elementDataQuantity > 0)
+   struct cce_u16vec4 *iterator;
+   if (textureInfoQuantity > 0)
    {
       do
       {
          iterator = glMapBuffer(GL_TEXTURE_BUFFER, GL_WRITE_ONLY);
          GL_CHECK_ERRORS;
-         for (uint16_t *end = iterator + elementDataQuantity * 4; iterator < end; iterator += 4, ++elementData)
+         for (struct cce_u16vec4 *end = iterator + textureInfoQuantity; iterator < end; ++iterator, ++info)
          {
-            iterator[0] = (elementData->size.x                    << 8) | elementData->transformGroups[0];
-            iterator[1] = (elementData->size.y                    << 8) | elementData->transformGroups[1];
-            iterator[2] = (elementData->textureOffsetGroup        << 8) | elementData->transformGroups[2];
-            iterator[3] = (elementData->colorGroupAndGlobalOffset << 8) | elementData->transformGroups[3];
+            if (info->textureID == 0) // Fragment has fixed color if no texture is applied
+            {
+               iterator->x = (info->data.rgba.x << 8) | info->data.rgba.y;
+               iterator->y = (info->data.rgba.z << 8) | (info->size.x & 0xFF);
+               iterator->w = info->data.rgba.w;
+            }
+            else
+            {
+               iterator->x = (info->data.texturePosition.x & 0xFFF) | ((info->data.texturePosition.y << 4) & 0xF000);
+               iterator->y = ((info->data.texturePosition.y & 0xFF) << 8) | (info->size.x & 0xFF);
+               iterator->w = info->textureID + 255;
+            }
+            iterator->z = ((info->size.x << 4) & 0xF000) | (info->size.y & 0xFFF);
          }
-         for (uint16_t *jiterator = iterator + textureInfoQuantity * 4; jiterator > iterator; ++textureInfo)
-         {
-            jiterator -= 4;
-            positionY = (*g_textures)[textureInfo->ID].size.y - (textureInfo->position.y + textureInfo->size.y);
-            jiterator[0] = (textureInfo->position.x & 0xFFF) | (textureInfo->size.y << 12);
-            jiterator[1] = (positionY               & 0xFFF) | ((textureInfo->size.y << 8) & 0xF);
-            jiterator[2] = (textureInfo->size.x     & 0xFFF) | ((textureInfo->size.y << 4) & 0xF);
-            jiterator[3] = textureInfo->ID;
-         }
-         elementData -= elementDataQuantity;
-         textureInfo -= textureInfoQuantity;
+         info -= textureInfoQuantity;
       }
       while (glUnmapBuffer(GL_TEXTURE_BUFFER) != GL_TRUE);
    }
@@ -329,57 +292,6 @@ static struct RenderingData* map2DElementsToRenderingBuffer__openGL (const struc
    GL_CHECK_ERRORS;
    return data;
 }
-
-/*
-static struct ElementInfo* renderingBufferToMap2DElements__openGL (struct RenderingData *data)
-{
-   struct ElementInfo *result = malloc(sizeof(struct ElementInfo) + data->elementBufferSize * sizeof(struct Map2DElementPosition)
-                                                                  + data->elementDataQuantity * sizeof(struct Map2DElementData)
-                                                                  + data->textureInfoQuantity * sizeof(struct cce_texture2D));
-   result->elementsQuantity = data->elementBufferSize;
-   result->elementDataQuantity = data->elementDataQuantity;
-   result->textureInfoQuantity = data->textureInfoQuantity;
-   result->elements = (struct Map2DElementPosition*)(result + 1);
-   result->elementData = (struct Map2DElementData*)(result->elements + result->elementsQuantity);
-   result->textureInfo = (struct cce_texture2D*)(result->elementData + result->elementDataQuantity);
-   glBindBuffer(GL_TEXTURE_BUFFER, data->elementBuffer);
-   glGetBufferSubData(GL_TEXTURE_BUFFER, 0, result->elementsQuantity * sizeof(struct Map2DElementPosition), result->elements);
-   glBindBuffer(GL_TEXTURE_BUFFER, data->metaDataBuffer);
-   {
-      struct GLdata
-      {
-         uint16_t data[4];
-      };
-      struct GLdata *iterator = glMapBuffer(GL_TEXTURE_BUFFER, GL_READ_ONLY);
-      struct Map2DElementData *elementData = result->elementData;
-      struct GLdata buf;
-      for (struct GLdata *end = iterator + result->elementDataQuantity; iterator < end; ++iterator, ++elementData)
-      {
-         buf = *iterator;
-         elementData->size.x = buf.data[0] >> 8;
-         elementData->transformGroups[0] = buf.data[0] & UINT8_MAX;
-         elementData->size.y = buf.data[1] >> 8;
-         elementData->transformGroups[1] = buf.data[1] & UINT8_MAX;
-         elementData->textureOffsetGroup = buf.data[2] >> 8;
-         elementData->transformGroups[2] = buf.data[2] & UINT8_MAX;
-         elementData->colorGroupAndGlobalOffset = buf.data[3] >> 8;
-         elementData->transformGroups[3] = buf.data[3] & UINT8_MAX;
-      }
-      struct cce_texture2D *textureInfo = result->textureInfo;
-      for (struct GLdata *jiterator = iterator + result->textureInfoQuantity - 1; jiterator >= iterator; --jiterator, ++textureInfo)
-      {
-         buf = *jiterator;
-         textureInfo->position.x = buf.data[0] & 0xFFF;
-         textureInfo->position.y = buf.data[1] & 0xFFF;
-         textureInfo->size.x     = buf.data[2] & 0xFFF;
-         textureInfo->size.y     = buf.data[0] & 0xF000 | (buf.data[1] & 0xF000) >> 4 | (buf.data[2] & 0xF000) >> 8;
-         textureInfo->ID         = buf.data[3];
-      }
-      glUnmapBuffer(GL_TEXTURE_BUFFER);
-   }
-   return result;
-}
-*/
 
 static void deleteMap2DRenderingBuffer__openGL (struct RenderingData *data)
 {
@@ -419,17 +331,13 @@ static void loadTexture__openGL (void *data, uint16_t width, uint16_t height, ui
 void terminateMap2DRenderer__openGL (void)
 {
    free(uniformLocations);
-   free(bufferUniformsOffsets);
    if (GLAD_GL_NV_copy_image == 0)
    {
       glDeleteFramebuffers(1, &glTemporaryFBO);
       GL_CHECK_ERRORS;
    }
-   {
-      GLuint buffers[2] = {g_UBO, g_VBO};
-      glDeleteBuffers(2, buffers);
-      GL_CHECK_ERRORS;
-   }
+   glDeleteBuffers(1, &g_VBO);
+   GL_CHECK_ERRORS;
    glDeleteVertexArrays(1, &g_VAO);
    glDeleteTextures(1, &glTexturesArray);
    glDeleteProgram(shaderProgram);
@@ -448,7 +356,7 @@ int initMap2DRenderer__openGL (const struct LoadedTextures **textures, struct Re
       if (shaderProgram == 0u)
       #endif // SYSTEM_RESOURCE_PATH
       {
-         shaderProgram = cce__makeVFshaderProgram("./shaders/vertex_shader.glsl", "./shaders/fragment_shader.glsl", vertexShaderAdditionalString, NULL);
+         shaderProgram = cce__makeVFshaderProgram("shaders/vertex_shader.glsl", "shaders/fragment_shader.glsl", vertexShaderAdditionalString, NULL);
       }
    }
    if (!shaderProgram)
@@ -460,32 +368,10 @@ int initMap2DRenderer__openGL (const struct LoadedTextures **textures, struct Re
    GL_CHECK_ERRORS;
    *(uniformLocations) = glGetUniformLocation(shaderProgram, "ViewMatrix");
    GL_CHECK_ERRORS;
-   {
-      const GLchar *uniformNames[] = {"Transform", "Offset", "Colors", "TextureOffset"};
-      GLuint indices[4];
-      glGetUniformIndices(shaderProgram, 4, uniformNames, indices);
-      GL_CHECK_ERRORS;
-      bufferUniformsOffsets = (GLint*) malloc(4 * sizeof(GLint));
-      glGetActiveUniformsiv(shaderProgram, 4, indices, GL_UNIFORM_OFFSET, bufferUniformsOffsets);
-      GL_CHECK_ERRORS;
-      glUniformBlockBinding(shaderProgram, glGetUniformBlockIndex(shaderProgram, "Variables"), 1u);
-      GL_CHECK_ERRORS;
-      g_uniformBufferSize = bufferUniformsOffsets[2] + sizeof(GLint) * 2 * 256;
-   }
    glUseProgram(shaderProgram);
    GL_CHECK_ERRORS;
-   {
-      GLuint buffers[2];
-      glGenBuffers(2, buffers);
-      GL_CHECK_ERRORS;
-      g_UBO = buffers[0];
-      g_VBO = buffers[1];
-   }
-   glBindBuffer(GL_UNIFORM_BUFFER, g_UBO);
+   glGenBuffers(1, &g_VBO);
    GL_CHECK_ERRORS;
-   glBufferData(GL_UNIFORM_BUFFER, (g_uniformBufferSize), NULL, GL_DYNAMIC_DRAW);
-   GL_CHECK_ERRORS;
-   setUniformBufferToDefault(g_UBO);
    glEnable(GL_BLEND);
    GL_CHECK_ERRORS;
    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);

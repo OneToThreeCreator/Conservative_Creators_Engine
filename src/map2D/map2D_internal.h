@@ -77,46 +77,46 @@ struct Map2Darray
 struct Map2DElementPosition
 {
    struct cce_i16vec2 position;
-   uint16_t           elementDataID;
+   uint8_t            rotation;
+   uint8_t            textureDataOffsetGroup;
    uint16_t           textureDataID;
 };
 
 CCE_ARRAY_STRUCT(Map2DElementPositionArray, struct Map2DElementPosition, uint32_t);
-
-struct Map2DElementData
-{
-   struct cce_u8vec2 size;
-   uint8_t           transformGroups[4];
-   uint8_t           textureOffsetGroup;
-   uint8_t           colorGroupAndGlobalOffset;
-};
 
 struct RenderingInfo
 {
    struct RenderingData *data;
 };
 
+/*
+struct cce_texture2D
+{
+   struct cce_u16vec2 position;
+   struct cce_u16vec2 size;
+   uint16_t ID; // 0 is no texture
+};
+*/
+
 struct ElementInfo
 {
-   struct Map2DElementPositionArray *elements;
-   struct cce_texture2D             *textureInfo;
-   struct Map2DElementData          *elementData;
-   uint8_t                           layersQuantity;
-   uint16_t                          textureInfoQuantity;
-   uint16_t                          elementDataQuantity;
+   union
+   {
+      struct cce_u16vec2 texturePosition;
+      struct cce_u8vec4  rgba;
+   } data;
+   struct cce_u16vec2 size;
+   uint16_t textureID;
 };
 
 struct DynamicRenderingInfo
 {
    struct RenderingData             *data;
    struct Map2DElementPositionArray *elements;
-   struct cce_texture2D             *textureInfo;
-   struct Map2DElementData          *elementData;
+   struct ElementInfo               *info;
+   uint16_t                          infoQuantity;
    uint8_t                           layersQuantity;
-   uint16_t                          textureInfoQuantity;
-   uint16_t                          elementDataQuantity;
-   uint16_t                          textureInfoAllocated;
-   uint16_t                          elementDataAllocated;
+   uint16_t                          infoAllocated;
 };
 
 struct CollisionInfo
@@ -198,8 +198,7 @@ struct RendereringFunctions
 {
    void (*drawMap2D)(struct RenderingData**, uint32_t);
    struct RenderingData* (*map2DElementsToRenderingBuffer)(const struct Map2DElementPositionArray *elements, uint8_t layersQuantity,
-                                                           const struct cce_texture2D *textureInfo, uint16_t textureInfoQuantity,
-                                                           const struct Map2DElementData *elementData, uint16_t elementDataQuantity);
+                                                           const struct ElementInfo *elementInfo, uint16_t elementInfoQuantity);
    struct ElementInfo* (*renderingBufferToMap2DElements) (struct RenderingData *data);
    size_t (*getRenderingDataSize) (void);
    struct RenderingData* (*createElementsBuffer)(size_t);
@@ -221,8 +220,8 @@ extern uint16_t cce__texturesQuantity;
 extern uint16_t cce__staticMapFunctionSet, cce__dynamicMapFunctionSet;
 
 #define cce__drawMap2D(maps, mapsQuantity) cce__renderingFunctions.drawMap2D(maps, mapsQuantity)
-#define cce__map2DElementsToRenderingBuffer(elements, layersQuantity, textureInfo, textureInfoQuantity, elementData, elementDataQuantity) \
-cce__renderingFunctions.map2DElementsToRenderingBuffer(elements, layersQuantity, textureInfo, textureInfoQuantity, elementData, elementDataQuantity)
+#define cce__map2DElementsToRenderingBuffer(elements, layersQuantity, textureInfo, textureInfoQuantity) \
+cce__renderingFunctions.map2DElementsToRenderingBuffer(elements, layersQuantity, textureInfo, textureInfoQuantity)
 #define cce__renderingBufferToMap2DElements(data) cce__renderingFunctions.renderingBufferToMap2DElements(data)
 #define cce__getRenderingDataSize() cce__renderingFunctions.getRenderingDataSize()
 #define cce__createElementsBuffer(size) cce__renderingFunctions.createElementsBuffer(size)

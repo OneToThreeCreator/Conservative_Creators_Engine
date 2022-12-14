@@ -696,11 +696,6 @@ static int loadKeys__glfw (void *data)
    g_keys[g_keysQuantity - 2] = (struct key_glfw){GLFW_KEY_F4, KEY_FULLSCREEN};
    g_keys[g_keysQuantity - 1] = (struct key_glfw){GLFW_KEY_F11, KEY_FULLSCREEN};
    qsort(g_keys, g_keysQuantity, sizeof(struct key_glfw), keycompare);
-   printf("Key values:\n");
-   for (struct key_glfw *it = g_keys, *end = g_keys + g_keysQuantity; it < end; ++it)
-   {
-      printf("  GLFW key %i, buttonfn %u\n", it->key, it->fn);
-   }
    g_keyWeight = keys->keyAxisValue;
    g_deadzone = keys->deadzone;
    g_maxValueDeadzoneCorrected = INT8_MAX / (1.0f - keys->deadzone);

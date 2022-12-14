@@ -22,15 +22,14 @@
 
 out vec4 FragColor;
 
-in vec4     Color;
 flat in int TextureID; // From 1
 in vec2     TextureCoord;
+flat in vec4 Color;
 
 uniform sampler2DArray Textures;
-const vec4 white = vec4(1.0f, 1.0f, 1.0f, 1.0f);
 
 void main()
 {
    int isTexture = min(TextureID, 1);
-   FragColor = mix(white, texture(Textures, vec3(TextureCoord.xy, TextureID - isTexture)), isTexture) * Color;
+   FragColor = mix(Color, texture(Textures, vec3(TextureCoord.xy, TextureID - isTexture)), isTexture);
 }
