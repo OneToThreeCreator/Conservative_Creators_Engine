@@ -29,25 +29,25 @@ extern "C"
 #include <stdint.h>
 #include <stddef.h>
 #include "cce_exports.h"
-#define CCE_PUBLIC_OPTIONS CCE_EXPORTS
+#define CCE_API CCE_EXPORTS
 
 typedef uint8_t cce_endianess;
 
 #define CCE_BIG_ENDIAN 0
 #define CCE_LITTLE_ENDIAN 1
 
-CCE_PUBLIC_OPTIONS extern const cce_endianess *const g_endianess;
+CCE_API extern const cce_endianess *const cceEndianess;
 
-CCE_PUBLIC_OPTIONS extern uint16_t (*cceLittleEndianConversionInt16) (uint16_t);
-CCE_PUBLIC_OPTIONS extern uint32_t (*cceLittleEndianConversionInt32) (uint32_t);
-CCE_PUBLIC_OPTIONS extern uint64_t (*cceLittleEndianConversionInt64) (uint64_t);
-CCE_PUBLIC_OPTIONS extern void* (*cceLittleEndianConversionArrayIntN)    (void*, size_t, size_t);
-CCE_PUBLIC_OPTIONS extern void* (*cceLittleEndianConversionNewArrayIntN) (void*, const void*, size_t, size_t);
-CCE_PUBLIC_OPTIONS extern uint16_t (*cceBigEndianConversionInt16) (uint16_t);
-CCE_PUBLIC_OPTIONS extern uint32_t (*cceBigEndianConversionInt32) (uint32_t);
-CCE_PUBLIC_OPTIONS extern uint64_t (*cceBigEndianConversionInt64) (uint64_t);
-CCE_PUBLIC_OPTIONS extern void* (*cceBigEndianConversionArrayIntN)    (void*, size_t, size_t);
-CCE_PUBLIC_OPTIONS extern void* (*cceBigEndianConversionNewArrayIntN) (void*, const void*, size_t, size_t);
+CCE_API extern uint16_t (*cceLittleEndianConversionInt16) (uint16_t);
+CCE_API extern uint32_t (*cceLittleEndianConversionInt32) (uint32_t);
+CCE_API extern uint64_t (*cceLittleEndianConversionInt64) (uint64_t);
+CCE_API extern void* (*cceLittleEndianConversionArrayIntN)    (void*, size_t, size_t);
+CCE_API extern void* (*cceLittleEndianConversionNewArrayIntN) (void*, const void*, size_t, size_t);
+CCE_API extern uint16_t (*cceBigEndianConversionInt16) (uint16_t);
+CCE_API extern uint32_t (*cceBigEndianConversionInt32) (uint32_t);
+CCE_API extern uint64_t (*cceBigEndianConversionInt64) (uint64_t);
+CCE_API extern void* (*cceBigEndianConversionArrayIntN)    (void*, size_t, size_t);
+CCE_API extern void* (*cceBigEndianConversionNewArrayIntN) (void*, const void*, size_t, size_t);
 
 #define cceBigEndianToHostEndianInt16(value) cceBigEndianConversionInt16(value)
 #define cceHostEndianToBigEndianInt16(value) cceBigEndianConversionInt16(value)
@@ -99,11 +99,11 @@ CCE_PUBLIC_OPTIONS extern void* (*cceBigEndianConversionNewArrayIntN) (void*, co
 #define cceHostEndianToLittleEndianNewArrayIntN(dest, src, size, n) cceLittleEndianConversionNewArrayIntN(dest, src, size, n)
 #define cceLittleEndianToHostEndianNewArrayIntN(dest, src, size, n) cceLittleEndianConversionNewArrayIntN(dest, src, size, n)
 
-CCE_PUBLIC_OPTIONS uint16_t cceSwapEndianInt16 (uint16_t value);
-CCE_PUBLIC_OPTIONS uint32_t cceSwapEndianInt32 (uint32_t value);
-CCE_PUBLIC_OPTIONS uint64_t cceSwapEndianInt64 (uint64_t value);
-CCE_PUBLIC_OPTIONS void* cceSwapEndianArrayIntN (void *array, size_t arraySize, size_t n);
-CCE_PUBLIC_OPTIONS void* cceSwapEndianNewArrayIntN (void *newArray, const void *array, size_t arraySize, size_t n);
+CCE_API uint16_t cceSwapEndianInt16 (uint16_t value);
+CCE_API uint32_t cceSwapEndianInt32 (uint32_t value);
+CCE_API uint64_t cceSwapEndianInt64 (uint64_t value);
+CCE_API void* cceSwapEndianArrayIntN (void *array, size_t arraySize, size_t n);
+CCE_API void* cceSwapEndianNewArrayIntN (void *newArray, const void *array, size_t arraySize, size_t n);
 
 #define cceBigEndianToLittleEndianInt16(value) cceSwapEndianInt16(value)
 #define cceLittleEndianToBigEndianInt16(value) cceSwapEndianInt16(value)
@@ -130,7 +130,7 @@ CCE_PUBLIC_OPTIONS void* cceSwapEndianNewArrayIntN (void *newArray, const void *
 #define cceBigEndianToLittleEndianNewArrayIntN(dest, src, size, n) cceSwapEndianNewArrayIntN(dest, src, size, n)
 #define cceLittleEndianToBigEndianNewArrayIntN(dest, src, size, n) cceSwapEndianNewArrayIntN(dest, src, size, n)
 
-CCE_PUBLIC_OPTIONS void cceInitEndianConversion (void);
+CCE_API void cceInitEndianConversion (void);
 
 #ifdef __cplusplus
 }

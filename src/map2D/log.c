@@ -97,6 +97,6 @@ void cce__criticalErrorPrint (const char *const msgAndFormat, ...)
    vfprintf(stderr, msgAndFormat, args);
    fprintf(stderr, "\nCritical!\nShutting down engine...\n");
    va_end(args);
-   cce__terminateEngine2D();
+   cceTerminateEngine();
    exit(-1);
 }

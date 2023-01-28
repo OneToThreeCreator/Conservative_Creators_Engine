@@ -26,10 +26,10 @@
 #define CCE_DUMMY_TEXTURE_SECONDARY_COLOR 0,0,0
 #endif // CCE_DUMMY_TEXTURE_SECONDARY_COLOR
 
+#include <assert.h>
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <stddef.h>
 #include <string.h>
 
 #include "../../include/cce/engine_common.h"
@@ -43,23 +43,40 @@
 #include "plugins.h"
 #include "map2D_internal.h"
 
-static struct cce_u16vec2                          g_textureSize;
-CCE_PUBLIC_OPTIONS const struct cce_u16vec2 *const cceTextureSize = &g_textureSize;
-CCE_ARRAY(g_textures, static struct LoadedTextures, static uint16_t);
-static uint16_t               g_textureBufferSize;
-CCE_ARRAY(g_texturesEmpty, static struct LoadedTextures*, static uint16_t);
-static struct RenderingData **g_layers;
-static uint8_t                g_layersQuantity;
-static ptrdiff_t              g_renderingBufferOffset;
-static size_t                 g_renderingDataSize;
-struct TransformationValues   cce__groupsCache;
-struct TransformationValues   cce__transformations;
-struct RendereringFunctions   cce__renderingFunctions;
+static struct cce_u16vec2               g_textureSize;
+CCE_API const struct cce_u16vec2 *const cceTextureSize = &g_textureSize;
+CCE_ARRAY(g_textures, static struct cce_loadedtextures, static uint16_t);
+static uint16_t                         g_textureBufferSize;
+CCE_ARRAY(g_texturesEmpty, static struct cce_loadedtextures*, static uint16_t);
+static struct cce_layer                *g_renderingLayers;
+static uint8_t                          g_renderingLayersQuantity;
+static size_t                           g_renderingDataSize;
+struct cce_rendereringfuns              cce__renderingFunctions;
 
-static char *texturesPath = NULL;
+static char  *texturesPath = NULL;
 static size_t texturesPathLength = 0;
 
+uint16_t cce__pixelsPerCoordinate;
+uint8_t  cce__viewRotationAngle;
+struct cce_i16vec2 cce__cameraPosition;
+
 cce_flag cce__map2Dflags;
+static void cce__updateTexturesArray (void);
+
+CCE_API void cceSetPixelsPerCoordinate (uint16_t k)
+{
+   cce__pixelsPerCoordinate = k;
+}
+
+CCE_API void cceSetViewRotation (uint8_t normalizedAngle)
+{
+   cce__viewRotationAngle = normalizedAngle;
+}
+
+CCE_API void cceSetCameraPosition (struct cce_i16vec2 position)
+{
+   cce__cameraPosition = position;
+}
 
 static int loadCallback (void *data, const char *name, const char *value)
 {
@@ -69,7 +86,7 @@ static int loadCallback (void *data, const char *name, const char *value)
    cceMemoryToLowercase(buf, 23);
    if (CCE_STREQ(buf, "renderinglayers") || CCE_STREQ(buf, "renderinglayersquantity"))
    {
-      g_layersQuantity = atoi(value);
+      g_renderingLayersQuantity = atoi(value);
    }
    else if (CCE_STREQ(buf, "texsize") || CCE_STREQ(buf, "texturesize"))
    {
@@ -83,68 +100,50 @@ static int loadCallback (void *data, const char *name, const char *value)
    {
       cceSetMap2Dpath(value);
    }
-   else if (CCE_STREQ(buf, "colorformat"))
-   {
-      strncpy(buf, value, 4);
-      cceMemoryToLowercase(buf, 3);
-      cce__map2Dflags &= ~CCE_STORE_COLOR_IN;
-      if (CCE_STREQ(buf, "rgb"))
-      {
-         cce__map2Dflags |= CCE_STORE_COLOR_IN_RGB;
-      }
-      else if (CCE_STREQ(buf, "hsv"))
-      {
-         cce__map2Dflags |= CCE_STORE_COLOR_IN_HSV;
-      }
-      else if (CCE_STREQ(buf, "hsl"))
-      {
-         cce__map2Dflags |= CCE_STORE_COLOR_IN_HSL;
-      }
-      else if (CCE_STREQ(buf, "hcl") || CCE_STREQ(buf, "lch"))
-      {
-         cce__map2Dflags |= CCE_STORE_COLOR_IN_HCL;
-      }
-   }
-   else if (CCE_STREQ(buf, "collidertype") || CCE_STREQ(buf, "collider"))
-   {
-      strncpy(buf, value, 10);
-      cceMemoryToLowercase(buf, 9);
-      cce__map2Dflags &= ~(CCE_RECTANGLE_COLLIDER | CCE_CIRCLE_COLLIDER);
-      if (CCE_STREQ(buf, "rect") || CCE_STREQ(buf, "rectangle"))
-      {
-         cce__map2Dflags |= CCE_RECTANGLE_COLLIDER;
-      }
-      else if (CCE_STREQ(buf, "cir") || CCE_STREQ(buf, "circle"))
-      {
-         cce__map2Dflags |= CCE_CIRCLE_COLLIDER;
-      }
-   }
    else if (CCE_STREQ(buf, "usefallbackmap") || CCE_STREQ(buf, "genfallbackmaponfailure") || CCE_STREQ(buf, "genmaponfailure"))
    {
-      cce__map2Dflags ^= (cce__map2Dflags & CCE_RETURN_NULL_ON_MAP_LOADING_FAILURE) ^ ((cceStringToBool(value) - 1) & CCE_RETURN_NULL_ON_MAP_LOADING_FAILURE);
+      cce__map2Dflags &= ~CCE_RETURN_NULL_ON_MAP_LOADING_FAILURE;
+      cce__map2Dflags |= ((cceStringToBool(value) - 1) & CCE_RETURN_NULL_ON_MAP_LOADING_FAILURE);
+   }
+   else if (CCE_STREQ(buf, "pxpercoord") || CCE_STREQ(buf, "pixelspercoordinate") || CCE_STREQ(buf, "pxpercell") || CCE_STREQ(buf, "pixelspercell"))
+   {
+      char *last;
+      uint16_t px = strtoul(value, &last, 0);
+      if (px == 0 && value == last)
+      {
+         fprintf(stderr, "%s is not a valid number of pixels per coordinate\n", value);
+         return 0;
+      }
+      cce__pixelsPerCoordinate = px;
    }
    return 0;
 }
 
-CCE_PUBLIC_OPTIONS void cceRenderingLayerSetMap2D (uint8_t layer, uint8_t mapLayer, struct cce_buffer *map)
+CCE_API void cceSetRenderingLayerMap2D (uint8_t layer, uint8_t mapLayer, struct cce_buffer *map)
 {
-   if (layer >= g_layersQuantity)
+   assert(map != NULL);
+   assert(map->loadingFunctionBlockID == cce__staticMapFunctionSet || map->loadingFunctionBlockID == cce__dynamicMapFunctionSet);
+   if (layer >= g_renderingLayersQuantity)
       return;
-   g_layers[layer] = (struct RenderingData*)((cce_void*)((struct RenderingInfo*)((cce_void*) map + g_renderingBufferOffset))->data + mapLayer * g_renderingDataSize);
+   g_renderingLayers[layer].layersData = (struct cce_renderinginfo*)((cce_void*) map + cce__renderingInfoOffset);
+   g_renderingLayers[layer].layer = mapLayer;
+   g_renderingLayers[layer].flags = map->loadingFunctionBlockID == cce__dynamicMapFunctionSet;
 }
 
-CCE_PUBLIC_OPTIONS void cceRenderMap2D (void)
+CCE_API void cceRenderMap2D (void)
 {
    cce__screenUpdate(); // Sync only between draw calls
-   cce__drawMap2D(g_layers, g_layersQuantity);
+   if (cce__map2Dflags & CCE_LOADEDTEXTURES_TOBELOADED)
+      cce__updateTexturesArray();
+   cce__drawMap2D(g_renderingLayers, g_renderingLayersQuantity);
 }
 
-CCE_PUBLIC_OPTIONS void cceUpdateEngineMap2D (void)
+CCE_API void cceUpdateEngineMap2D (void)
 {
    cce__engineUpdate();
 }
 
-CCE_PUBLIC_OPTIONS void cceSetTexturesPath (const char *path)
+CCE_API void cceSetTexturesPath (const char *path)
 {
    CCE_SET_PATH(texturesPath, texturesPathLength, path);
 }
@@ -177,7 +176,7 @@ static int loadTexture (char *path, uint16_t position)
    data = stbi_load(path, (int*) &width, (int*) &height, NULL, 4);
    if (!data)
    {
-      fprintf(stderr, "ENGINE::TEXTURE::DECODING_ERROR:\n%s\n", stbi_failure_reason());
+      fprintf(stderr, "ENGINE::TEXTURE::DECODING_ERROR:\n%s\nFile located at %s\n", stbi_failure_reason(), path);
       if (length >= 16)
          free(path);
       else if (length > 0)
@@ -241,7 +240,7 @@ static int setTextureAttributes (uint16_t ID)
    return result;
 }
 
-CCE_PUBLIC_OPTIONS void* cceGenDummyTextureRGBA8 (uint16_t width, uint16_t height)
+CCE_API void* cceGenDummyTextureRGBA8 (uint16_t width, uint16_t height)
 {
    struct cce_u8vec4 colors[2] = {{CCE_DUMMY_TEXTURE_SECONDARY_COLOR, 255}, {CCE_DUMMY_TEXTURE_PRIMARY_COLOR, 255}};
    struct cce_u8vec4 *image = malloc(width * height * sizeof(struct cce_u8vec4));
@@ -257,27 +256,36 @@ CCE_PUBLIC_OPTIONS void* cceGenDummyTextureRGBA8 (uint16_t width, uint16_t heigh
    return image;
 }
 
-void cce__updateTexturesArray (void)
+static void cce__updateTexturesArray (void)
 {
    {
-      struct LoadedTextures *iterator = g_textures + g_texturesQuantity;
+      struct cce_loadedtextures *iterator = g_textures + g_texturesQuantity;
       do
       {
          --iterator;
       }
       while (iterator > g_textures && iterator->dependantMapsQuantity == 0u);
-      size_t newTexturesQuantity = iterator - g_textures;
-      g_texturesEmptyQuantity -= g_texturesQuantity - newTexturesQuantity;
-      memmove(g_texturesEmpty, g_texturesEmpty + (g_texturesQuantity - newTexturesQuantity), g_texturesEmptyQuantity);
-      g_texturesQuantity = newTexturesQuantity;
-      CCE_REALLOC_ARRAY(g_texturesEmpty, g_texturesEmptyQuantity);
-      CCE_REALLOC_ARRAY(g_textures, g_texturesQuantity);
+      size_t newTexturesQuantity = CCE_MAX(iterator - g_textures, 0);
+      struct cce_loadedtextures **jiterator = g_texturesEmpty;
+      for (struct cce_loadedtextures **end = g_texturesEmpty + g_texturesEmptyQuantity; jiterator < end && (size_t)(*jiterator - g_textures) >= (g_texturesQuantity - newTexturesQuantity); ++jiterator)
+      {
+         
+      }
+      size_t emptyTexturesIgnore = jiterator - g_texturesEmpty;
+      g_texturesEmptyQuantity -= emptyTexturesIgnore;
+      g_texturesQuantity -= newTexturesQuantity;
+      if (emptyTexturesIgnore != 0)
+      {
+         memmove(g_texturesEmpty, g_texturesEmpty + emptyTexturesIgnore, g_texturesEmptyQuantity);
+         CCE_REALLOC_ARRAY(g_texturesEmpty, g_texturesEmptyQuantity);
+         CCE_REALLOC_ARRAY(g_textures, g_texturesQuantity);
+      }
    }
    const uint8_t arrayResized = g_texturesAllocated >= g_textureBufferSize;
    if (arrayResized)
       cce__reallocateTextureArray(g_texturesAllocated);
    
-   for (struct LoadedTextures *iterator = g_textures, *end = g_textures + g_texturesQuantity; iterator < end; ++iterator)
+   for (struct cce_loadedtextures *iterator = g_textures, *end = g_textures + g_texturesQuantity; iterator < end; ++iterator)
    {
       if (iterator->dependantMapsQuantity > 0u)
       {
@@ -285,7 +293,9 @@ void cce__updateTexturesArray (void)
          {
             if (loadTexture(iterator->path, iterator - g_textures) != 0)
             {
-               cce__loadTexture(cceGenDummyTextureRGBA8(g_textureSize.x, g_textureSize.y), g_textureSize.x, g_textureSize.y, iterator - g_textures);
+               void *data = cceGenDummyTextureRGBA8(g_textureSize.x, g_textureSize.y);
+               cce__loadTexture(data, g_textureSize.x, g_textureSize.y, iterator - g_textures);
+               free(data);
             }
             *(texturesPath + texturesPathLength) = '\0';
             iterator->flags &= ~CCE_LOADEDTEXTURES_TOBELOADED;
@@ -305,12 +315,15 @@ void cce__updateTexturesArray (void)
    {
       cce__removeOldArray();
    }
+   cce__map2Dflags &= ~CCE_LOADEDTEXTURES_TOBELOADED;
    return;
 }
 
-CCE_PUBLIC_OPTIONS uint16_t cceLoadTexture (char *path)
+CCE_API uint16_t cceLoadTexture (char *path, uint8_t usersQuantity)
 {
-   for (struct LoadedTextures *iterator = g_textures, *end = g_textures + g_texturesQuantity; iterator < end; ++iterator)
+   assert(path != NULL);
+   cce__map2Dflags |= CCE_LOADEDTEXTURES_TOBELOADED;
+   for (struct cce_loadedtextures *iterator = g_textures, *end = g_textures + g_texturesQuantity; iterator < end; ++iterator)
    {
       if (iterator->dependantMapsQuantity == 0u)
       {
@@ -318,12 +331,12 @@ CCE_PUBLIC_OPTIONS uint16_t cceLoadTexture (char *path)
       }
       if (strcmp(iterator->path, path) == 0)
       {
-         ++iterator->dependantMapsQuantity;
+         iterator->dependantMapsQuantity += usersQuantity;
          return iterator - g_textures;
       }
    }
-   struct LoadedTextures *current;
-   if (g_texturesEmpty == 0)
+   struct cce_loadedtextures *current;
+   if (g_texturesEmptyQuantity == 0)
    {
       CCE_REALLOC_ARRAY_ZEROED(g_textures, g_texturesQuantity + 1);
       current = g_textures + g_texturesQuantity++;
@@ -331,13 +344,13 @@ CCE_PUBLIC_OPTIONS uint16_t cceLoadTexture (char *path)
    else
    {
       current = g_texturesEmpty[--g_texturesEmptyQuantity];
-      if (current->path != NULL)
-         free(current->path);
    }
+   free(current->path);
    size_t pathLength = strlen(path);
    current->path = malloc((pathLength + 1) * sizeof(char));
    memcpy(current->path, path, pathLength + 1);
-   current->dependantMapsQuantity = 1u;
+   current->dependantMapsQuantity = usersQuantity;
+   current->flags = CCE_LOADEDTEXTURES_TOBELOADED;
    setTextureAttributes(current - g_textures);
    return current - g_textures + 1;
 }
@@ -351,8 +364,10 @@ int stringCompare (const void *a, const void *b)
 // Done this way because we need dependency order in texturesMapDependOn to exactly match the order of paths (used when elements load)
 int cce__loadTextures (void *buffer, struct cce_buffer *info, char **paths)
 {
+   assert(buffer);
    CCE_UNUSED(info);
-   struct UsedTexturesInfo *data = buffer;
+   cce__map2Dflags |= CCE_LOADEDTEXTURES_TOBELOADED;
+   struct cce_usedtexinfo *data = buffer;
    size_t pathsLength;
    for (char **iterator = paths;; ++iterator)
    {
@@ -363,11 +378,11 @@ int cce__loadTextures (void *buffer, struct cce_buffer *info, char **paths)
       break;
    }
    char **path;
-   data->texturesMapDependsOn = malloc(pathsLength);
+   data->texturesMapDependsOn = malloc(pathsLength * sizeof(uint16_t));
    data->texturesMapDependsOnQuantity = pathsLength;
    data->texturesMapDependsOnAllocated = pathsLength;
    uint16_t *depTextureIt = data->texturesMapDependsOn;
-   for (struct LoadedTextures *iterator = g_textures, *end = g_textures + g_texturesQuantity; iterator < end; ++iterator)
+   for (struct cce_loadedtextures *iterator = g_textures, *end = g_textures + g_texturesQuantity; iterator < end; ++iterator)
    {
       if (iterator->dependantMapsQuantity == 0)
          continue;
@@ -375,6 +390,7 @@ int cce__loadTextures (void *buffer, struct cce_buffer *info, char **paths)
       if (strcmp(*path, iterator->path) == 0)
       {
          setTextureAttributes(iterator - g_textures);
+         ++iterator->dependantMapsQuantity;
          depTextureIt[(path - paths)] = iterator - g_textures + 1;
          if (path > paths)
          {
@@ -402,16 +418,19 @@ int cce__loadTextures (void *buffer, struct cce_buffer *info, char **paths)
    }
    char **jiterator = paths, **jend = paths + pathsLength;
    size_t len;
+   if (g_texturesEmptyQuantity > 0)
    {
-      struct LoadedTextures **iterator = g_texturesEmpty + g_texturesEmptyQuantity, **end = g_texturesEmpty;
+      struct cce_loadedtextures **iterator = g_texturesEmpty + g_texturesEmptyQuantity, **end = g_texturesEmpty;
       do
       {
          --iterator;
          len = strlen(*jiterator);
+         free((**iterator).path);
          (**iterator).path = malloc((len + 1) * sizeof(char));;
          memcpy((**iterator).path, *jiterator, len + 1);
          (**iterator).flags |= CCE_LOADEDTEXTURES_TOBELOADED;
          setTextureAttributes(*iterator - g_textures);
+         (**iterator).dependantMapsQuantity = 1;
          *depTextureIt = *iterator - g_textures + 1;
          ++jiterator;
          ++depTextureIt;
@@ -444,9 +463,11 @@ int cce__loadTextures (void *buffer, struct cce_buffer *info, char **paths)
          CCE_REALLOC_ARRAY_ZEROED(g_textures, g_texturesQuantity + 1);
          
       len = strlen(*jiterator);
+      free(g_textures[i].path);
       g_textures[i].path = malloc((len + 1) * sizeof(char));
       memcpy(g_textures[i].path, *jiterator, len + 1);
       g_textures[i].flags |= CCE_LOADEDTEXTURES_TOBELOADED;
+      g_textures[i].dependantMapsQuantity = 1;
       setTextureAttributes(i);
       *depTextureIt = i + 1;
       ++jiterator;
@@ -471,7 +492,7 @@ int cce__loadTextures (void *buffer, struct cce_buffer *info, char **paths)
 void cce__createTextures (void *buffer, struct cce_buffer *info)
 {
    CCE_UNUSED(info);
-   struct UsedTexturesInfo *data = buffer;
+   struct cce_usedtexinfo *data = buffer;
    data->texturesMapDependsOn          = NULL;
    data->texturesMapDependsOnQuantity  = 0;
    data->texturesMapDependsOnAllocated = 0;
@@ -481,17 +502,17 @@ const void **lastChecked;
 
 int ptrcomp (const void *__a, const void *__b)
 {
-   const void *a = *(const void**)__a;
-   const void *b = *(const void**)__b;
+   const uint8_t *a = *(const uint8_t**)__a;
+   const uint8_t *b = *(const uint8_t**)__b;
    lastChecked = (const void**)__b;
-   return (a > b) - (a < b);
+   return a - b;
 }
 
 void cce__releaseTextures (void *buffer, struct cce_buffer *info)
 {
    CCE_UNUSED(info);
    uint16_t textureID;
-   struct UsedTexturesInfo *data = buffer;
+   struct cce_usedtexinfo *data = buffer;
    if (data->texturesMapDependsOnQuantity == 0)
       return;
    // Iteration from the end to increase likelyhood of freeing last textures first (potentially avoiding expensive move and decreasing it's cost)
@@ -512,8 +533,8 @@ void cce__releaseTextures (void *buffer, struct cce_buffer *info)
          if (g_texturesEmptyQuantity >= g_texturesEmptyAllocated)
             CCE_REALLOC_ARRAY(g_texturesEmpty, g_texturesEmptyQuantity + 1);
          void *tofind = g_textures + textureID - 1;
-         (void)bsearch(&tofind, g_texturesEmpty, g_texturesEmptyQuantity, sizeof(struct LoadedTextures*), ptrcomp); // Returns NULL if no matches found (= always in this case)
-         struct LoadedTextures **pos = (struct LoadedTextures**) lastChecked;
+         (void)bsearch(&tofind, g_texturesEmpty, g_texturesEmptyQuantity, sizeof(struct cce_loadedtextures*), ptrcomp); // Returns NULL if no matches found (= always in this case)
+         struct cce_loadedtextures **pos = (struct cce_loadedtextures**) lastChecked;
          memmove(pos + 1, pos, g_texturesEmptyQuantity - (pos - g_texturesEmpty));
          *pos = g_textures + textureID;
       }
@@ -538,8 +559,8 @@ void cce__releaseTexture (uint16_t textureID)
       if (g_texturesEmptyQuantity >= g_texturesEmptyAllocated)
          CCE_REALLOC_ARRAY(g_texturesEmpty, g_texturesEmptyQuantity + 1);
       void *tofind = g_textures + textureID - 1;
-      (void)bsearch(&tofind, g_texturesEmpty, g_texturesEmptyQuantity, sizeof(struct LoadedTextures*), ptrcomp); // Returns NULL if no matches found (= always in this case)
-      struct LoadedTextures **pos = (struct LoadedTextures**) lastChecked;
+      (void)bsearch(&tofind, g_texturesEmpty, g_texturesEmptyQuantity, sizeof(struct cce_loadedtextures*), ptrcomp); // Returns NULL if no matches found (= always in this case)
+      struct cce_loadedtextures **pos = (struct cce_loadedtextures**) lastChecked;
       memmove(pos + 1, pos, g_texturesEmptyQuantity - (pos - g_texturesEmpty));
       *pos = g_textures + textureID;
    }
@@ -548,15 +569,15 @@ void cce__releaseTexture (uint16_t textureID)
 
 int textureCompare (const void *_a, const void *_b)
 {
-   struct LoadedTextures *a = g_textures + *(uint16_t*)_a - 1;
-   struct LoadedTextures *b = g_textures + *(uint16_t*)_b - 1;
+   struct cce_loadedtextures *a = g_textures + *(uint16_t*)_a - 1;
+   struct cce_loadedtextures *b = g_textures + *(uint16_t*)_b - 1;
    return strcmp(a->path, b->path);
 }
 
 char** cce__storeTextures (void *buffer, struct cce_buffer *info)
 {
    CCE_UNUSED(info);
-   struct UsedTexturesInfo *data = buffer;
+   struct cce_usedtexinfo *data = buffer;
    qsort(data->texturesMapDependsOn, data->texturesMapDependsOnQuantity, sizeof(uint16_t), textureCompare);
    char **paths = malloc((data->texturesMapDependsOnQuantity + 1) * sizeof(char*));
    char **jiterator = paths;
@@ -568,67 +589,25 @@ char** cce__storeTextures (void *buffer, struct cce_buffer *info)
    return paths;
 }
 
+int initMap2DRenderer__openGL (const struct cce_loadedtextures **textures);
 
-
-/*
-cce_ubyte cce__checkCollision (const uint32_t *group1firstID, uint16_t groups1quantity, const uint32_t *group2firstID, uint16_t groups2quantity,
-                               const cce_void *elements1, size_t element1size, const cce_void *elements2, size_t element2size)
+static void terminateEngine2D (void)
 {
-   cce_ubyte isDifferent = (elements1 != elements2);
-   const uint32_t *group1IDs = group1firstID, *group2IDs, *groups1end = group1firstID + groups1quantity, *groups2end = group2firstID + groups2quantity;
-   while (group1IDs < groups1end)
+   cce__terminateMap2DRenderer();
+   cce__terminateMap2DLoaders();
+   for (struct cce_loadedtextures *it = g_textures, *end = g_textures + g_texturesAllocated; it < end; ++it)
    {
-      group2IDs = group2firstID;
-      while (group2IDs < groups2end)
-      {
-         if (((*group1IDs != *group2IDs) || isDifferent) &&
-         cceCheckCollisionMap2D((struct Map2DCollider*) (elements1 + (*group1IDs * element1size)), (struct Map2DCollider*) (elements2 + (*group2IDs * element2size))))
-         {
-            return 1u;
-         }
-         ++group2IDs;
-      }
-      ++group1IDs;
+      free(it->path);
    }
-   return 0u;
+   free(g_textures);
+   free(texturesPath);
+   free(g_renderingLayers);
+   texturesPath = NULL;
+   texturesPathLength = 0;
+   //cce__actionsTerminate();
 }
 
-cce_ubyte cce__checkCollisionWithOffset (const uint32_t *group1firstID, uint16_t groups1quantity, const uint32_t *group2firstID, uint16_t groups2quantity,
-                                         const cce_void *elements1, size_t element1size, const struct cce_i32vec2 *elements1offset,
-                                         const cce_void *elements2, size_t element2size, const struct cce_i32vec2 *elements2offset)
-{
-   cce_ubyte isDifferent = (elements1 != elements2);
-   const uint32_t *group1IDs = group1firstID, *group2IDs, *groups1end = group1firstID + groups1quantity, *groups2end = group2firstID + groups2quantity;
-   while (group1IDs < groups1end)
-   {
-      group2IDs = group2firstID;
-      while (group2IDs < groups2end)
-      {
-         struct cce_i32vec2 offset = {elements2offset->x - elements1offset->x, elements2offset->y - elements1offset->y};
-         if (((*group1IDs != *group2IDs) || isDifferent) &&
-         cceCheckCollisionMap2DWithOffset((struct Map2DCollider*) (elements1 + (*group1IDs * element1size)), (struct Map2DCollider*) (elements2 + (*group2IDs * element2size)), &offset))
-         {
-            return 1u;
-         }
-         ++group2IDs;
-      }
-      ++group1IDs;
-   }
-   return 0u;
-}
-
-cce_ubyte cce__fourthLogicTypeFuncMap2D(uint16_t ID, va_list argp)
-{
-   struct Map2D *map = (struct Map2D*) va_arg(argp, struct Map2D*);
-   return cce__checkCollision((map->collisionGroups + (map->collision + ID)->group1)->elements, (map->collisionGroups + (map->collision + ID)->group1)->elementsQuantity,
-                              (map->collisionGroups + (map->collision + ID)->group2)->elements, (map->collisionGroups + (map->collision + ID)->group2)->elementsQuantity,
-                              (cce_void*) map->colliders, sizeof(struct Map2DCollider), (cce_void*) map->colliders, sizeof(struct Map2DCollider));
-}
-*/
-
-int initMap2DRenderer__openGL (const struct LoadedTextures **textures, struct RendereringFunctions *funcStruct);
-
-CCE_PUBLIC_OPTIONS int cceInitEngine2D (const char *gameINIpath)
+CCE_API int cceInitEngine2D (const char *gameINIpath)
 {
    cce__map2Dflags = CCE_INIT;
    g_textureSize = (struct cce_u16vec2){0, 0};
@@ -651,119 +630,20 @@ CCE_PUBLIC_OPTIONS int cceInitEngine2D (const char *gameINIpath)
       return -1;
    
    cce__initMap2DLoaders();
-   g_renderingBufferOffset = cceGetFunctionBufferOffset(1, cce__staticMapFunctionSet);
-   if (initMap2DRenderer__openGL((const struct LoadedTextures**) &g_textures, &cce__renderingFunctions) != 0)
+   if (initMap2DRenderer__openGL((const struct cce_loadedtextures**) &g_textures) != 0)
    {
       fputs("ENGINE::INIT::BACKEND_FAILURE:\nCan't initialize engine without backend\n", stderr);
       return -1;
    }
+   cceRegisterMapCustomResourceCallback(cce__loadTextures, cce__releaseTextures, cce__createTextures, cce__storeTextures, sizeof(struct cce_usedtexinfo));
+   cceRegisterOnTerminationCallback(terminateEngine2D);
    g_renderingDataSize = cce__getRenderingDataSize();
    
-   CCE_ALLOC_ARRAY_ZEROED(g_textures);
-   CCE_ALLOC_ARRAY(g_texturesEmpty);
+   CCE_ALLOC_ARRAY_ZEROED(g_textures, 1);
+   CCE_ALLOC_ARRAY(g_texturesEmpty, 1);
    g_textureBufferSize = 0;
-   cce__actionsInit();
+   //cce__actionsInit();
    cce__map2Dflags &= ~CCE_INIT;
-   g_layers = calloc(g_layersQuantity, sizeof(struct cce_buffer*));
+   g_renderingLayers = calloc(g_renderingLayersQuantity, sizeof(struct cce_layer));
    return 0;
 }
-
-void cce__terminateEngine2D (void)
-{
-   cce__terminateMap2DRenderer();
-   cce__terminateMap2DLoaders();
-   free(g_textures);
-   free(texturesPath);
-   free(g_layers);
-   texturesPath = NULL;
-   texturesPathLength = 0;
-   cce__actionsTerminate();
-   cce__terminateEngine();
-}
-
-/*
-
-CCE_PUBLIC_OPTIONS int cceEngine2D (void)
-{
-   if (cce__map2Dflags & CCE_INIT)
-      return -1;
-      
-   cce__showWindow();
-   cce__engineUpdate();
-   while (!(*cce__flags & CCE_ENGINE_STOP))
-   {
-      cce__processDynamicMap2DElements();
-      
-      if (cce__map2Dflags & CCE_PROCESS_TEXTURES)
-      {
-         cce__updateTexturesArray();
-         cce__map2Dflags &= ~CCE_PROCESS_TEXTURES;
-      }
-
-      if (cce__map2Dflags & CCE_PROCESS_UBO_ARRAY)
-      {
-         updateUBOarray();
-         cce__map2Dflags &= ~CCE_PROCESS_UBO_ARRAY;
-      }
-      glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-      glClear(GL_COLOR_BUFFER_BIT);
-      GL_CHECK_ERRORS;
-      glBindTexture(GL_TEXTURE_2D_ARRAY, glTexturesArray);
-      GL_CHECK_ERRORS;
-      if (maps->main->exitMapsQuantity > 0)
-      {
-         if (cce__map2Dflags & CCE_PROCESS_NEAREST_MAPS)
-         {
-            cce__processNearestMap2D(maps->main->exitMaps, maps->main->exitMapsQuantity);
-            cce__map2Dflags &= ~CCE_PROCESS_NEAREST_MAPS;
-         }
-         drawMap2Dcommon(maps);
-      }
-      else
-      {
-         drawMap2D(maps->main);
-      }
-      
-      glBindVertexArray(g_dynamicMap->VAO);
-      GL_CHECK_ERRORS;
-      glBindBufferRange(GL_UNIFORM_BUFFER, 1u, (g_UBOs + g_dynamicMap->UBO_ID)->UBO, 0u, g_uniformBufferSize);
-      GL_CHECK_ERRORS;
-      glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, g_EBO);
-      GL_CHECK_ERRORS;
-      glDrawElements(GL_TRIANGLES, g_dynamicMap->elementsQuantity * 6, GL_UNSIGNED_INT, (void*) 0);
-      GL_CHECK_ERRORS;
-      cce__swapBuffers();
-      cce__engineUpdate();
-      processLogicMap2Dcommon(maps);
-#ifndef NDEBUG
-      {
-         static uint16_t frames = 0;
-         static float timePassed = 0.0f;
-         timePassed += *cceDeltaTime;
-         ++frames;
-         if (timePassed > 2.0f)
-         {
-            printf("%f FPS\n", frames / timePassed);
-            frames = 0;
-            timePassed = 0.0f;
-         }
-      }
-#endif
-      if (cce__map2Dflags & CCE_PROCESS_LOADEDMAP2D)
-      {
-         cce__loadMapsAndSetState(maps);
-         cce__map2Dflags &= ~CCE_PROCESS_LOADEDMAP2D;
-         cce__map2Dflags |= CCE_PROCESS_NEAREST_MAPS;
-      }
-   }
-   for (struct Map2D **iterator = maps->dependies, **end = maps->dependies + maps->main->exitMapsQuantity; iterator < end; ++iterator)
-   {
-      cceFreeMap2D(*iterator);
-   }
-   cceFreeMap2D(maps->main);
-   free(maps->dependies);
-   free(maps);
-   cce__terminateEngine2D();
-   return 0;
-}
-*/

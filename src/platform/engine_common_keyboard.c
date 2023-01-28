@@ -28,7 +28,7 @@
 #include "../../include/cce/utils.h"
 #include "../../include/cce/engine_common_keyboard.h"
 
-// If y is string literal, all optimizing compilers will optimize strlen call away
+// If y is string literal, all optimizing compilers will optimize strlen call away. x must be at least as big as y (or buffer overrun will happen).
 #define CCE_MEMEQ(x,y) (memcmp(x, y, strlen(y)) == 0)
 
 #define CCE_LEFT_RIGHT_CHOOSE(str, l, r) (str[0] == 'l' && (str[1] == '\0' || CCE_STREQ(str + 1, "eft"))  ? l : \
@@ -193,6 +193,13 @@ static uint8_t cce__keyFromName (char *buf)
                if (CCE_STREQ(it, "down"))
                   return CCE_KEY_DOWN_ARROW;
                return CCE_LEFT_RIGHT_CHOOSE(it, CCE_KEY_LEFT_ARROW, CCE_KEY_RIGHT_ARROW);
+            case 's':
+               if (!CCE_MEMEQ(buf + 2, "terisk")) // asterisk, *
+                  return CCE_KEY_UNKNOWN;
+               it = buf + 8 + cceIsCharWhitespaceLike(buf[8]);
+               if (CCE_STREQ(it, "kp") || CCE_STREQ(it, "keypad"))
+                  return CCE_KEY_KP_MULTIPLY;
+               return CCE_KEY_UNKNOWN;
             default:
                return CCE_KEY_UNKNOWN;
          }
@@ -292,31 +299,30 @@ CONTROL_KEY:
       case 'e':
          switch (buf[1])
          {
+            case 'i':
+               if (!CCE_MEMEQ(buf + 2, "ght")) // eight
+                  return CCE_KEY_UNKNOWN;
+               if (buf[5] == '\0')
+                  return CCE_KEY_8;
+               it = buf + 5 + cceIsCharWhitespaceLike(buf[5]);
+               if (CCE_STREQ(it, "kp") || CCE_STREQ(it, "keypad"))
+                  return CCE_KEY_KP_8;
+               return CCE_KEY_UNKNOWN;
             case 'n':
-               if (CCE_STREQ(buf + 2, "d")) // end
-                  return CCE_KEY_END;
                if (CCE_MEMEQ(buf + 2, "ter")) // enter
                {
-                  it = buf + 5;
-                  switch (*it)
-                     case '\0':
-                        return CCE_KEY_ENTER;
-                     case ' ':
-                     case '_':
-                     case '-':
-                        ++it;
-                        if (*it != 'k')
-                           return CCE_KEY_UNKNOWN;
-                        // fallthrough
-                     case 'k':
-                        ++it;
-                        if (CCE_STREQ(it, "p") || CCE_STREQ(it, "eypad"))
-                           return CCE_KEY_KP_ENTER;
-                        return CCE_KEY_UNKNOWN;
+                  if (buf[5] == '\0')
+                     return CCE_KEY_ENTER;
+                  it = buf + 5 + cceIsCharWhitespaceLike(buf[5]);
+                  if (CCE_STREQ(it, "kp") || CCE_STREQ(it, "keypad"))
+                     return CCE_KEY_KP_ENTER;
+                  return CCE_KEY_UNKNOWN;
                }
+               if (CCE_STREQ(buf + 1, "nd")) // end
+                  return CCE_KEY_END;
                return CCE_KEY_UNKNOWN;
             case 's':
-               if (CCE_STREQ(buf, "c") || CCE_STREQ(buf, "cape")) // esc or escape
+               if (CCE_MEMEQ(buf + 1, "sc") && (buf[3] == '\0' || CCE_STREQ(buf + 3, "ape"))) // esc or escape
                   return CCE_KEY_ESCAPE;
                return CCE_KEY_UNKNOWN;
             default:
@@ -406,6 +412,24 @@ CONTROL_KEY:
                if (buf[2] != '\0')
                   return CCE_KEY_UNKNOWN;
                return CCE_KEY_F9;
+            case 'i':
+               if (!CCE_MEMEQ(buf + 2, "ve")) // five
+                  return CCE_KEY_UNKNOWN;
+               if (buf[4] == '\0')
+                  return CCE_KEY_5;
+               it = buf + 4 + cceIsCharWhitespaceLike(buf[4]);
+               if (CCE_STREQ(it, "kp") || CCE_STREQ(it, "keypad"))
+                  return CCE_KEY_KP_5;
+               return CCE_KEY_UNKNOWN;
+            case 'o':
+               if (!CCE_MEMEQ(buf + 2, "ur")) // four
+                  return CCE_KEY_UNKNOWN;
+               if (buf[4] == '\0')
+                  return CCE_KEY_4;
+               it = buf + 4 + cceIsCharWhitespaceLike(buf[4]);
+               if (CCE_STREQ(it, "kp") || CCE_STREQ(it, "keypad"))
+                  return CCE_KEY_KP_4;
+               return CCE_KEY_UNKNOWN;
             default:
                return CCE_KEY_UNKNOWN;
          }
@@ -422,8 +446,13 @@ CONTROL_KEY:
       case 'h':
          if (CCE_STREQ(buf + 1, "ome")) // home
             return CCE_KEY_HOME;
-         if (CCE_STREQ(buf + 1, "yphen")) // hyphen
+         if (!CCE_MEMEQ(buf + 1, "yphen")) // hyphen
+            return CCE_KEY_UNKNOWN;
+         if (buf[6] == '\0')
             return CCE_KEY_MINUS;
+         it = buf + 6 + cceIsCharWhitespaceLike(buf[6]);
+         if (CCE_STREQ(it, "kp") || CCE_STREQ(it, "keypad"))
+            return CCE_KEY_KP_MINUS;
          return CCE_KEY_UNKNOWN;
       case 'i':
          if (CCE_MEMEQ(buf + 1, "ns") && (buf[3] == '\0' || CCE_STREQ(buf + 3, "ert"))) // ins or insert
@@ -445,8 +474,7 @@ CONTROL_KEY:
                it = buf + 6;
                // fallthrough
             case 'p': // kp
-               if (cceIsCharWhitespaceLike(*it))
-                  ++it;
+               it += cceIsCharWhitespaceLike(*it);
                if (it[1] == '\0')
                   switch (*it)
                   {
@@ -483,7 +511,6 @@ CONTROL_KEY:
                      default: 
                         return CCE_KEY_UNKNOWN;
                   }
-               return CCE_KEY_UNKNOWN;
                switch (*it)
                {
                   case 'a':
@@ -503,31 +530,37 @@ CONTROL_KEY:
                   case 'e':
                      if (CCE_STREQ(it + 1, "nter"))
                         return CCE_KEY_KP_ENTER;
+                     if (CCE_STREQ(it + 1, "ight")) // eight
+                        return CCE_KEY_KP_8;
+                     return CCE_KEY_UNKNOWN;
+                  case 'f':
+                     if (CCE_STREQ(it + 1, "our")) // four
+                        return CCE_KEY_KP_4;
+                     if (CCE_STREQ(it + 1, "ive")) // five
+                        return CCE_KEY_KP_5;
                      return CCE_KEY_UNKNOWN;
                   case 'h':
                      if (CCE_STREQ(it + 1, "yphen")) // hyphen
                         return CCE_KEY_KP_MINUS;
                      return CCE_KEY_UNKNOWN;
                   case 'm':
-                     switch (it[1])
-                     {
-                        case 'i':
-                           if (CCE_STREQ(it + 2, "nus")) // minus
-                              return CCE_KEY_MINUS;
-                           return CCE_KEY_UNKNOWN;
-                        case 'u':
-                           if (it[2] == 'l' && (it[3] == '\0' || CCE_STREQ(it + 4, "tiply"))) // multiply
-                              return CCE_KEY_KP_MULTIPLY;
-                           return CCE_KEY_UNKNOWN;
-                        default:
-                           return CCE_KEY_UNKNOWN;
-                     }
+                     if (CCE_STREQ(it + 1, "inus")) // minus
+                        return CCE_KEY_MINUS;
+                     if (CCE_MEMEQ(it + 1, "ul") && (it[3] == '\0' || CCE_STREQ(it + 4, "tiply"))) // multiply
+                        return CCE_KEY_KP_MULTIPLY;
+                     return CCE_KEY_UNKNOWN;
                   case 'n':
+                     if (CCE_STREQ(it + 1, "ine")) // nine
+                        return CCE_KEY_KP_9;
                      if (!CCE_MEMEQ(it + 1, "um"))
                         return CCE_KEY_UNKNOWN;
                      it += 3 + cceIsCharWhitespaceLike(*it);
                      if (CCE_STREQ(it, "lock"))
                         return CCE_KEY_NUMLOCK;
+                     return CCE_KEY_UNKNOWN;
+                  case 'o':
+                     if (CCE_STREQ(it + 1, "ne")) // one
+                        return CCE_KEY_KP_1;
                      return CCE_KEY_UNKNOWN;
                   case 'p':
                      if (CCE_STREQ(it + 1, "lus")) // plus
@@ -542,6 +575,20 @@ CONTROL_KEY:
                         return CCE_KEY_KP_DIVIDE;
                      if (CCE_STREQ(it + 1, "ubtract")) // subtract
                         return CCE_KEY_KP_MINUS;
+                     if (CCE_STREQ(it + 1, "ix")) // six
+                        return CCE_KEY_KP_6;
+                     if (CCE_STREQ(it + 1, "even")) // seven
+                        return CCE_KEY_KP_7;
+                     return CCE_KEY_UNKNOWN;
+                  case 't':
+                     if (CCE_STREQ(it + 1, "wo")) // two
+                        return CCE_KEY_KP_2;
+                     if (CCE_STREQ(it + 1, "hree")) // three
+                        return CCE_KEY_KP_3;
+                     return CCE_KEY_UNKNOWN;
+                  case 'z':
+                     if (CCE_STREQ(it + 1, "ero")) // zero
+                        return CCE_KEY_KP_0;
                      return CCE_KEY_UNKNOWN;
                   default:
                      return CCE_KEY_UNKNOWN;
@@ -604,31 +651,69 @@ SIDE_KEY:
          switch (buf[1])
          {
             case 'e':
-               if (CCE_STREQ(buf + 2, "enu"))
+               if (CCE_STREQ(buf + 2, "enu")) //  menu
                   return CCE_KEY_MENU;
                return CCE_KEY_UNKNOWN;
             case 'i':
-               if (CCE_STREQ(buf + 2, "nus"))
+               if (!CCE_MEMEQ(buf + 2, "nus")) // minus
+                  return CCE_KEY_UNKNOWN;
+               if (buf[5] == '\0')
                   return CCE_KEY_MINUS;
+               it = buf + 5 + cceIsCharWhitespaceLike(buf[5]);
+               if (CCE_STREQ(it, "kp") || CCE_STREQ(it, "keypad"))
+                  return CCE_KEY_KP_MINUS;
+               return CCE_KEY_UNKNOWN;
+            case 'u':
+               if (!CCE_MEMEQ(buf + 2, "ltiply")) // multiply
+                  return CCE_KEY_UNKNOWN;
+               it = buf + 8 + cceIsCharWhitespaceLike(buf[8]);
+               if (CCE_STREQ(it, "kp") || CCE_STREQ(it, "keypad"))
+                  return CCE_KEY_KP_MULTIPLY;
                return CCE_KEY_UNKNOWN;
             default:
                return CCE_KEY_UNKNOWN;
          }
       case 'n':
-         if (CCE_MEMEQ(buf + 1, "um") && (buf[3] == '\0' || CCE_STREQ(buf + 3 + cceIsCharWhitespaceLike(buf[3]), "lock")))
-            return CCE_KEY_NUMLOCK;
-         if (CCE_MEMEQ(buf + 1, "non") || CCE_MEMEQ(buf + 1, "not"))
+         switch (buf[1])
          {
-            it = buf + 3 + cceIsCharWhitespaceLike(buf[3]);
-            it += (-CCE_MEMEQ(it, "std") & 3) | (-CCE_MEMEQ(it, "standard") & 8) | (-CCE_MEMEQ(it, "standartized") & 12);
-            if (it <= buf + 4)
+            case 'i':
+               if (!CCE_MEMEQ(buf + 2, "ne")) // nine
+                  return CCE_KEY_UNKNOWN;
+               if (buf[4] == '\0')
+                  return CCE_KEY_9;
+               it = buf + 4 + cceIsCharWhitespaceLike(buf[4]);
+               if (CCE_STREQ(it, "kp") || CCE_STREQ(it, "keypad"))
+                  return CCE_KEY_KP_9;
                return CCE_KEY_UNKNOWN;
-            it += cceIsCharWhitespaceLike(buf[3]);
-            if (*it == '\0' || CCE_STREQ(it, "1"))
-               return CCE_KEY_WORLD1;
-            if (CCE_STREQ(it, "2"))
-               return CCE_KEY_WORLD2;
+            case 'o':
+               it = buf + 2 + cceIsCharWhitespaceLike(buf[2]);
+               if (CCE_STREQ(it, "key"))
+                  return CCE_KEY_NOKEY;
+               it += (buf[2] == 'n' || buf[2] == 't') + cceIsCharWhitespaceLike(buf[3]);
+               it += (-CCE_MEMEQ(it, "std") & 3) | (-CCE_MEMEQ(it, "standard") & 8) | (-CCE_MEMEQ(it, "standartized") & 12);
+               if (it <= buf + 4)
+                  return CCE_KEY_UNKNOWN;
+               it += cceIsCharWhitespaceLike(buf[3]);
+               if (*it == '\0' || CCE_STREQ(it, "1"))
+                  return CCE_KEY_WORLD1;
+               if (CCE_STREQ(it, "2"))
+                  return CCE_KEY_WORLD2;
+               return CCE_KEY_UNKNOWN;
+            case 'u':
+               if (buf[2] == 'm' && (buf[3] == '\0' || CCE_STREQ(buf + 3 + cceIsCharWhitespaceLike(buf[3]), "lock")))
+                  return CCE_KEY_NUMLOCK;
+               return CCE_KEY_UNKNOWN;
+            default:
+               return CCE_KEY_UNKNOWN;
          }
+      case 'o':
+         if (!CCE_MEMEQ(buf + 1, "ne")) // one
+            return CCE_KEY_UNKNOWN;
+         if (buf[3] == '\0')
+            return CCE_KEY_1;
+         it = buf + 3 + cceIsCharWhitespaceLike(buf[3]);
+         if (CCE_STREQ(it, "kp") || CCE_STREQ(it, "keypad"))
+            return CCE_KEY_KP_1;
          return CCE_KEY_UNKNOWN;
       case 'p':
          switch (buf[1])
@@ -650,6 +735,13 @@ SIDE_KEY:
                if (CCE_STREQ(buf + 2, "dn")) // PgDn
                   return CCE_KEY_PAGEDOWN;
                return CCE_KEY_UNKNOWN;
+            case 'l':
+               if (!CCE_MEMEQ(buf + 2, "us"))
+                  return CCE_KEY_UNKNOWN;
+               it = buf + 4 + cceIsCharWhitespaceLike(buf[4]);
+               if (CCE_STREQ(it, "kp") || CCE_STREQ(it, "keypad"))
+                  return CCE_KEY_KP_PLUS;
+               return CCE_KEY_UNKNOWN;
             case 'r':
                if (CCE_STREQ(buf + 2, "scn") || (CCE_MEMEQ(buf + 2, "int") && CCE_STREQ(buf + 5 + cceIsCharWhitespaceLike(buf[5]), "screen"))) // prscn or printscreen
                   return CCE_KEY_PRINTSCREEN;
@@ -667,11 +759,31 @@ SIDE_KEY:
                if (CCE_STREQ(it, "lock"))
                   return CCE_KEY_SCROLLLOCK;
                return CCE_KEY_UNKNOWN;
+            case 'e':
+               if (CCE_MEMEQ(buf + 2, "mi") && CCE_STREQ(buf + 4 + cceIsCharWhitespaceLike(buf[4]), "colon")) // semicolon
+                  return CCE_KEY_SEMICOLON;
+               if (!CCE_MEMEQ(buf + 2, "ven")) // seven
+                  return CCE_KEY_UNKNOWN;
+               if (buf[5] == '\0')
+                  return CCE_KEY_7;
+               it = buf + 5 + cceIsCharWhitespaceLike(buf[5]);
+               if (CCE_STREQ(it, "kp") || CCE_STREQ(it, "keypad"))
+                  return CCE_KEY_KP_7;
+               return CCE_KEY_UNKNOWN;
             case 'h':
                if (!CCE_MEMEQ(buf + 2, "ift")) // shift
                   return CCE_KEY_UNKNOWN;
                it = buf + 5 + cceIsCharWhitespaceLike(buf[5]);
                return CCE_LEFT_RIGHT_CHOOSE(it, CCE_KEY_LSHIFT, CCE_KEY_RSHIFT);
+            case 'i':
+               if (!CCE_MEMEQ(buf + 2, "x"))   // six
+                  return CCE_KEY_UNKNOWN;
+               if (buf[3] == '\0')
+                  return CCE_KEY_6;
+               it = buf + 3 + cceIsCharWhitespaceLike(buf[3]);
+               if (CCE_STREQ(it, "kp") || CCE_STREQ(it, "keypad"))
+                  return CCE_KEY_KP_6;
+               return CCE_KEY_UNKNOWN;
             case 'l':
                if (CCE_STREQ(buf + 2, "ash")) // slash
                   return CCE_KEY_SLASH;
@@ -707,8 +819,21 @@ SIDE_KEY:
                return CCE_KEY_UNKNOWN;
          }
       case 't':
-         if (CCE_STREQ(buf + 1, "ab")) // tab
-            return CCE_KEY_TAB;
+         switch (buf[1])
+         {
+            case 'a':
+               if (CCE_STREQ(buf + 2, "b")) // tab
+                  return CCE_KEY_TAB;
+               return CCE_KEY_UNKNOWN;
+            case 'h':
+               if (CCE_STREQ(buf + 2, "ree")) // three
+                  return CCE_KEY_3;
+               return CCE_KEY_UNKNOWN;
+            case 'w':
+               if (CCE_STREQ(buf + 2, "o")) // two
+                  return CCE_KEY_2;
+               return CCE_KEY_UNKNOWN;
+         }
          return CCE_KEY_UNKNOWN;
       case 'u':
          if (buf[1] == 'p' && (buf[2] == '\0' || CCE_STREQ(buf + 2 + cceIsCharWhitespaceLike(buf[2]), "arrow")))
@@ -729,12 +854,21 @@ SIDE_KEY:
          if (CCE_STREQ(it, "2"))
             return CCE_KEY_WORLD2;
          return CCE_KEY_UNKNOWN;
+      case 'z':
+         if (!CCE_MEMEQ(buf + 2, "ero")) // zero
+            return CCE_KEY_UNKNOWN;
+         if (buf[4] == '\0')
+            return CCE_KEY_0;
+         it = buf + 4 + cceIsCharWhitespaceLike(buf[4]);
+         if (CCE_STREQ(it, "kp") || CCE_STREQ(it, "keypad"))
+            return CCE_KEY_KP_0;
+         return CCE_KEY_UNKNOWN;
       default:
          return CCE_KEY_UNKNOWN;
    }
 }
 
-CCE_PUBLIC_OPTIONS uint8_t cceKeyFromName (const char *name)
+CCE_API uint8_t cceGetKeyFromName (const char *name)
 {
    char buf[19];
    strncpy(buf, name, 19);
@@ -782,19 +916,19 @@ for (uint8_t *resptr = result, *end = result + n; resptr < end; ++resptr) \
    str = it + 1; \
 }
 
-CCE_PUBLIC_OPTIONS struct cce_u8vec2 cceStringToKeys2 (const char *str)
+CCE_API struct cce_u8vec2 cceStringToKeys2 (const char *str)
 {
    KEYS_FROM_STRING_N(str, 2)
    return (struct cce_u8vec2) {result[0], result[1]};
 }
 
-CCE_PUBLIC_OPTIONS struct cce_u8vec3 cceStringToKeys3 (const char *str)
+CCE_API struct cce_u8vec3 cceStringToKeys3 (const char *str)
 {
    KEYS_FROM_STRING_N(str, 3)
    return (struct cce_u8vec3) {result[0], result[1], result[2]};
 }
 
-CCE_PUBLIC_OPTIONS struct cce_u8vec4 cceStringToKeys4 (const char *str)
+CCE_API struct cce_u8vec4 cceStringToKeys4 (const char *str)
 {
    KEYS_FROM_STRING_N(str, 4)
    return (struct cce_u8vec4) {result[0], result[1], result[2], result[3]};

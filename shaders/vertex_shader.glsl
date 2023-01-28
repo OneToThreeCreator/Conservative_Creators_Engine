@@ -21,18 +21,15 @@
 #version 150 core
 
 #define UCHAR_MAX 0xFFu
-#define PI 3.14159265f
 
 in vec2 aCoords;
 
 uniform isamplerBuffer ElementInfo;
-uniform usamplerBuffer ElementData;
+uniform isamplerBuffer ElementData;
 
-uniform ivec2 TextureOffset[256];
+uniform mat3 CameraTransform;
 
-uniform mat3 globalTransform = mat3(vec3(1, 0, 0), vec3(0, 1, 0), vec3(0, 0, 1));
-
-uniform mat3 ViewMatrix = mat3(vec3(0.0625f, 0, 0), vec3(0, 1.0f/9.0f, 0), vec3(0, 0, 1));
+uniform mat3 ViewTransform;
 
 out vec2 TextureCoord;
 flat out int TextureID;
@@ -40,42 +37,44 @@ flat out vec4 Color;
 
 void main()
 {
-   ivec2 pos;
+   ivec2 pos, groupPos;
    uvec4 texCoordsAndSize;
-   uvec4 transformIDs;
    vec2  rotation;
    uint  texOffsetID;
-   uint  isGlobalOffset;
+   uint  isMovedByCamera;
    uint  texID;
+   int   isFlipped;
    {
-      ivec4 data1 = texelFetch(ElementInfo, gl_InstanceID);
-      pos = data1.xy;
-      data1.zw += (1 << 15);
-      texOffsetID = uint(data1.z) >> 8u;
-      rotation = (uvec2(data1.z + 64, data1.z) & 0xFFu) * (PI/128.0f);
-      uvec4 data2 = texelFetch(ElementData, data1.w & 0x7FFF);
-      isGlobalOffset = uint(data1.w) >> 15u;
-      // Unpacking data2
+      ivec4 data = texelFetch(ElementInfo, gl_InstanceID);
+      pos = data.xy;
+      data.zw += (1 << 15);
+      texOffsetID = uint(data.z) >> 8u;
+      data = texelFetch(ElementData, data.w);
+      // Unpacking
+      uvec4 data2 = uvec4(uint(data.x), uint(data.y), uint(data.z), uint(data.w)) & 0xFFFFu;
+      data >>= 16;
+      groupPos = data.xy;
+      rotation = data.zw * (1.0f/32767.0f);
       uvec4 bitwiseOps;
       bitwiseOps.xz = data2.xy >> 8u;
       bitwiseOps.yw = data2.xy & 0xFFu;
       texCoordsAndSize.xw = data2.xz & 0x0FFFu;
       texCoordsAndSize.yz = ((data2.xz & 0xF000u) >> 4u) | bitwiseOps.zw;
       Color = vec4(bitwiseOps.xyz, data2.w) * (1.0f/255.0f);
-      TextureID = max(int(data2.w) - 255, 0); // To encode alpha value when texture is not used
+      TextureID = max(int(data2.w & 0x3FFFu) - 255, 0); // To encode alpha value when texture is not used and pass cameraMoved and flip flags
+      isMovedByCamera = data2.w >> 15u;
+      isFlipped = 1 - int((data2.w >> 13u) & 0x2u);
    }
-   vec3 coords = vec3(aCoords * texCoordsAndSize.zw, 1);
-   mat3 transform;
-   transform[0] = vec3(sin(rotation), 0); // cos(x rad) = sin((x + pi/2) rad)
-   transform[1] = vec3(-transform[0].y, transform[0].x, 0);
-   transform[2] = vec3(0, 0, 1);
-   transform *= (globalTransform * isGlobalOffset) + (mat3(vec3(1, 0, 0), vec3(0, 1, 0), vec3(0, 0, 1)) * (1u - isGlobalOffset));
+   vec3 coords = vec3(aCoords * texCoordsAndSize.zw + pos, 1);
+   mat3 transform = mat3(vec3(rotation.yx, 0), vec3(-rotation.x, rotation.y, 0), vec3(0, 0, 1));
+   transform[0][0] *= isFlipped;
+   transform[0][1] *= isFlipped;
+   transform *= (CameraTransform * isMovedByCamera) + (mat3(vec3(1, 0, 0), vec3(0, 1, 0), vec3(0, 0, 1)) * (1u - isMovedByCamera));
    coords *= transform;
    coords += vec3(texCoordsAndSize.zw, 0.0f) * 0.5f;
-   coords.xy += pos;
-   coords *= ViewMatrix;
-   gl_Position = vec4(coords.xy * 0.5f, 0, 1);
+   coords.xy += groupPos;
+   coords *= ViewTransform;
+   gl_Position = vec4(coords.xy, 0, 1);
    
-   vec2 textureCoords = max(aCoords * 2, 0.0) * vec2(float(texCoordsAndSize.z), float(texCoordsAndSize.w)) * inverseTextureSize;
-   TextureCoord = textureCoords + vec2(TextureOffset[texOffsetID] * ivec2(texCoordsAndSize.zw) + ivec2(texCoordsAndSize.xy)) * inverseTextureSize;
+   TextureCoord = (max(aCoords * 2, 0.0) * vec2(texCoordsAndSize.zw) + vec2(texCoordsAndSize.xy)) * inverseTextureSize;
 }

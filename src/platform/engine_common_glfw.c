@@ -42,11 +42,11 @@
 #define CCE_RESIZABLE 0x4
 #define CCE_VERTICAL_SYNC 0x8
 
-GLFWwindow *g_window;
-struct cce_i32vec2 g_windowResolution;
-struct cce_i32vec2 g_windowBaseResolution;
-struct cce_i32vec2 g_windowLastPos;
-uint8_t g_flags;
+static GLFWwindow *g_window;
+static struct cce_i32vec2 g_windowResolution;
+static struct cce_i32vec2 g_windowBaseResolution;
+static struct cce_i32vec2 g_windowLastPos;
+static uint8_t g_flags;
 
 struct glfw_properties
 {
@@ -88,15 +88,14 @@ struct key_glfw
 #define RIGHT_STICK_UP    24
 #define KEY_FULLSCREEN    25
 
-struct key_glfw *g_keys;
-uint8_t          g_keysQuantity;
+static struct key_glfw *g_keys;
+static uint8_t          g_keysQuantity;
 
-uint8_t g_gamepads;
-uint16_t g_lastButtonsState;
-int8_t gamepadAxes[6];
-uint8_t dpadState;
-float g_deadzone, g_maxValueDeadzoneCorrected;
-int8_t g_keyWeight;
+static uint8_t g_gamepads;
+static uint16_t g_lastButtonsState;
+static int8_t gamepadAxes[6];
+static float g_deadzone, g_maxValueDeadzoneCorrected;
+static int8_t g_keyWeight;
 
 static uint8_t cceKeyFromGLFWkey (int16_t key);
 static int16_t cceKeyToGLFWkey (uint8_t key);
@@ -503,13 +502,13 @@ int initEngine__glfw (void *data)
 #else
    glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT,  GLFW_TRUE);
 #endif
-   
+   char *windowName = vals->windowName;
    if (vals->windowName == NULL || *vals->windowName == '\0')
    {
-      vals->windowName = CCE_DEFAULT_WINDOW_LABEL;
+      windowName = CCE_DEFAULT_WINDOW_LABEL;
    }
    
-   g_window = glfwCreateWindow(vals->resolution.x, vals->resolution.y, vals->windowName, NULL, NULL);
+   g_window = glfwCreateWindow(vals->resolution.x, vals->resolution.y, windowName, NULL, NULL);
    if (g_window == NULL)
    {
       // it's perfectly fine to not support this extensions.
@@ -518,7 +517,7 @@ int initEngine__glfw (void *data)
 #else
       glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT,  GLFW_FALSE);
 #endif
-      g_window = glfwCreateWindow(vals->resolution.x, vals->resolution.y, vals->windowName, NULL, NULL);
+      g_window = glfwCreateWindow(vals->resolution.x, vals->resolution.y, windowName, NULL, NULL);
       if (g_window == NULL)
       {
          fprintf(stderr, "GLFW::WINDOW::FAILED_TO_CREATE\n");
@@ -579,6 +578,8 @@ int initEngine__glfw (void *data)
    cce__engineBackend.getTime = getTime__glfw;
    cceEngineShouldTerminate = engineShouldTerminate__glfw;
    cceSetEngineShouldTerminate = setEngineShouldTerminate__glfw;
+   cce__gameResolution = vals->resolution;
+   free(vals->windowName);
    return 0;
 }
 
@@ -597,7 +598,7 @@ static int iniCallback__glfw (void *data, const char *name, const char *value)
    strncpy(buf, name, 24);
    cceMemoryToLowercase(buf, 23);
    char *it;
-   if (CCE_STREQ(buf, "gameres") || CCE_STREQ(buf, "res") || CCE_STREQ(buf, "gameresolution") || CCE_STREQ(buf, "resolution"))
+   if (CCE_STREQ(buf, "gameres") || CCE_STREQ(buf, "res") || CCE_STREQ(buf, "gameresolution") || CCE_STREQ(buf, "resolution") || CCE_STREQ(buf, "virtualresolution"))
    {
       vals->resolution = cceStringToU16Vec2(value);
    }

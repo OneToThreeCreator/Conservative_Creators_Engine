@@ -18,47 +18,46 @@
     USA
 */
 
+#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 
 #include <glad/gl.h>
 #include "../shader.h"
 
-#include "../external/stb_image.h"
-
 #include "../../include/cce/engine_common_IO.h"
 #include "../../include/cce/utils.h"
 #include "../../include/cce/os_interaction.h"
 
+#include "../engine_common_internal.h"
 #include "map2D_internal.h"
 
-#define CCE_TRANSFORMGROUP_OFFSET 0u
-#define CCE_OFFSET_OFFSET 1u
-#define CCE_COLORGROUP_OFFSET 2u
-#define CCE_TEXTUREOFFSET_OFFSET 3u
+#define CCE_CAMERATRANSFORM_OFFSET 0u
+#define CCE_VIEWTRANSFORM_OFFSET 1u
+#define CCE_TEXTUREOFFSET_OFFSET 2u
 
-#define CCE_GLOBALTRANSFORM_OFFSET 0u
-#define CCE_VIEWMATRIX_OFFSET 1u
+#define CCE_UPDATE_VIEW 0x1
+#define CCE_UPDATE_CAMERA 0x2
 
-struct RenderingData
+struct cce_renderingdata
 {
-   GLuint elementBuffer;
-   GLuint elementTexture;
-   GLuint metaDataBuffer;
-   GLuint metaDataTexture;
-   uint32_t elementBufferSize;
-   uint16_t textureInfoQuantity;
+   GLuint   elementBuffer;
+   GLuint   elementTexture;
+   uint32_t elementsQuantity;
 };
 
-static const struct LoadedTextures **g_textures;
-static GLuint   glTexturesArray;
-static GLuint   glOldTexturesArray;
-static GLuint   glTemporaryFBO;
-static GLuint   shaderProgram;
-static GLuint   g_VAO, g_VBO;
-static GLint   *uniformLocations;
+static const struct cce_loadedtextures **g_textures;
+static GLuint                            glTexturesArray;
+static GLuint                            glOldTexturesArray;
+static GLuint                            glTemporaryFBO;
+static GLuint                            shaderProgram;
+static GLuint                            g_VAO, g_VBO;
+static GLint                             g_uniformLocations[3];
+static uint8_t                           g_rotationAngle;
+static uint16_t                          g_pixelsPerCoordinate;
+struct cce_i16vec2                       g_cameraPosition;
 
-static void cce__openGLErrorPrint (GLenum error, size_t line, const char *file)
+static void openGLErrorPrint (GLenum error, size_t line, const char *file)
 {
    switch (error)
    {
@@ -88,16 +87,6 @@ static void cce__openGLErrorPrint (GLenum error, size_t line, const char *file)
          fprintf(stderr, "%s: %zu: OPENGL::OUT_OF_MEMORY:\nthere is not enough memory left to execute the command\n", file, line);
          break;
       }
-/*    case GL_STACK_UNDERFLOW:
-      {
-         fprintf(stderr, "OPENGL::STACK::OVERFLOW:\nan attempt has been made to perform an operation that would cause an internal stack to underflow\n");
-         break;
-      }
-      case GL_STACK_OVERFLOW:
-      {
-         fprintf(stderr, "OPENGL::STACK::OVERFLOW:\nan attempt has been made to perform an operation that would cause an internal stack to overflow\n");
-         break;
-      }*/
       default:
       {
          fprintf(stderr, "%s: %zu: OPENGL::UNKNOWN:\n%d\n", file, line, error);
@@ -108,42 +97,45 @@ static void cce__openGLErrorPrint (GLenum error, size_t line, const char *file)
 #ifdef NDEBUG
 #define GL_CHECK_ERRORS
 #else
-#define GL_CHECK_ERRORS cce__openGLErrorPrint(glGetError(), __LINE__, __FILE__)
+#define GL_CHECK_ERRORS openGLErrorPrint(glGetError(), __LINE__, __FILE__)
 #endif
+
+static inline void updateView (void)
+{
+   g_pixelsPerCoordinate = cce__pixelsPerCoordinate;
+   g_rotationAngle       = cce__viewRotationAngle;
+   float matrix[3 * 3];
+   matrix[0] = (g_pixelsPerCoordinate * 2.0f) / cce__gameResolution.x;
+   matrix[4] = (g_pixelsPerCoordinate * 2.0f) / cce__gameResolution.y;
+   matrix[8] = 1;
+   float trigonometry = cceFastSinInt8(g_rotationAngle);
+   matrix[1] =  trigonometry * matrix[0];
+   matrix[3] = -trigonometry * matrix[4];
+   trigonometry = cceFastCosInt8(g_rotationAngle);
+   matrix[0] *= trigonometry;
+   matrix[4] *= trigonometry;
+   matrix[2] = 0;
+   matrix[5] = 0;
+   matrix[6] = 0;
+   matrix[7] = 0;
+   glUniformMatrix3fv(g_uniformLocations[CCE_VIEWTRANSFORM_OFFSET], 1, GL_FALSE, matrix);
+}
+
+static inline void updateCamera (void)
+{
+   g_cameraPosition = cce__cameraPosition;
+   float matrix[3 * 3] = {0};
+   matrix[0] = 1;
+   matrix[2] = g_cameraPosition.x;
+   matrix[4] = 1;
+   matrix[5] = g_cameraPosition.y;
+   matrix[8] = 1;
+   glUniformMatrix3fv(g_uniformLocations[CCE_CAMERATRANSFORM_OFFSET], 1, GL_FALSE, matrix);
+}
 
 static size_t getRenderingDataSize__openGL (void)
 {
-   return sizeof(struct RenderingData);
-}
-
-static void drawMap2D__openGL (struct RenderingData **maps, uint32_t mapsQuantity)
-{
-   glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
-   GL_CHECK_ERRORS;
-   glClear(GL_COLOR_BUFFER_BIT);
-   GL_CHECK_ERRORS;
-   glBindVertexArray(g_VAO);
-   GL_CHECK_ERRORS;
-   glActiveTexture(GL_TEXTURE0);
-   GL_CHECK_ERRORS;
-   glBindTexture(GL_TEXTURE_2D_ARRAY, glTexturesArray);
-   GL_CHECK_ERRORS;
-   for (struct RenderingData **iterator = maps, **end = maps + mapsQuantity; iterator < end; ++iterator)
-   {
-      if (*iterator == NULL)
-         continue;
-      glActiveTexture(GL_TEXTURE1);
-      GL_CHECK_ERRORS;
-      glBindTexture(GL_TEXTURE_BUFFER, (**iterator).elementTexture);
-      GL_CHECK_ERRORS;
-      glActiveTexture(GL_TEXTURE2);
-      GL_CHECK_ERRORS;
-      glBindTexture(GL_TEXTURE_BUFFER, (**iterator).metaDataTexture);
-      GL_CHECK_ERRORS;
-      
-      glDrawArraysInstanced(GL_TRIANGLE_STRIP, 0, 4, (**iterator).elementBufferSize);
-      GL_CHECK_ERRORS;
-   }
+   return sizeof(struct cce_renderingdata);
 }
 
 static GLuint createTextureArray (uint16_t newSize)
@@ -213,124 +205,234 @@ static void resizeTextureArrayEnd__openGL_no_ext (void)
    GL_CHECK_ERRORS;
 }
 
-static struct RenderingData* map2DElementsToRenderingBuffer__openGL (const struct Map2DElementPositionArray *elements, uint8_t layersQuantity,
-                                                                     const struct ElementInfo *info, uint16_t textureInfoQuantity)
+/* Buffer MUST be bound to GL_TEXTURE_BUFFER!*/
+#define UPDATE_LAYER(layer, mapFN) \
+do \
+{ \
+   struct cce_i16vec4 *ITERATOR = mapFN; \
+   GL_CHECK_ERRORS; \
+   assert(ITERATOR != NULL); \
+   struct cce_elementposition *position = layer->data; \
+   for (struct cce_i16vec4 *END = ITERATOR + layer->dataQuantity; ITERATOR < END; ++ITERATOR, ++position) \
+   { \
+      ITERATOR->x = position->position.x; \
+      ITERATOR->y = -position->position.y; \
+      ITERATOR->z = (position->__reserved | (position->textureDataOffsetGroup << 8)) - (1 << (sizeof(uint16_t) * 8 - 1)); \
+      ITERATOR->w = position->textureDataID - (1 << (sizeof(uint16_t) * 8 - 1)); /* We need to get it back as unsigned in glsl (simple reinterpret cast won't work - glsl doesn't have 16-bit types) */ \
+   } \
+} \
+while (glUnmapBuffer(GL_TEXTURE_BUFFER) == GL_FALSE)
+
+#define UPDATE_ELEMENTS(elements, elementsQuantity, mapFN) \
+struct cce_u32vec4 *ITERATOR; \
+do \
+{ \
+   ITERATOR = mapFN; \
+   GL_CHECK_ERRORS; \
+   memset(ITERATOR++, 0, sizeof(struct cce_u32vec4)); /* Zeroth element is always empty */ \
+   uint16_t TEXTURE_POS_Y; \
+   for (struct cce_u32vec4 *END = ITERATOR + elementsQuantity; ITERATOR < END; ++ITERATOR, ++elements) \
+   { \
+      if (elements->textureID == 0) /* Fragment has fixed color if no texture is applied */ \
+      { \
+         ITERATOR->x = (elements->data.rgba.x << 8) | elements->data.rgba.y | ((uint32_t)elements->position.x << 16); \
+         ITERATOR->y = (elements->data.rgba.z << 8) | (elements->size.x & 0xFF) | ((uint32_t)(-elements->position.y - elements->size.y) << 16); \
+         ITERATOR->w = elements->data.rgba.w | ((uint16_t)((int16_t)(cceFastCosInt8(elements->rotation + (-((elements->flags & CCE_ELEMENT_FLIP_VERTICALLY) > 0) & 128)) * INT16_MAX)) << 16) | \
+                       (-(!(elements->flags & CCE_ELEMENT_IGNORE_CAMERA)) & 0x8000) | (-(((elements->flags & CCE_ELEMENT_FLIP_HORIZONTALLY) > 0) != ((elements->flags & CCE_ELEMENT_FLIP_VERTICALLY) > 0)) & 0x4000); \
+      } \
+      else \
+      { \
+         TEXTURE_POS_Y = cceTextureSize->y - elements->data.texturePosition.y - elements->size.y; /* Normally textures go from top to bottom. It is reversed by openGL. */ \
+         ITERATOR->x = (elements->data.texturePosition.x & 0xFFF) | ((TEXTURE_POS_Y << 4) & 0xF000) | ((uint32_t)elements->position.x << 16); \
+         ITERATOR->y = ((TEXTURE_POS_Y & 0xFF) << 8) | (elements->size.x & 0xFF) | ((uint32_t)(-elements->position.y - elements->size.y) << 16); \
+         ITERATOR->w = ((elements->textureID + 255) & 0x3FFF) | ((uint16_t)((int16_t)(cceFastCosInt8(elements->rotation + (-((elements->flags & CCE_ELEMENT_FLIP_VERTICALLY) > 0) & 128)) * INT16_MAX)) << 16) | \
+                       (-(!(elements->flags & CCE_ELEMENT_IGNORE_CAMERA)) & 0x8000) | (-(((elements->flags & CCE_ELEMENT_FLIP_HORIZONTALLY) > 0) != ((elements->flags & CCE_ELEMENT_FLIP_VERTICALLY) > 0)) & 0x4000); \
+      } \
+      ITERATOR->z = ((elements->size.x << 4) & 0xF000) | (elements->size.y & 0xFFF) | ((uint16_t)((int16_t)(cceFastSinInt8(elements->rotation + (-((elements->flags & CCE_ELEMENT_FLIP_VERTICALLY) > 0) & 128)) * INT16_MAX)) << 16); \
+   } \
+   elements -= elementsQuantity; \
+} \
+while (glUnmapBuffer(GL_TEXTURE_BUFFER) != GL_TRUE)
+
+static struct cce_renderingdata* map2DElementsToRenderingBuffer__openGL (const struct cce_elementpositionarray *layers, uint8_t layersQuantity,
+                                                                         const struct cce_element *elements, uint16_t elementsQuantity, uint16_t elementsAllocated)
 {
+   if (layersQuantity == 0 || elementsQuantity == 0)
+      return NULL;
    GLuint elementsBuffers[256];
    GLuint textures[256];
    glGenBuffers(1 + layersQuantity, elementsBuffers);
    GL_CHECK_ERRORS;
    glGenTextures(1 + layersQuantity, textures);
    GL_CHECK_ERRORS;
-   struct RenderingData *data = malloc(layersQuantity * sizeof(struct RenderingData)), *diterator = data;
+   struct cce_renderingdata *data = malloc((layersQuantity + 1) * sizeof(struct cce_renderingdata)), *diterator = data + 1;
    GLuint *ebiterator = elementsBuffers + 1, *titerator = textures + 1;
-   for (const struct Map2DElementPositionArray *elementsEnd = elements + layersQuantity; elements < elementsEnd; ++elements, ++ebiterator, ++titerator, ++diterator)
+   for (const struct cce_elementpositionarray *elementsEnd = layers + layersQuantity; layers < elementsEnd; ++layers, ++ebiterator, ++titerator, ++diterator)
    {
+      diterator->elementsQuantity = CCE_MAX(layers->dataQuantity, layers->dataAllocated);
       glBindBuffer(GL_TEXTURE_BUFFER, *ebiterator);
       GL_CHECK_ERRORS;
-      glBufferData(GL_TEXTURE_BUFFER, elements->dataQuantity * sizeof(struct Map2DElementPosition), NULL, GL_DYNAMIC_DRAW); // Expected to be modified
+      glBufferData(GL_TEXTURE_BUFFER, diterator->elementsQuantity * sizeof(struct cce_elementposition), NULL, GL_STATIC_DRAW);
       GL_CHECK_ERRORS;
-      do
-      {
-         struct cce_i16vec4 *iterator = glMapBuffer(GL_TEXTURE_BUFFER, GL_WRITE_ONLY);
-         struct Map2DElementPosition *element = elements->data;
-         for (struct cce_i16vec4 *end = iterator + elements->dataQuantity; iterator < end; ++iterator, ++element)
-         {
-            iterator->x = element->position.x;
-            iterator->y = element->position.y;
-            iterator->z = (element->rotation | (element->textureDataOffsetGroup << 8)) - (1 << (sizeof(uint16_t) * 8 - 1));
-            iterator->w = element->textureDataID - (1 << (sizeof(uint16_t) * 8 - 1)); // We need to get it back as unsigned in glsl (simple reinterpret cast won't work - glsl doesn't have 16-bit types)
-         }
-      }
-      while (glUnmapBuffer(GL_TEXTURE_BUFFER) == GL_FALSE);
+      
+      UPDATE_LAYER(layers, glMapBuffer(GL_TEXTURE_BUFFER, GL_WRITE_ONLY));
+      GL_CHECK_ERRORS;
       glBindTexture(GL_TEXTURE_BUFFER, *titerator);
       GL_CHECK_ERRORS;
       glTexBuffer(GL_TEXTURE_BUFFER, GL_RGBA16I, *ebiterator);
       GL_CHECK_ERRORS;
-      diterator->elementBufferSize = elements->dataQuantity;
-      diterator->textureInfoQuantity = textureInfoQuantity;
       diterator->elementBuffer = *ebiterator;
       diterator->elementTexture = *titerator;
-      diterator->metaDataBuffer = elementsBuffers[0];
-      diterator->metaDataTexture = textures[0];
+      
    }
-   
+   data->elementBuffer = elementsBuffers[0];
+   data->elementTexture = textures[0];
+   data->elementsQuantity = elementsAllocated;
    glBindBuffer(GL_TEXTURE_BUFFER, elementsBuffers[0]);
    GL_CHECK_ERRORS;
-   glBufferData(GL_TEXTURE_BUFFER, (textureInfoQuantity) * 8, NULL, GL_STATIC_DRAW); // Rarely modified
+   glBufferData(GL_TEXTURE_BUFFER, (elementsAllocated + 1) * 16, NULL, GL_DYNAMIC_DRAW);
    GL_CHECK_ERRORS;
-   struct cce_u16vec4 *iterator;
-   if (textureInfoQuantity > 0)
-   {
-      do
-      {
-         iterator = glMapBuffer(GL_TEXTURE_BUFFER, GL_WRITE_ONLY);
-         GL_CHECK_ERRORS;
-         for (struct cce_u16vec4 *end = iterator + textureInfoQuantity; iterator < end; ++iterator, ++info)
-         {
-            if (info->textureID == 0) // Fragment has fixed color if no texture is applied
-            {
-               iterator->x = (info->data.rgba.x << 8) | info->data.rgba.y;
-               iterator->y = (info->data.rgba.z << 8) | (info->size.x & 0xFF);
-               iterator->w = info->data.rgba.w;
-            }
-            else
-            {
-               iterator->x = (info->data.texturePosition.x & 0xFFF) | ((info->data.texturePosition.y << 4) & 0xF000);
-               iterator->y = ((info->data.texturePosition.y & 0xFF) << 8) | (info->size.x & 0xFF);
-               iterator->w = info->textureID + 255;
-            }
-            iterator->z = ((info->size.x << 4) & 0xF000) | (info->size.y & 0xFFF);
-         }
-         info -= textureInfoQuantity;
-      }
-      while (glUnmapBuffer(GL_TEXTURE_BUFFER) != GL_TRUE);
-   }
+   UPDATE_ELEMENTS(elements, elementsQuantity, glMapBuffer(GL_TEXTURE_BUFFER, GL_WRITE_ONLY));
+   GL_CHECK_ERRORS;
    glBindTexture(GL_TEXTURE_BUFFER, textures[0]);
    GL_CHECK_ERRORS;
-   glTexBuffer(GL_TEXTURE_BUFFER, GL_RGBA16UI, elementsBuffers[0]);
+   glTexBuffer(GL_TEXTURE_BUFFER, GL_RGBA32UI, elementsBuffers[0]);
    GL_CHECK_ERRORS;
    return data;
 }
 
-static void deleteMap2DRenderingBuffer__openGL (struct RenderingData *data)
+static void deleteMap2DRenderingBuffer__openGL (struct cce_renderingdata *data, uint8_t layersQuantity)
 {
-   GLuint objects[2] = {data->elementBuffer, data->metaDataBuffer};
-   glDeleteBuffers(2, objects);
+   if (data == NULL)
+      return;
+   GLuint buffers[256];
+   GLuint textures[256];
+   GLuint *jiterator = buffers;
+   GLuint *kiterator = textures;
+   for (struct cce_renderingdata *iterator = data, *end = data + layersQuantity + 1; iterator < end; ++iterator, ++jiterator, ++kiterator)
+   {
+      *jiterator = iterator->elementBuffer;
+      *kiterator = iterator->elementTexture;
+   }
+   glDeleteBuffers(1 + layersQuantity, buffers);
    GL_CHECK_ERRORS;
-   objects[0] = data->elementTexture;
-   objects[1] = data->metaDataTexture;
-   glDeleteTextures(2, objects);
+   glDeleteTextures(1 + layersQuantity, buffers);
    GL_CHECK_ERRORS;
    free(data);
 }
 
 static void loadTexture__openGL (void *data, uint16_t width, uint16_t height, uint16_t textureID)
 {
+   struct cce_u8vec4 tmp[512];
    glBindTexture(GL_TEXTURE_2D_ARRAY, glTexturesArray);
    GL_CHECK_ERRORS;
-   if (width > cceTextureSize->x || height > cceTextureSize->y)
+   width = CCE_MIN(width, cceTextureSize->x);
+   height = CCE_MIN(height, cceTextureSize->y);
+   uint16_t widthRemainer = width & 511;
+   for (struct cce_u8vec4 *iterator = data, *jiterator = iterator + (height - 1) * width; iterator <= jiterator; iterator += widthRemainer, jiterator -= width * 2 - widthRemainer)
    {
-      // Texture is truncated downwards, but openGL expects 0 to be at the bottom. So, we move texture parts line by line to the bottom
-      for (struct cce_u8vec4 *iterator = data, *jiterator = (struct cce_u8vec4*)data + width * (height - cceTextureSize->y), *jend = (struct cce_u8vec4*)data + width * height;
-           jiterator < jend;)
+      for (struct cce_u8vec4 *end = iterator + width - widthRemainer; iterator < end; iterator += 512, jiterator -= 512)
       {
-         for (struct cce_u8vec4 *end = iterator + cceTextureSize->x; iterator < end; ++iterator, ++jiterator)
-         {
-            *iterator = *jiterator;
-         }
-         jiterator += width - cceTextureSize->y;
+         memcpy(tmp,       iterator,  512 * sizeof(struct cce_u8vec4));
+         memcpy(iterator,  jiterator, 512 * sizeof(struct cce_u8vec4));
+         memcpy(jiterator, tmp,       512 * sizeof(struct cce_u8vec4));
       }
-      width = cceTextureSize->x;
-      height = cceTextureSize->y;
+      memcpy(tmp,       iterator,  widthRemainer * sizeof(struct cce_u8vec4));
+      memcpy(iterator,  jiterator, widthRemainer * sizeof(struct cce_u8vec4));
+      memcpy(jiterator, tmp,       widthRemainer * sizeof(struct cce_u8vec4));
    }
-   glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, 0, 0, textureID, width, height, 1, GL_RGBA, GL_UNSIGNED_BYTE, data);
+   glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, 0, cceTextureSize->y - height, textureID, width, height, 1, GL_RGBA, GL_UNSIGNED_BYTE, data);
+   GL_CHECK_ERRORS;
+}
+
+static void drawMap2D__openGL (struct cce_layer *layers, uint32_t layersQuantity)
+{
+   if (g_pixelsPerCoordinate != cce__pixelsPerCoordinate || g_rotationAngle != cce__viewRotationAngle)
+      updateView();
+   if (g_cameraPosition.x != cce__cameraPosition.x || g_cameraPosition.y != cce__cameraPosition.y)
+      updateCamera();
+   glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+   GL_CHECK_ERRORS;
+   glClear(GL_COLOR_BUFFER_BIT);
+   GL_CHECK_ERRORS;
+   glBindVertexArray(g_VAO);
+   GL_CHECK_ERRORS;
+   glActiveTexture(GL_TEXTURE0);
+   GL_CHECK_ERRORS;
+   glBindTexture(GL_TEXTURE_2D_ARRAY, glTexturesArray);
+   GL_CHECK_ERRORS;
+   for (struct cce_layer *iterator = layers, *end = layers + layersQuantity; iterator < end; ++iterator)
+   {
+      if (iterator->layersData == NULL)
+         continue;
+      struct cce_dynamicrenderinginfo *info = iterator->layersData;
+      if (info->elementsQuantity == 0)
+         continue;
+      if (info->data == NULL)
+      {
+         info->data = map2DElementsToRenderingBuffer__openGL(info->positions, info->layersQuantity, info->elements, info->elementsQuantity, (iterator->flags & CCE_LAYER_DYNAMIC) ? info->elementsAllocated : info->elementsQuantity);
+         info->flags &= ~CCE_ELEMENT_UPDATED;
+         info->positions[iterator->layer].dataAllocated &= ~1;
+         info->positions[iterator->layer].dataAllocated |= (info->positions->dataQuantity == 1 || info->positions->dataAllocated > 0x80000000);
+      }
+      else
+      {
+         if (info->flags & CCE_ELEMENT_UPDATED)
+         {
+            glBindBuffer(GL_TEXTURE_BUFFER, info->data[0].elementBuffer);
+            GL_CHECK_ERRORS;
+            if ((iterator->flags & CCE_LAYER_DYNAMIC) && info->elementsAllocated > info->data[0].elementsQuantity)
+            {
+               glBufferData(GL_TEXTURE_BUFFER, info->elementsAllocated * sizeof(struct cce_element), NULL, GL_DYNAMIC_DRAW);
+               UPDATE_ELEMENTS(info->elements, info->elementsQuantity, glMapBuffer(GL_TEXTURE_BUFFER, GL_WRITE_ONLY));
+               info->data[0].elementsQuantity = info->elementsAllocated;
+            }
+            else
+            {
+               // Invalidate buffer
+               UPDATE_ELEMENTS(info->elements, info->elementsQuantity, glMapBufferRange(GL_TEXTURE_BUFFER, 0, info->elementsQuantity * sizeof(struct cce_element), GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_BUFFER_BIT));
+            }
+            info->flags &= ~CCE_ELEMENT_UPDATED;
+         }
+         // Workaround!
+         if ((info->positions[iterator->layer].dataAllocated & 1) == !(info->positions->dataQuantity == 1 || info->positions->dataAllocated > 0x80000000))
+         {
+            info->positions[iterator->layer].dataAllocated ^= 1;
+            struct cce_elementpositionarray *layer = info->positions + iterator->layer;
+            glBindBuffer(GL_TEXTURE_BUFFER, info->data[1 + iterator->layer].elementBuffer);
+            GL_CHECK_ERRORS;
+            if ((iterator->flags & CCE_LAYER_DYNAMIC) && layer->dataAllocated > info->data[1 + iterator->layer].elementsQuantity)
+            {
+               glBufferData(GL_TEXTURE_BUFFER, layer->dataAllocated * sizeof(struct cce_elementposition), NULL, GL_STATIC_DRAW);
+               UPDATE_LAYER(layer, glMapBuffer(GL_TEXTURE_BUFFER, GL_WRITE_ONLY));
+               GL_CHECK_ERRORS;
+               info->data[1 + iterator->layer].elementsQuantity = info->positions[iterator->layer].dataAllocated;
+            }
+            else
+            {
+               // Invalidate buffer
+               UPDATE_LAYER(layer, glMapBufferRange(GL_TEXTURE_BUFFER, 0, layer->dataQuantity * sizeof(struct cce_elementposition), GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_BUFFER_BIT));
+            }
+         }
+      }
+      glActiveTexture(GL_TEXTURE1);
+      GL_CHECK_ERRORS;
+      glBindTexture(GL_TEXTURE_BUFFER, info->data[iterator->layer + 1].elementTexture);
+      GL_CHECK_ERRORS;
+      glActiveTexture(GL_TEXTURE2);
+      GL_CHECK_ERRORS;
+      glBindTexture(GL_TEXTURE_BUFFER, info->data->elementTexture);
+      GL_CHECK_ERRORS;
+      
+      glDrawArraysInstanced(GL_TRIANGLE_STRIP, 0, 4, info->positions[iterator->layer].dataQuantity);
+      GL_CHECK_ERRORS;
+   }
+   glFlush();
    GL_CHECK_ERRORS;
 }
 
 void terminateMap2DRenderer__openGL (void)
 {
-   free(uniformLocations);
    if (GLAD_GL_NV_copy_image == 0)
    {
       glDeleteFramebuffers(1, &glTemporaryFBO);
@@ -339,17 +441,19 @@ void terminateMap2DRenderer__openGL (void)
    glDeleteBuffers(1, &g_VBO);
    GL_CHECK_ERRORS;
    glDeleteVertexArrays(1, &g_VAO);
+   GL_CHECK_ERRORS;
    glDeleteTextures(1, &glTexturesArray);
+   GL_CHECK_ERRORS;
    glDeleteProgram(shaderProgram);
+   GL_CHECK_ERRORS;
 }
 
-int initMap2DRenderer__openGL (const struct LoadedTextures **textures, struct RendereringFunctions *funcStruct)
+int initMap2DRenderer__openGL (const struct cce_loadedtextures **textures)
 {
    {
-      /*strlen("define CCE_GLOBAL_OFFSET_MASK 0xXXXXXXXX\n") == 42*/
-      /*strlen("const uvec2 textureSize = uvec2(0.XXXXXXXX, 0.XXXXXXXX);") == 56*/
-      char vertexShaderAdditionalString[42 + 56 + 1] = "#define CCE_GLOBAL_OFFSET_MASK " CCE_MACRO_TO_STR(CCE_GLOBAL_OFFSET_MASK) "\nconst vec2 inverseTextureSize = vec2(";
-      sprintf(vertexShaderAdditionalString + strlen(vertexShaderAdditionalString), "%.8f, %.8f);", 1.0f / cceTextureSize->x, 1.0f / cceTextureSize->y);
+      /*strlen("const vec2 inverseTextureSize = vec2(0.XXXXXXXX, 0.XXXXXXXX);") == 61*/
+      char vertexShaderAdditionalString[61 + 1] = "const vec2 inverseTextureSize = vec2(";
+      sprintf(vertexShaderAdditionalString + 37, "%.8f, %.8f);", 1.0f / cceTextureSize->x, 1.0f / cceTextureSize->y);
       
       #ifdef SYSTEM_RESOURCE_PATH
       shaderProgram = cce__makeVFshaderProgram(SYSTEM_RESOURCE_PATH "shaders/vertex_shader.glsl", SYSTEM_RESOURCE_PATH "shaders/fragment_shader.glsl", vertexShaderAdditionalString, NULL);
@@ -364,9 +468,11 @@ int initMap2DRenderer__openGL (const struct LoadedTextures **textures, struct Re
       fputs("ENGINE::INIT::SHADERS_CANNOT_BE_LOADED", stderr);
       return -1;
    }
-   uniformLocations = malloc(1 * sizeof(GLint));
+   g_uniformLocations[0] = glGetUniformLocation(shaderProgram, "CameraTransform");
    GL_CHECK_ERRORS;
-   *(uniformLocations) = glGetUniformLocation(shaderProgram, "ViewMatrix");
+   g_uniformLocations[1] = glGetUniformLocation(shaderProgram, "ViewTransform");
+   GL_CHECK_ERRORS;
+   g_uniformLocations[2] = glGetUniformLocation(shaderProgram, "TextureOffset");
    GL_CHECK_ERRORS;
    glUseProgram(shaderProgram);
    GL_CHECK_ERRORS;
@@ -400,32 +506,36 @@ int initMap2DRenderer__openGL (const struct LoadedTextures **textures, struct Re
       glEnableVertexAttribArray(aCoordsLocation);
    }
    g_textures = textures;
-   stbi_set_flip_vertically_on_load(1);
+   glTexturesArray = 0;
+   g_rotationAngle = 0;
+   g_cameraPosition = (struct cce_i16vec2){0, 0};
+   g_pixelsPerCoordinate = 1;
    glUniform1i(glGetUniformLocation(shaderProgram, "Textures"), 0);
    GL_CHECK_ERRORS;
    glUniform1i(glGetUniformLocation(shaderProgram, "ElementInfo"), 1);
    GL_CHECK_ERRORS;
    glUniform1i(glGetUniformLocation(shaderProgram, "ElementData"), 2);
    GL_CHECK_ERRORS;
-   funcStruct->drawMap2D = drawMap2D__openGL;
-   funcStruct->map2DElementsToRenderingBuffer = map2DElementsToRenderingBuffer__openGL;
-   //funcStruct->renderingBufferToMap2DElements = renderingBufferToMap2DElements__openGL;
-   funcStruct->deleteMap2DRenderingBuffer = deleteMap2DRenderingBuffer__openGL;
-   funcStruct->loadTexture = loadTexture__openGL;
-   funcStruct->terminateMap2DRenderer = terminateMap2DRenderer__openGL;
-   funcStruct->getRenderingDataSize = getRenderingDataSize__openGL;
+   cce__renderingFunctions.drawMap2D = drawMap2D__openGL;
+   cce__renderingFunctions.map2DElementsToRenderingBuffer = map2DElementsToRenderingBuffer__openGL;
+   cce__renderingFunctions.deleteMap2DRenderingBuffer = deleteMap2DRenderingBuffer__openGL;
+   cce__renderingFunctions.loadTexture = loadTexture__openGL;
+   cce__renderingFunctions.terminateMap2DRenderer = terminateMap2DRenderer__openGL;
+   cce__renderingFunctions.getRenderingDataSize = getRenderingDataSize__openGL;
    if (GLAD_GL_NV_copy_image == 0)
    {
       glGenFramebuffers(1, &glTemporaryFBO);
-      funcStruct->reallocateTextureArray = resizeTextureArrayBegin__openGL_no_ext;
-      funcStruct->moveTextureFromOldArray = copyTextureToResizedArray__openGL_no_ext;
-      funcStruct->removeOldArray = resizeTextureArrayEnd__openGL_no_ext;
+      cce__renderingFunctions.reallocateTextureArray = resizeTextureArrayBegin__openGL_no_ext;
+      cce__renderingFunctions.moveTextureFromOldArray = copyTextureToResizedArray__openGL_no_ext;
+      cce__renderingFunctions.removeOldArray = resizeTextureArrayEnd__openGL_no_ext;
    }
    else
    {
-      funcStruct->reallocateTextureArray = resizeTextureArrayBegin__openGL_copy_image_ext;
-      funcStruct->moveTextureFromOldArray = copyTextureToResizedArray__openGL_copy_image_ext;
-      funcStruct->removeOldArray = resizeTextureArrayEnd__openGL_copy_image_ext;
+      cce__renderingFunctions.reallocateTextureArray = resizeTextureArrayBegin__openGL_copy_image_ext;
+      cce__renderingFunctions.moveTextureFromOldArray = copyTextureToResizedArray__openGL_copy_image_ext;
+      cce__renderingFunctions.removeOldArray = resizeTextureArrayEnd__openGL_copy_image_ext;
    }
+   updateView();
+   updateCamera();
    return 0;
 }

@@ -31,7 +31,7 @@ extern "C"
 #include <stdio.h>
 
 #include "cce_exports.h"
-#define CCE_PUBLIC_OPTIONS CCE_EXPORTS
+#define CCE_API CCE_EXPORTS
 
 #if defined(_WIN32) || defined(__WIN32__) || defined(_WIN64) || defined(__TOS_WIN__) || defined(__WINDOWS__) || \
     defined(__MINGW32__) || defined(__MINGW64__) || defined(__CYGWIN__)
@@ -44,17 +44,17 @@ extern "C"
 #define cceNativePathDelimiter '/'
 #endif
 
-CCE_PUBLIC_OPTIONS char* cceCreateNewPathFromOldPath (const char *oldPath, const char *appendPath, size_t freeSpaceToLeave);
-CCE_PUBLIC_OPTIONS void  cceTruncateFile (FILE *file, size_t size);
-CCE_PUBLIC_OPTIONS char* cceGetAbsolutePath (const char *path, size_t spaceToLeave);
-CCE_PUBLIC_OPTIONS int   cceSetCurrentPath (const char *path);
-CCE_PUBLIC_OPTIONS char* cceGetDirectory (char *path, size_t bufferSize);
-CCE_PUBLIC_OPTIONS char* cceGetCurrentPath (size_t spaceToLeave);
-CCE_PUBLIC_OPTIONS void  cceDeleteDirectory (const char *path);
-CCE_PUBLIC_OPTIONS char* cceGetAppDataPath (const char *folderName, size_t spaceToLeave);
-CCE_PUBLIC_OPTIONS char* cceAppendPath (char *buffer, size_t bufferSize, const char *append);
-CCE_PUBLIC_OPTIONS char* cceGetTemporaryDirectory (size_t spaceToLeave);
-CCE_PUBLIC_OPTIONS void  cceTerminateTemporaryDirectory (void);
+CCE_API char* cceCreateNewPathFromOldPath (const char *oldPath, const char *appendPath, size_t freeSpaceToLeave);
+CCE_API void  cceTruncateFile (FILE *file, size_t size);
+CCE_API char* cceGetAbsolutePath (const char *path, size_t spaceToLeave);
+CCE_API int   cceSetCurrentPath (const char *path);
+CCE_API char* cceGetDirectory (char *path, size_t bufferSize);
+CCE_API char* cceGetCurrentPath (size_t spaceToLeave);
+CCE_API void  cceDeleteDirectory (const char *path);
+CCE_API char* cceGetAppDataPath (const char *folderName, size_t spaceToLeave);
+CCE_API char* cceAppendPath (char *buffer, size_t bufferSize, const char *append);
+CCE_API char* cceGetTemporaryDirectory (size_t spaceToLeave);
+CCE_API void  cceTerminateTemporaryDirectory (void);
 
 #ifdef __cplusplus
 }

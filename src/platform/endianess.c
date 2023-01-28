@@ -26,22 +26,22 @@
 
 #define CCE_UNUSED(x) (void)(x)
 
-CCE_PUBLIC_OPTIONS uint16_t (*cceLittleEndianConversionInt16) (uint16_t) = NULL;
-CCE_PUBLIC_OPTIONS uint32_t (*cceLittleEndianConversionInt32) (uint32_t) = NULL;
-CCE_PUBLIC_OPTIONS uint64_t (*cceLittleEndianConversionInt64) (uint64_t) = NULL;
-CCE_PUBLIC_OPTIONS void* (*cceLittleEndianConversionArrayIntN)    (void*, size_t, size_t)        = NULL;
-CCE_PUBLIC_OPTIONS void* (*cceLittleEndianConversionNewArrayIntN) (void*, const void*, size_t, size_t) = NULL;
-CCE_PUBLIC_OPTIONS uint16_t (*cceBigEndianConversionInt16) (uint16_t) = NULL;
-CCE_PUBLIC_OPTIONS uint32_t (*cceBigEndianConversionInt32) (uint32_t) = NULL;
-CCE_PUBLIC_OPTIONS uint64_t (*cceBigEndianConversionInt64) (uint64_t) = NULL;
-CCE_PUBLIC_OPTIONS void* (*cceBigEndianConversionArrayIntN)    (void*, size_t, size_t)        = NULL;
-CCE_PUBLIC_OPTIONS void* (*cceBigEndianConversionNewArrayIntN) (void*, const void*, size_t, size_t) = NULL;
+CCE_API uint16_t (*cceLittleEndianConversionInt16) (uint16_t) = NULL;
+CCE_API uint32_t (*cceLittleEndianConversionInt32) (uint32_t) = NULL;
+CCE_API uint64_t (*cceLittleEndianConversionInt64) (uint64_t) = NULL;
+CCE_API void* (*cceLittleEndianConversionArrayIntN)    (void*, size_t, size_t)        = NULL;
+CCE_API void* (*cceLittleEndianConversionNewArrayIntN) (void*, const void*, size_t, size_t) = NULL;
+CCE_API uint16_t (*cceBigEndianConversionInt16) (uint16_t) = NULL;
+CCE_API uint32_t (*cceBigEndianConversionInt32) (uint32_t) = NULL;
+CCE_API uint64_t (*cceBigEndianConversionInt64) (uint64_t) = NULL;
+CCE_API void* (*cceBigEndianConversionArrayIntN)    (void*, size_t, size_t)        = NULL;
+CCE_API void* (*cceBigEndianConversionNewArrayIntN) (void*, const void*, size_t, size_t) = NULL;
 
 // 0 - Big Endian, 1 - Little Endian
-static cce_endianess endianess;
-CCE_PUBLIC_OPTIONS const cce_endianess *const g_endianess = &endianess;
+static cce_endianess g_endianess;
+CCE_API const cce_endianess *const cceEndianess = &g_endianess;
 
-CCE_PUBLIC_OPTIONS uint16_t cceSwapEndianInt16 (uint16_t value)
+CCE_API uint16_t cceSwapEndianInt16 (uint16_t value)
 {
    uint8_t *bytes = (uint8_t*) &value;
    register uint8_t buffer;
@@ -51,7 +51,7 @@ CCE_PUBLIC_OPTIONS uint16_t cceSwapEndianInt16 (uint16_t value)
    return value;
 }
 
-CCE_PUBLIC_OPTIONS uint32_t cceSwapEndianInt32 (uint32_t value)
+CCE_API uint32_t cceSwapEndianInt32 (uint32_t value)
 {
    uint8_t *bytes = (uint8_t*) &value;
    register uint8_t buffer;
@@ -64,7 +64,7 @@ CCE_PUBLIC_OPTIONS uint32_t cceSwapEndianInt32 (uint32_t value)
    return value;
 }
 
-CCE_PUBLIC_OPTIONS uint64_t cceSwapEndianInt64 (uint64_t value)
+CCE_API uint64_t cceSwapEndianInt64 (uint64_t value)
 {
    uint8_t *bytes = (uint8_t*) &value;
    register uint8_t buffer;
@@ -83,7 +83,7 @@ CCE_PUBLIC_OPTIONS uint64_t cceSwapEndianInt64 (uint64_t value)
    return value;
 }
 
-CCE_PUBLIC_OPTIONS void* cceSwapEndianArrayIntN (void *array, size_t arraySize, size_t n)
+CCE_API void* cceSwapEndianArrayIntN (void *array, size_t arraySize, size_t n)
 {
    register uint8_t buffer;
    for (uint8_t *iterator = (uint8_t*) array, *end = ((uint8_t*) array) + arraySize * n; iterator < end; iterator += n)
@@ -98,7 +98,7 @@ CCE_PUBLIC_OPTIONS void* cceSwapEndianArrayIntN (void *array, size_t arraySize, 
    return array;
 }
 
-CCE_PUBLIC_OPTIONS void* cceSwapEndianNewArrayIntN (void *newArray, const void *array, size_t arraySize, size_t n)
+CCE_API void* cceSwapEndianNewArrayIntN (void *newArray, const void *array, size_t arraySize, size_t n)
 {
    for (uint8_t *iterator = (uint8_t*) array, *jiterator = (uint8_t*) newArray, *end = ((uint8_t*) array) + arraySize * n;
         iterator < end; iterator += n)
@@ -127,14 +127,14 @@ static uint64_t ccePreserveEndianInt64 (uint64_t value)
    return value;
 }
 
-CCE_PUBLIC_OPTIONS void* ccePreserveEndianArrayIntN (void *array, size_t arraySize, size_t n)
+CCE_API void* ccePreserveEndianArrayIntN (void *array, size_t arraySize, size_t n)
 {
    CCE_UNUSED(arraySize);
    CCE_UNUSED(n);
    return array;
 }
 
-CCE_PUBLIC_OPTIONS void* ccePreserveEndianNewArrayIntN (void *newArray, const void *array, size_t arraySize, size_t n)
+CCE_API void* ccePreserveEndianNewArrayIntN (void *newArray, const void *array, size_t arraySize, size_t n)
 {
    memcpy(newArray, array, arraySize * n);
    return newArray;
@@ -147,10 +147,10 @@ static inline uint8_t getEndianess (void)
    return a == *b;
 }
 
-CCE_PUBLIC_OPTIONS void cceInitEndianConversion (void)
+CCE_API void cceInitEndianConversion (void)
 {
-   endianess = getEndianess();
-   if (endianess == CCE_BIG_ENDIAN)
+   g_endianess = getEndianess();
+   if (g_endianess == CCE_BIG_ENDIAN)
    {
       cceLittleEndianConversionInt16 = cceSwapEndianInt16;
       cceLittleEndianConversionInt32 = cceSwapEndianInt32;

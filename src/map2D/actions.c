@@ -63,6 +63,8 @@ struct Action
    uint32_t ID;
 };
 
+/*
+
 static void transformAction (const void *data, uint8_t count)
 {
    const struct transformAction *params = data;
@@ -137,7 +139,7 @@ static void changeColorAction (const void *data, uint8_t count)
    }
    cceChangeColorGroup(params->groupID, params->color, params->actionType);
 }
-
+*/
 static void runActionsAction (const void *data, uint8_t count)
 {
    const struct runActions *params = data;
@@ -171,7 +173,7 @@ static void delayActionAction (const void *data, uint8_t count)
    else
       cceDelayAction(params->timerInfo.delay / count, params->repeatsQuantity, params->delayedActionStructSize, ((void*) (params + 1)), params->flags); // Integer division is painfully slow
 }
-
+/*
 static void transformActionSwapEndian (void *data)
 {
    struct transformAction *params = (struct transformAction*) data;
@@ -198,6 +200,7 @@ static void changeColorActionSwapEndian (void *data)
    if (params->color.rgb.type != CCE_COLOR_RGB)
       params->color.hsv.h = cceSwapEndianInt16(params->color.hsv.h);
 }
+*/
 
 static void runActionsActionSwapEndian (void *data)
 {
@@ -265,7 +268,7 @@ static int loadActions (void *buffer, uint8_t sectionSize, struct cce_buffer *in
    CCE_UNUSED(info);
    CCE_UNUSED(sectionSize);
    uint32_t onLoadActionsSize = 0, onFreeActionsSize = 0;
-   struct ActionInfo *map = buffer;
+   struct cce_actioninfo *map = buffer;
    void *onLoadActions;
    uint16_t *onLoadActionsSizes;
    uint16_t onLoadActionsQuantity;
@@ -285,7 +288,7 @@ static int loadActionsDynamic (void *buffer, uint8_t sectionSize, struct cce_buf
    CCE_UNUSED(info);
    CCE_UNUSED(sectionSize);
    uint32_t onLoadActionsSize = 0, onFreeActionsSize = 0;
-   struct DynamicActionInfo *map = buffer;
+   struct cce_dynamicactioninfo *map = buffer;
    CCE__LOAD_ACTION_METADATA(map, file, map->onLoadActions, map->onFreeActions, onLoadActionsSize, onFreeActionsSize);
    CCE__LOAD_ACTIONS(map, file, map->onLoadActions, map->onFreeActions, onLoadActionsSize, onFreeActionsSize,
                      malloc(onLoadActionsSize), 
@@ -301,9 +304,9 @@ static int loadActionsDynamic (void *buffer, uint8_t sectionSize, struct cce_buf
 static void createActions (void *buffer, struct cce_buffer *info)
 {
    CCE_UNUSED(info);
-   struct DynamicActionInfo *map = buffer;
-   CCE_ALLOC_ARRAY(map->onLoadActionsSizes);
-   CCE_ALLOC_ARRAY(map->onFreeActionsSizes);
+   struct cce_dynamicactioninfo *map = buffer;
+   CCE_ALLOC_ARRAY(map->onLoadActionsSizes, 1);
+   CCE_ALLOC_ARRAY(map->onFreeActionsSizes, 1);
    map->onLoadActions = NULL;
    map->onFreeActions = NULL;
 }
@@ -311,14 +314,14 @@ static void createActions (void *buffer, struct cce_buffer *info)
 static void freeActions (void *buffer, struct cce_buffer *info)
 {
    CCE_UNUSED(info);
-   struct ActionInfo *map = buffer;
+   struct cce_actioninfo *map = buffer;
    free(map->onFreeActions);
 }
 
 static void freeActionsDynamic (void *buffer, struct cce_buffer *info)
 {
    CCE_UNUSED(info);
-   struct DynamicActionInfo *map = buffer;
+   struct cce_dynamicactioninfo *map = buffer;
    free(map->onLoadActions);
    free(map->onLoadActionsSizes);
    free(map->onFreeActions);
@@ -352,7 +355,7 @@ for (cce_void *iterator = (cce_void*) action; sizes < end; iterator += *sizes++)
 static uint8_t storeActions (void *buffer, struct cce_buffer *info, FILE *file)
 {
    CCE_UNUSED(info);
-   struct DynamicActionInfo *map = buffer;
+   struct cce_dynamicactioninfo *map = buffer;
    uint16_t tmp = cceHostEndianToLittleEndianInt16(map->onLoadActionsQuantity);
    fwrite(&tmp, sizeof(uint16_t), 1, file);
    tmp = cceHostEndianToLittleEndianInt16(map->onFreeActionsQuantity);
@@ -362,7 +365,7 @@ static uint8_t storeActions (void *buffer, struct cce_buffer *info, FILE *file)
    uint32_t bytesWritten[4] = {0};
    uint16_t *sizes, *end;
    uint16_t maxSize = 0;
-   if (g_endianess == CCE_BIG_ENDIAN)
+   if (cceEndianess == CCE_BIG_ENDIAN)
    {
       sizes = map->onLoadActionsSizes, end = map->onLoadActionsSizes + map->onLoadActionsQuantity;
       for (uint16_t *iterator = sizes; iterator < end; ++iterator)
@@ -394,20 +397,20 @@ void cce__actionsInit (void)
 {
    actionsQuantity = CCE_BASIC_ACTIONS_QUANTITY * 2;
    timersQuantity = 0;
-   CCE_ALLOC_ARRAY_ZEROED(timers);
-   CCE_ALLOC_ARRAY_ZEROED(actions);
+   CCE_ALLOC_ARRAY_ZEROED(timers, 1);
+   CCE_ALLOC_ARRAY_ZEROED(actions, 1);
    delayedActionsWithExternalTimerQuantity = 0;
    delayedActions = LL_LIST_INIT(LL_SINGLELINKED);
    endianSwapActions = (void (**)(void*)) calloc(actionsQuantity, sizeof(void (*)(void*)));
    nextTimer = NULL;
    nextDelayedActionWithoutExternalTimer = NULL;
    lastDelayedActionWithExternalTimer = NULL;
-   cceRegisterFileIOcallbacks(cce__staticMapFunctionSet,  loadActions,        freeActions,        NULL,         NULL,         sizeof(struct ActionInfo));
-   cceRegisterFileIOcallbacks(cce__dynamicMapFunctionSet, loadActionsDynamic, freeActionsDynamic, createActions, storeActions, sizeof(struct DynamicActionInfo));
-   cceRegisterAction(CCE_TRANSFORM_ACTION,            transformAction,            transformActionSwapEndian);
-   cceRegisterAction(CCE_COMBINEDTRANSFORM_ACTION,    combinedTransformAction,    combinedTransformActionSwapEndian);
-   cceRegisterAction(CCE_OFFSETTEXTURE_ACTION,        offsetTextureAction,        offsetTextureActionSwapEndian);
-   cceRegisterAction(CCE_CHANGECOLOR_ACTION,          changeColorAction,          changeColorActionSwapEndian);
+   cceRegisterFileIOcallbacks(cce__staticMapFunctionSet,  loadActions,        freeActions,        NULL,         NULL,         sizeof(struct cce_actioninfo));
+   cceRegisterFileIOcallbacks(cce__dynamicMapFunctionSet, loadActionsDynamic, freeActionsDynamic, createActions, storeActions, sizeof(struct cce_dynamicactioninfo));
+   //cceRegisterAction(CCE_TRANSFORM_ACTION,            transformAction,            transformActionSwapEndian);
+   //cceRegisterAction(CCE_COMBINEDTRANSFORM_ACTION,    combinedTransformAction,    combinedTransformActionSwapEndian);
+   //cceRegisterAction(CCE_OFFSETTEXTURE_ACTION,        offsetTextureAction,        offsetTextureActionSwapEndian);
+   //cceRegisterAction(CCE_CHANGECOLOR_ACTION,          changeColorAction,          changeColorActionSwapEndian);
    cceRegisterAction(CCE_DELAYACTION_ACTION,          delayActionAction,          delayActionActionSwapEndian);
    cceRegisterAction(CCE_RUNACTIONS_ACTION,           runActionsAction,           runActionsActionSwapEndian);
    cceRegisterAction(CCE_STARTTIMER_ACTION,           setTimerStateAction,        setTimerStateActionSwapEndian);
@@ -422,7 +425,7 @@ void cce__actionsTerminate (void)
    free(timers);
 }
 
-CCE_PUBLIC_OPTIONS uint8_t cceRegisterAction (uint32_t ID, cce_actionfun action, void (*endianSwap)(void*))
+CCE_API uint8_t cceRegisterAction (uint32_t ID, cce_actionfun action, void (*endianSwap)(void*))
 {
    if (ID >= actionsAllocated)
    {
@@ -443,6 +446,7 @@ CCE_PUBLIC_OPTIONS uint8_t cceRegisterAction (uint32_t ID, cce_actionfun action,
    return 0u;
 }
 
+/*
 CCE_PUBLIC_OPTIONS void cceMoveGroup (uint8_t groupID, struct cce_i16vec2 coords, cce_enum actionType)
 {
    --groupID;
@@ -467,7 +471,7 @@ CCE_PUBLIC_OPTIONS void cceMoveGroup (uint8_t groupID, struct cce_i16vec2 coords
    return;
 }
 
-/* Group iteration is from 1, not 0 */
+// Group iteration is from 1, not 0
 CCE_PUBLIC_OPTIONS void cceScaleGroup (uint8_t groupID, struct cce_i16vec2 size, cce_enum actionType)
 {
    if (groupID == 0u) return;
@@ -499,7 +503,7 @@ CCE_PUBLIC_OPTIONS uint8_t cceNormalizeAngle (float angleInDegrees)
    return angleInDegrees * (255.0f/360.0f);
 }
 
-/* Group iteration is from 1, not 0 */
+// Group iteration is from 1, not 0
 CCE_PUBLIC_OPTIONS void cceRotateWithOffsetGroup (uint8_t groupID, uint8_t normalizedAngle, struct cce_i16vec2 offset, cce_enum actionType)
 {
    if (groupID == 0u) return;
@@ -528,7 +532,7 @@ CCE_PUBLIC_OPTIONS void cceRotateWithOffsetGroup (uint8_t groupID, uint8_t norma
    }
 }
 
-/* Group iteration is from 1, not 0 */
+// Group iteration is from 1, not 0
 CCE_PUBLIC_OPTIONS void cceRotateGroup (uint8_t groupID, uint8_t normalizedAngle, cce_enum actionType)
 {
    if (groupID == 0u) return;
@@ -551,7 +555,7 @@ CCE_PUBLIC_OPTIONS void cceRotateGroup (uint8_t groupID, uint8_t normalizedAngle
    }
 }
 
-/* Group iteration is from 1, not 0 */
+// Group iteration is from 1, not 0
 CCE_PUBLIC_OPTIONS void cceChangeColorGroup (uint8_t groupID, union cce_color color, cce_enum actionType)
 {
    if (groupID == 0u || groupID > 128) return;
@@ -624,8 +628,9 @@ CCE_PUBLIC_OPTIONS void cceOffsetTextureGroup (uint8_t groupID, struct cce_i16ve
       default: break;
    }
 }
+*/
 
-CCE_PUBLIC_OPTIONS void cceSetTimerState (uint16_t timerID, uint8_t state)
+CCE_API void cceSetTimerState (uint16_t timerID, uint8_t state)
 {
    if (timerID >= timersAllocated)
    {
@@ -638,7 +643,7 @@ CCE_PUBLIC_OPTIONS void cceSetTimerState (uint16_t timerID, uint8_t state)
    cce__map2Dflags |= CCE_PROCESS_TIMERS;
 }
 
-CCE_PUBLIC_OPTIONS void cceSetTimerDelay (uint16_t timerID, uint32_t newDelay, uint8_t actionType)
+CCE_API void cceSetTimerDelay (uint16_t timerID, uint32_t newDelay, uint8_t actionType)
 {
    if (timerID >= timersAllocated)
    {
@@ -664,7 +669,7 @@ CCE_PUBLIC_OPTIONS void cceSetTimerDelay (uint16_t timerID, uint32_t newDelay, u
    timers[timerID].delay = newDelay;
 }
 
-CCE_PUBLIC_OPTIONS void cceDelayAction (uint16_t repeatsQuantity, uint32_t delayOrID, uint32_t actionStructSize, void *actionStruct, uint8_t flags)
+CCE_API void cceDelayAction (uint16_t repeatsQuantity, uint32_t delayOrID, uint32_t actionStructSize, void *actionStruct, uint8_t flags)
 {
    if (flags & CCE_DELAYACTION_EXECUTE_ON_START)
       EXEC_ACTION(actionStruct, 1);

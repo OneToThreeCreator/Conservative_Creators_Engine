@@ -46,19 +46,19 @@ struct name \
 }
 
 template <typename T, typename ST>
-static inline void cce__alloc_array(T **array, ST &array_size)
+static inline void cce__alloc_array(T **array, ST array_size)
 {
-   *array = static_cast<T*>(std::malloc((array_size = 1) * sizeof(T)));
+   *array = static_cast<T*>(std::malloc(array_size * sizeof(T)));
 }
 
-#define CCE_ALLOC_ARRAY(name) cce__alloc_array(&name, name ## Allocated)
+#define CCE_ALLOC_ARRAY(name, size) cce__alloc_array(&name, CCE_CEIL_TO_POWER_OF_TWO(size, name ## Allocated))
 
 template <typename T, typename ST>
-static inline void cce__alloc_array_zeroed(T **array, ST &array_size)
+static inline void cce__alloc_array_zeroed(T **array, ST array_size)
 {
-   *array = static_cast<T*>(std::calloc(array_size = 1, sizeof(T)));
+   *array = static_cast<T*>(std::calloc(array_size, sizeof(T)));
 }
-#define CCE_ALLOC_ARRAY_ZEROED(name) cce__alloc_array_zeroed(&name, name ## Allocated);
+#define CCE_ALLOC_ARRAY_ZEROED(name) cce__alloc_array_zeroed(&name, CCE_CEIL_TO_POWER_OF_TWO(size, name ## Allocated));
 
 template <typename T, typename ST>
 static inline void cce__realloc_array(T **array, ST &array_size, ST array_new_size)

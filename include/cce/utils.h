@@ -22,7 +22,7 @@
 #define UTILS_H
 
 #include "cce_exports.h"
-#define CCE_PUBLIC_OPTIONS CCE_EXPORTS
+#define CCE_API CCE_EXPORTS
 #include <stdint.h>
 
 #define CCE_UNUSED(x) (void)(x)
@@ -33,7 +33,8 @@
 #define CCE__MACRO_TO_STR(x) #x 
 #define CCE_MACRO_TO_STR(x) CCE__MACRO_TO_STR(x)
 
-#define CCE_STREQ(x,literal) (memcmp(x, literal, strlen(literal) + 1) == 0)
+// Compares string and literal, returns true if they are equal. x must be at least as big as literal (or buffer overrun will happen).
+#define CCE_STREQ(x, literal) (memcmp(x, literal, strlen(literal) + 1) == 0)
 
 #define CCE_CEIL_TO_POWER_OF_TWO(x, result) \
 (result = (x) - ((x) != 0), \
@@ -92,10 +93,7 @@ extern "C"
 #define CCE_MAX(x,y) (((x)>(y))?(x): (y))
 #define CCE_MIN(x,y) (((x)<(y))?(x): (y))
 #define CCE_ABS(x)   (((x)>=0) ?(x):(-x))
-
-// Bitfield size cannot be negative. Positive is jist fine
-#define CCE_UNSIGNED_ONLY(t) struct CCE_MACRO_CONCAT(CCE__ERROR_TYPE_MUST_BE_UNSIGNED_L, __LINE__) {int CHECK : ((((t) -1) < 0) * -2 + 1);}
-#define CCE_SIGNED_ONLY(t)   struct CCE_MACRO_CONCAT(CCE__ERROR_TYPE_MUST_BE_SIGNED_L,   __LINE__) {int CHECK : ((((t) -1) > 0) * -2 + 1);}
+#define CCE_CLAMP(x, min, max) (((x) < (max)) ? (((x) > (min)) ? (x) : (min)) : (max))
 
 // sizeType MUST be unsigned
 #define CCE_ARRAY(name, type, sizeType) \
@@ -111,8 +109,8 @@ struct name \
    sizeType dataAllocated; \
 } \
 
-#define CCE_ALLOC_ARRAY(name)        (name) = malloc(((name ## Allocated) = 1) * sizeof(*(name)))
-#define CCE_ALLOC_ARRAY_ZEROED(name) (name) = calloc(((name ## Allocated) = 1),  sizeof(*(name)))
+#define CCE_ALLOC_ARRAY(name, size)        (name) = malloc(CCE_CEIL_TO_POWER_OF_TWO(size, (name ## Allocated)) * sizeof(*(name)))
+#define CCE_ALLOC_ARRAY_ZEROED(name, size) (name) = calloc(CCE_CEIL_TO_POWER_OF_TWO(size, (name ## Allocated)),  sizeof(*(name)))
 
 #define CCE__REALLOC_ARRAY(name, newQuantity) \
 size_t oldAllocated = name ## Allocated; \
@@ -145,36 +143,36 @@ struct UnicodeCharWithSize
    uint32_t size;
 };
 
-CCE_PUBLIC_OPTIONS char*    cceReverseMemory (char *memory, size_t size);
-CCE_PUBLIC_OPTIONS uint32_t cceGetCharSizeUTF8 (const unsigned char *ch);
-CCE_PUBLIC_OPTIONS uint32_t cceGetCharUTF8 (const unsigned char *ch);
-CCE_PUBLIC_OPTIONS struct UnicodeCharWithSize cceGetCharWithSizeUTF8 (const unsigned char *ch);
-CCE_PUBLIC_OPTIONS uint32_t cceGetCharFromStringUTF8 (const char *string, size_t position);
-CCE_PUBLIC_OPTIONS uint8_t  cceCeilToPowerOfTwoInt8 (uint8_t x);
-CCE_PUBLIC_OPTIONS uint16_t cceCeilToPowerOfTwoInt16 (uint16_t x);
-CCE_PUBLIC_OPTIONS uint32_t cceCeilToPowerOfTwoInt32 (uint32_t x);
-CCE_PUBLIC_OPTIONS uint64_t cceCeilToPowerOfTwoInt64 (uint64_t x);
-CCE_PUBLIC_OPTIONS uint8_t  cceU8Pow  (uint8_t base,  uint8_t exponent);
-CCE_PUBLIC_OPTIONS uint16_t cceU16Pow (uint16_t base, uint16_t exponent);
-CCE_PUBLIC_OPTIONS uint32_t cceU32Pow (uint32_t base, uint32_t exponent);
-CCE_PUBLIC_OPTIONS uint64_t cceU64Pow (uint64_t base, uint64_t exponent);
-CCE_PUBLIC_OPTIONS uint8_t  cceKeepHighBitInt8 (uint8_t x);
-CCE_PUBLIC_OPTIONS uint16_t cceKeepHighBitInt16 (uint16_t x);
-CCE_PUBLIC_OPTIONS uint32_t cceKeepHighBitInt32 (uint32_t x);
-CCE_PUBLIC_OPTIONS uint64_t cceKeepHighBitInt64 (uint64_t x);
-CCE_PUBLIC_OPTIONS float cceFastSinInt8 (uint8_t x);
-CCE_PUBLIC_OPTIONS char* cceConvertIntToBase64String (size_t number, char *buffer, uint8_t symbolsQuantity);
+CCE_API char*    cceReverseMemory (char *memory, size_t size);
+CCE_API uint32_t cceGetCharSizeUTF8 (const unsigned char *ch);
+CCE_API uint32_t cceGetCharUTF8 (const unsigned char *ch);
+CCE_API struct UnicodeCharWithSize cceGetCharWithSizeUTF8 (const unsigned char *ch);
+CCE_API uint32_t cceGetCharFromStringUTF8 (const char *string, size_t position);
+CCE_API uint8_t  cceCeilToPowerOfTwoInt8 (uint8_t x);
+CCE_API uint16_t cceCeilToPowerOfTwoInt16 (uint16_t x);
+CCE_API uint32_t cceCeilToPowerOfTwoInt32 (uint32_t x);
+CCE_API uint64_t cceCeilToPowerOfTwoInt64 (uint64_t x);
+CCE_API uint8_t  cceU8Pow  (uint8_t base,  uint8_t exponent);
+CCE_API uint16_t cceU16Pow (uint16_t base, uint16_t exponent);
+CCE_API uint32_t cceU32Pow (uint32_t base, uint32_t exponent);
+CCE_API uint64_t cceU64Pow (uint64_t base, uint64_t exponent);
+CCE_API uint8_t  cceKeepHighBitInt8 (uint8_t x);
+CCE_API uint16_t cceKeepHighBitInt16 (uint16_t x);
+CCE_API uint32_t cceKeepHighBitInt32 (uint32_t x);
+CCE_API uint64_t cceKeepHighBitInt64 (uint64_t x);
+CCE_API float cceFastSinInt8 (uint8_t x);
+CCE_API char* cceConvertIntToBase64String (size_t number, char *buffer, uint8_t symbolsQuantity);
 
-CCE_PUBLIC_OPTIONS size_t cceStringToLowercase (char *str);
-CCE_PUBLIC_OPTIONS void cceMemoryToLowercase (char *str, size_t size);
-CCE_PUBLIC_OPTIONS size_t cceStringToUppercase (char *str);
-CCE_PUBLIC_OPTIONS void cceMemoryToUppercase (char *str, size_t size);
-CCE_PUBLIC_OPTIONS uint8_t cceStringToBool (const char *str);
+CCE_API size_t cceStringToLowercase (char *str);
+CCE_API void cceMemoryToLowercase (char *str, size_t size);
+CCE_API size_t cceStringToUppercase (char *str);
+CCE_API void cceMemoryToUppercase (char *str, size_t size);
+CCE_API uint8_t cceStringToBool (const char *str);
 
-#define cceFastCosInt8(x) cceFastSinInt8(x + 64)
+#define cceFastCosInt8(x) cceFastSinInt8(x + 64u)
 
 #define CCE__STRING_TO_SXVECY(sign, signUpper, uIfUnsigned, bits, comp) \
-CCE_PUBLIC_OPTIONS struct cce_ ## sign ## bits ## vec ## comp cceStringTo ## signUpper ## bits ## Vec ## comp (const char *string)
+CCE_API struct cce_ ## sign ## bits ## vec ## comp cceStringTo ## signUpper ## bits ## Vec ## comp (const char *string)
 
 #define CCE__STRING_TO_XVECY(bits, comp) \
 CCE__STRING_TO_SXVECY(i, I, , bits, comp); \

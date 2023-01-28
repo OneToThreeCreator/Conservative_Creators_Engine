@@ -28,12 +28,12 @@ extern "C"
 {
 #endif // __cplusplus
 
-#define CCE_ACTION_SHIFT 0x0
-#define CCE_ACTION_SET   0x1
-
 /*
    Every structure here has 32-bit alignment. Using 64-bit aligned structures is not recommended, due to a possibility of misaligned reading
 */
+
+#define CCE_ACTION_SHIFT 0x0
+#define CCE_ACTION_SET 0x1
 
 #define CCE_ROTATE_FLIP 0x2
 
@@ -177,17 +177,17 @@ struct runActions
    uint16_t actionSizes[1]; // Can be more than 1 - depends on quantity. Last is omitted! When even must be pad to keep everithing aligned.
 };
 
-CCE_PUBLIC_OPTIONS void    cceMoveGroup (uint8_t groupID,  struct cce_i16vec2 coords, cce_enum actionType);
-CCE_PUBLIC_OPTIONS void    cceScaleGroup (uint8_t groupID, struct cce_i16vec2 size,   cce_enum actionType);
-CCE_PUBLIC_OPTIONS uint8_t cceNormalizeAngle (float angleInDegrees);
-CCE_PUBLIC_OPTIONS void    cceRotateWithOffsetGroup (uint8_t groupID, uint8_t normalizedAngle, struct cce_i16vec2 offset, cce_enum actionType);
-CCE_PUBLIC_OPTIONS void    cceRotateGroup (uint8_t groupID, uint8_t normalizedAngle, cce_enum actionType);
-CCE_PUBLIC_OPTIONS void    cceOffsetTextureGroup (uint8_t groupID, struct cce_i16vec2 offset, cce_enum actionType);
-CCE_PUBLIC_OPTIONS void    cceChangeColorGroup (uint8_t groupID, union cce_color color, cce_enum actionType);
-CCE_PUBLIC_OPTIONS void    cceSetTimerDelay (uint16_t timerID, uint32_t newDelay, uint8_t actionType);
-CCE_PUBLIC_OPTIONS void    cceSetTimerState (uint16_t timerID, uint8_t state);
-CCE_PUBLIC_OPTIONS void    cceDelayAction (uint16_t repeatsQuantity, uint32_t delayOrID, uint32_t actionStructSize, void *actionStruct, uint8_t flags);
-CCE_PUBLIC_OPTIONS uint8_t cceRegisterAction (uint32_t ID, cce_actionfun action, void (*endianSwap)(void*));
+CCE_API void    cceMoveGroup (uint8_t groupID,  struct cce_i16vec2 coords, cce_enum actionType);
+CCE_API void    cceScaleGroup (uint8_t groupID, struct cce_i16vec2 size,   cce_enum actionType);
+CCE_API uint8_t cceNormalizeAngle (float angleInDegrees);
+CCE_API void    cceRotateWithOffsetGroup (uint8_t groupID, uint8_t normalizedAngle, struct cce_i16vec2 offset, cce_enum actionType);
+CCE_API void    cceRotateGroup (uint8_t groupID, uint8_t normalizedAngle, cce_enum actionType);
+CCE_API void    cceOffsetTextureGroup (uint8_t groupID, struct cce_i16vec2 offset, cce_enum actionType);
+CCE_API void    cceChangeColorGroup (uint8_t groupID, union cce_color color, cce_enum actionType);
+CCE_API void    cceSetTimerDelay (uint16_t timerID, uint32_t newDelay, uint8_t actionType);
+CCE_API void    cceSetTimerState (uint16_t timerID, uint8_t state);
+CCE_API void    cceDelayAction (uint16_t repeatsQuantity, uint32_t delayOrID, uint32_t actionStructSize, void *actionStruct, uint8_t flags);
+CCE_API uint8_t cceRegisterAction (uint32_t ID, cce_actionfun action, void (*endianSwap)(void*));
 
 #define CCE_TRANSFORM_ACTION 0
 #define CCE_COMBINEDTRANSFORM_ACTION 1
@@ -224,7 +224,7 @@ do \
    fread(onFree ## Sizes, sizeof(uint16_t), onFree ## Quantity, file); \
    fread(onFree,  1, onFreeSize,  file); \
    \
-   if (g_endianess == CCE_BIG_ENDIAN) \
+   if (cceEndianess == CCE_BIG_ENDIAN) \
    { \
       cceSwapEndianArrayIntN(onLoad ## Sizes, onLoad ## Quantity, 2); \
       cceSwapEndianArrayIntN(onFree ## Sizes, onFree ## Quantity, 2); \

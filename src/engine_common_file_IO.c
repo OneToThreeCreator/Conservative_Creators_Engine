@@ -45,7 +45,7 @@ struct cce_IO_function_set
 
 CCE_ARRAY(IOfunctionSet, static struct cce_IO_function_set, static uint16_t);
 
-CCE_PUBLIC_OPTIONS FILE* cceMoveFileContent (FILE *file, long offset, int position, size_t size)
+CCE_API FILE* cceMoveFileContent (FILE *file, long offset, int position, size_t size)
 {
    char buffer[1024];
    long readOffset = ftell(file) + (size & 1023);
@@ -63,12 +63,12 @@ CCE_PUBLIC_OPTIONS FILE* cceMoveFileContent (FILE *file, long offset, int positi
    return file;
 }
 
-CCE_PUBLIC_OPTIONS uint16_t cceGetFileIOfunctionSet (void)
+CCE_API uint16_t cceGetFileIOfunctionSet (void)
 {
    if (IOfunctionSetQuantity >= IOfunctionSetAllocated)
       CCE_REALLOC_ARRAY(IOfunctionSet, IOfunctionSetQuantity + 1);
 
-   CCE_ALLOC_ARRAY(IOfunctionSet[IOfunctionSetQuantity].readingFunctions);
+   CCE_ALLOC_ARRAY(IOfunctionSet[IOfunctionSetQuantity].readingFunctions, 1);
    IOfunctionSet[IOfunctionSetQuantity].readingFunctionsQuantity = 0;
    IOfunctionSet[IOfunctionSetQuantity].freeingFunctions  = malloc(IOfunctionSet[IOfunctionSetQuantity].readingFunctionsAllocated * sizeof(cce_dataparsefun*));
    IOfunctionSet[IOfunctionSetQuantity].creatingFunctions = malloc(IOfunctionSet[IOfunctionSetQuantity].readingFunctionsAllocated * sizeof(cce_dataparsefun*));
@@ -78,7 +78,7 @@ CCE_PUBLIC_OPTIONS uint16_t cceGetFileIOfunctionSet (void)
    return IOfunctionSetQuantity++;
 }
 
-CCE_PUBLIC_OPTIONS ptrdiff_t cceGetFunctionBufferOffset (uint8_t functionID, uint16_t functionSetID)
+CCE_API ptrdiff_t cceGetFunctionBufferOffset (uint8_t functionID, uint16_t functionSetID)
 {
    if (functionID >= IOfunctionSet[functionSetID].readingFunctionsQuantity)
       return 0;
@@ -90,7 +90,7 @@ CCE_PUBLIC_OPTIONS ptrdiff_t cceGetFunctionBufferOffset (uint8_t functionID, uin
    return offset;
 }
 
-CCE_PUBLIC_OPTIONS uint8_t cceRegisterFileIOcallbacks (uint16_t functionSet, cce_freadfun onLoad, cce_dataparsefun onFree, cce_dataparsefun onCreate, cce_fwritefun onWrite, size_t bufferSize)
+CCE_API uint8_t cceRegisterFileIOcallbacks (uint16_t functionSet, cce_freadfun onLoad, cce_dataparsefun onFree, cce_dataparsefun onCreate, cce_fwritefun onWrite, size_t bufferSize)
 {
    struct cce_IO_function_set *currentFunctions = IOfunctionSet + functionSet;
    if (currentFunctions->readingFunctionsQuantity >= currentFunctions->readingFunctionsAllocated)
@@ -110,7 +110,7 @@ CCE_PUBLIC_OPTIONS uint8_t cceRegisterFileIOcallbacks (uint16_t functionSet, cce
    return currentFunctions->readingFunctionsQuantity++;
 }
 
-CCE_PUBLIC_OPTIONS struct cce_buffer* cceSetBufferSectionQuantity (struct cce_buffer *buffer, uint8_t newSectionsQuantity)
+CCE_API struct cce_buffer* cceSetBufferSectionQuantity (struct cce_buffer *buffer, uint8_t newSectionsQuantity)
 {
    uint8_t oldSectionsQuantity = buffer->sectionsQuantity;
    size_t size = IOfunctionSet[buffer->loadingFunctionBlockID].bufferSize;
@@ -134,8 +134,9 @@ CCE_PUBLIC_OPTIONS struct cce_buffer* cceSetBufferSectionQuantity (struct cce_bu
    return buffer;
 }
 
-CCE_PUBLIC_OPTIONS struct cce_buffer* cceCreateBuffer (uint8_t sectionsQuantity, uint16_t functionSetID)
+CCE_API struct cce_buffer* cceCreateBuffer (uint8_t sectionsQuantity, uint16_t functionSetID)
 {
+   sectionsQuantity = CCE_MIN(sectionsQuantity, IOfunctionSet[functionSetID].readingFunctionsQuantity);
    size_t size = IOfunctionSet[functionSetID].bufferSize;
    for (size_t *iterator = IOfunctionSet[functionSetID].readingFunctionsDataBufferSizes + IOfunctionSet[functionSetID].readingFunctionsQuantity - 1,
         *end = IOfunctionSet[functionSetID].readingFunctionsDataBufferSizes + sectionsQuantity; iterator >= end; --iterator)
@@ -155,7 +156,7 @@ CCE_PUBLIC_OPTIONS struct cce_buffer* cceCreateBuffer (uint8_t sectionsQuantity,
    return buffer;
 }
 
-CCE_PUBLIC_OPTIONS void cceFreeBuffer (struct cce_buffer *buffer)
+CCE_API void cceFreeBuffer (struct cce_buffer *buffer)
 {
    if (!buffer)
       return;
@@ -171,7 +172,7 @@ CCE_PUBLIC_OPTIONS void cceFreeBuffer (struct cce_buffer *buffer)
    free(buffer);
 }
 
-CCE_PUBLIC_OPTIONS struct cce_buffer* cceLoadBinaryCCF (char *path, uint16_t functionSetID)
+CCE_API struct cce_buffer* cceLoadBinaryCCF (char *path, uint16_t functionSetID)
 {
    FILE *file = fopen(path, "rb");
    if (file == NULL)
@@ -242,7 +243,7 @@ ERROR:
    return NULL;
 }
 
-CCE_PUBLIC_OPTIONS int cceWriteBinaryCCF (struct cce_buffer *buffer, char *path)
+CCE_API int cceWriteBinaryCCF (struct cce_buffer *buffer, char *path)
 {
    FILE *file = fopen(path, "wb+");
    if (file == NULL)

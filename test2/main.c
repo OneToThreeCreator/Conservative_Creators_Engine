@@ -18,6 +18,7 @@
     USA
 */
 
+#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -26,6 +27,8 @@
 #include <cce/engine_common.h>
 #include <cce/map2D/map2D.h>
 #include <cce/os_interaction.h>
+
+uint32_t frames = 0;
 
 void axisCallback (int8_t horizontal, int8_t vertical)
 {
@@ -37,16 +40,54 @@ void buttonCallback (uint16_t buttonsSet, uint16_t diff)
    printf("Set buttons 0x%x (diff 0x%x)\n", buttonsSet, diff);
 }
 
+struct cce_buffer* createMap (void)
+{
+   struct cce_buffer *map = cceCreateMap2Ddynamic();
+   struct cce_usedtexinfo *textures = cceGetResource(CCE_RESOURCE_TEXTURE, map);
+   CCE_ALLOC_ARRAY(textures->texturesMapDependsOn, 1);
+   textures->texturesMapDependsOnQuantity = 1;
+   uint16_t texture = cceLoadTexture("test.png", 1);
+   textures->texturesMapDependsOn[0] = texture;
+   struct cce_elementposition positions[] = 
+   {
+      {{0,  0}, 1, 0, 0},
+      {{0,  0}, 2, 0, 0},
+      {{0,  0}, 3, 0, 0},
+      {{5,  0}, 4, 0, 0},
+   };
+   struct cce_element elements[] = 
+   {
+      {{-16, -16}, { 0, 0}, {11,  4}, texture, 0,   0},
+      {{-16,   0}, { 0, 4}, { 5,  3}, texture, 0,   0},
+      {{-16,   8}, { 0, 7}, { 8,  8}, texture, 0,   0},
+      {{  0, -16}, {10, 3}, { 5, 13}, texture, 192, 0},
+   };
+   memcpy(cceGetElementsPosition(0, 0, 4, map), positions, 4 * sizeof(struct cce_elementposition));
+   memcpy(cceGetElements(0, 4, map),            elements,  4 * sizeof(struct cce_element));
+   struct cce_renderinginfo *info = cceGetRenderingInfo(map);
+   return map;
+}
+
+void alterMapFrame (struct cce_buffer *map)
+{
+   struct cce_element *element = cceGetElements(0, 3, map);
+   uint8_t updateFrame = (frames & 31) == 0;
+   uint8_t offsets[] = {0, 1};
+   uint8_t flags[] = {0, 0, CCE_ELEMENT_FLIP_HORIZONTALLY, CCE_ELEMENT_FLIP_VERTICALLY};
+   element[1].data.texturePosition.x = offsets[(frames >> 5) & 1];
+   element[1].flags = flags[(frames >> 5) & 3];
+   element[2].rotation -= 1;
+   element[3].flags ^= CCE_ELEMENT_FLIP_HORIZONTALLY & -(updateFrame);
+   if (frames >= 192)
+      cceSetEngineShouldTerminate(1);
+   cceSetElementsUpdated(cceGetRenderingInfo(map));
+}
+
 int main (int argc, char **argv)
 {
    char *path;
    size_t pathLength;
-   if (argc < 2)
-   {
-      path = cceGetCurrentPath(15);
-      pathLength = strlen(path);
-   }
-   else
+   if (argc >= 2)
    {
       if (argc > 2 || (argc == 2 && (!strcmp(argv[1], "-h") || !strcmp(argv[1], "--help"))))
       {
@@ -61,12 +102,15 @@ int main (int argc, char **argv)
       printf("Initialization failure\n");
       return -1;
    }
-   struct cce_buffer *map = cceLoadMap2Ddynamic("/NULL.c2m");
-   cceWriteMap2Ddynamic(map, "/tmp/test.c2m");
+   struct cce_buffer *map = createMap();
+   
+   char *tmp = cceGetTemporaryDirectory(8u);
+   strcat(tmp, "test.c2m");
+   cceWriteMap2Ddynamic(map, tmp);
    cceFreeMap2Ddynamic(map);
-   map = cceLoadMap2D("/tmp/test.c2m");
-   remove("/tmp/test.c2m");
-   cceRenderingLayerSetMap2D(0, 0, map);
+   map = cceLoadMap2D(tmp);
+   free(tmp);
+   cceSetRenderingLayerMap2D(0, 0, map);
    cceSetAxisChangeCallback(axisCallback, CCE_AXISPAIR_LSTICK);
    cceSetButtonCallback(buttonCallback);
    printf("Initialization complete\n");
@@ -74,6 +118,10 @@ int main (int argc, char **argv)
    {
       cceRenderMap2D();
       cceUpdateEngineMap2D();
+      ++frames;
+      alterMapFrame(map);
    }
+   cceFreeMap2D(map);
+   cceTerminateEngine();
    return 0;
 }

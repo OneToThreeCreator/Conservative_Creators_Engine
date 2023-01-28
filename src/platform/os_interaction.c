@@ -44,7 +44,7 @@
 static char *tmpPath = NULL;
 static size_t tmpPathLength;
 
-CCE_PUBLIC_OPTIONS char* cceCreateNewPathFromOldPath (const char *oldPath, const char *appendPath, size_t freeSpaceToLeave)
+CCE_API char* cceCreateNewPathFromOldPath (const char *oldPath, const char *appendPath, size_t freeSpaceToLeave)
 {
    char *newPath;
    size_t oldPathSize = strlen(oldPath);
@@ -63,7 +63,7 @@ CCE_PUBLIC_OPTIONS char* cceCreateNewPathFromOldPath (const char *oldPath, const
    return newPath;
 }
 
-CCE_PUBLIC_OPTIONS char* cceAppendPath (char *buffer, size_t bufferSize, const char *append)
+CCE_API char* cceAppendPath (char *buffer, size_t bufferSize, const char *append)
 {
    size_t oldPathLength = strlen(buffer);
    size_t appendPathLength = strlen(append);
@@ -85,7 +85,7 @@ CCE_PUBLIC_OPTIONS char* cceAppendPath (char *buffer, size_t bufferSize, const c
    return buffer;
 }
 
-CCE_PUBLIC_OPTIONS void cceTerminateTemporaryDirectory (void)
+CCE_API void cceTerminateTemporaryDirectory (void)
 {
    if (!tmpPath)
    {
@@ -105,12 +105,12 @@ CCE_PUBLIC_OPTIONS void cceTerminateTemporaryDirectory (void)
 
 #define DEFAULT_PATH_LENGTH 256
 
-CCE_PUBLIC_OPTIONS void cceTruncateFile (FILE *file, size_t size)
+CCE_API void cceTruncateFile (FILE *file, size_t size)
 {
    ftruncate(fileno(file), size);
 }
 
-CCE_PUBLIC_OPTIONS char* cceGetAbsolutePath (const char *path, size_t spaceToLeave)
+CCE_API char* cceGetAbsolutePath (const char *path, size_t spaceToLeave)
 {
    char *result = realpath(path, NULL);
    if (result == NULL)
@@ -118,12 +118,12 @@ CCE_PUBLIC_OPTIONS char* cceGetAbsolutePath (const char *path, size_t spaceToLea
    return realloc(result, strlen(result) + 1 + spaceToLeave);
 }
 
-CCE_PUBLIC_OPTIONS int cceSetCurrentPath (const char *path)
+CCE_API int cceSetCurrentPath (const char *path)
 {
    return chdir(path);
 }
 
-CCE_PUBLIC_OPTIONS char* cceGetCurrentPath (size_t spaceToLeave)
+CCE_API char* cceGetCurrentPath (size_t spaceToLeave)
 {
    char *path;
    size_t pathLength;
@@ -147,7 +147,7 @@ CCE_PUBLIC_OPTIONS char* cceGetCurrentPath (size_t spaceToLeave)
    return realloc(path, strnlen(path, pathLength) + 1 + spaceToLeave);
 }
 
-CCE_PUBLIC_OPTIONS char* cceGetDirectory (char *path, size_t bufferSize)
+CCE_API char* cceGetDirectory (char *path, size_t bufferSize)
 {
    struct stat st;
    size_t length = strnlen(path, bufferSize);
@@ -208,7 +208,7 @@ CCE_PUBLIC_OPTIONS char* cceGetDirectory (char *path, size_t bufferSize)
 #define APPDATA_APPEND_SIZE 14u // strlen("/.local/share/") == 14
 #endif
 
-CCE_PUBLIC_OPTIONS char* cceGetAppDataPath (const char *folderName, size_t spaceToLeave)
+CCE_API char* cceGetAppDataPath (const char *folderName, size_t spaceToLeave)
 {
    struct stat st;
    char *appDataPath;
@@ -270,7 +270,7 @@ CCE_PUBLIC_OPTIONS char* cceGetAppDataPath (const char *folderName, size_t space
    return result;
 }
 
-CCE_PUBLIC_OPTIONS char* cceGetTemporaryDirectory (size_t spaceToLeave)
+CCE_API char* cceGetTemporaryDirectory (size_t spaceToLeave)
 {
    if (!tmpPath)
    {
@@ -325,7 +325,7 @@ static int removeCallback (const char *path, const struct stat *st, int type, st
    }
 }
 
-CCE_PUBLIC_OPTIONS void cceDeleteDirectory (const char *path)
+CCE_API void cceDeleteDirectory (const char *path)
 {
    int nftwState = nftw(path, removeCallback, FOPEN_MAX, FTW_DEPTH | FTW_MOUNT | FTW_PHYS);
    if (nftwState != 0)

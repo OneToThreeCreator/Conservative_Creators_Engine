@@ -64,7 +64,7 @@ add_library(cce ${CCE_LIB_TYPE}
    include/cce/endianess.h
    src/map2D/actions.c
    include/cce/map2D/actions.h
-   #src/map2D/dynamic_map2D.c
+   src/map2D/map2D_modification.c
    src/map2D/map2D.c
    src/map2D/map2D_openGL.c
    include/cce/map2D/map2D.h
@@ -143,7 +143,7 @@ if("${CCE_BUILD_TYPE}" MATCHES "debug")
    endif()
 endif()
 
-if(CCE_BUILD_TYPE MATCHES "release" OR CCE_BUILD_TYPE MATCHES "relwithdebinfo")
+if("${CCE_BUILD_TYPE}" MATCHES "release" OR "${CCE_BUILD_TYPE}" MATCHES "relwithdebinfo")
    set_property(TARGET cce PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)
 endif()
 

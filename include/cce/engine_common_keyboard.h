@@ -174,6 +174,10 @@
 #define CCE_KEY_LEFT_SHIFT    CCE_KEY_LSHIFT
 #define CCE_KEY_RIGHT_SHIFT   CCE_KEY_RSHIFT
 
+#define CCE_KEY_KP_SLASH      CCE_KEY_KP_DIVIDE
+#define CCE_KEY_KP_ASTERISK   CCE_KEY_KP_MULTIPLY
+#define CCE_KEY_KP_HYPHEN     CCE_KEY_KP_MINUS
+
 #include <stdint.h>
 
 #include "../../include/cce/engine_common.h"
@@ -197,11 +201,11 @@ struct cce_keys
    struct cce_u8vec2 start;
 };
 
-CCE_PUBLIC_OPTIONS uint8_t cceKeyFromName (const char *name);
-#define cceStringToKey(str) cceKeyFromName(str)
-#define cceStringToKeys1(str) ((struct cce_u8vec1){cceKeyFromName(str)})
-CCE_PUBLIC_OPTIONS struct cce_u8vec2 cceStringToKeys2 (const char *str);
-CCE_PUBLIC_OPTIONS struct cce_u8vec3 cceStringToKeys3 (const char *str);
-CCE_PUBLIC_OPTIONS struct cce_u8vec4 cceStringToKeys4 (const char *str);
+CCE_API uint8_t cceGetKeyFromName (const char *name);
+#define cceStringToKey(str) cceGetKeyFromName(str)
+#define cceStringToKeys1(str) ((struct cce_u8vec1){cceGetKeyFromName(str)})
+CCE_API struct cce_u8vec2 cceStringToKeys2 (const char *str);
+CCE_API struct cce_u8vec3 cceStringToKeys3 (const char *str);
+CCE_API struct cce_u8vec4 cceStringToKeys4 (const char *str);
 
 #endif // ENGINE_COMMON_KEYBOARD_H

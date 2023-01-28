@@ -30,11 +30,7 @@ extern "C"
 
 #include "../include/cce/engine_common.h"
 
-// Fine for games with 16x16 textures, when using integer scaling.
-#define CCE_DEFAULT_WINDOW_WIDTH  256u
-#define CCE_DEFAULT_WINDOW_HEIGHT 144u
-
-#define CCE_DEFAULT_WINDOW_LABEL "CoffeeChainEngine Window"
+#define CCE_DEFAULT_WINDOW_LABEL "CCE Window"
 
 #define CCE_ENGINE_STOP 0x80
 
@@ -42,7 +38,6 @@ extern const uint8_t *const cce__flags;
 extern uint64_t cce__currentTime, cce__deltaTime;
 
 int cce__initEngine (const char *label);
-void cce__terminateEngine (void);
 void cce__engineUpdate (void);
 void cce__doNothing (void);
 void cce__shortToString (char *str, const unsigned short number, const char *strEnd);
@@ -68,6 +63,8 @@ extern int8_t   cce__axes[8];
 extern uint16_t cce__buttonsBitField;
 extern uint16_t cce__buttonsBitFieldDiff;
 extern void (*cce__keyCallback)(cce_enum key, cce_enum state);
+
+extern struct cce_u16vec2 cce__gameResolution;
 
 #ifdef __cplusplus
 }

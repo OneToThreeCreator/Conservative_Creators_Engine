@@ -36,9 +36,12 @@
 
 #include "engine_common_internal.h"
 
+CCE_ARRAY(terminationCallbacks, cce_termfun, uint16_t);
+
 struct cce_backend_data cce__engineBackend;
 uint64_t cce__currentTime, cce__deltaTime;
 
+struct cce_u16vec2 cce__gameResolution;
 uint16_t cce__buttonsBitFieldDiff;
 uint16_t cce__buttonsBitField;
 uint8_t  cce__axesPairChanged;
@@ -47,8 +50,8 @@ static void (*moveCallbacks[4])(int8_t, int8_t);
 static void (*buttonsCallback)(uint16_t, uint16_t);
 void (*cce__keyCallback)(cce_enum key, cce_enum state);
 
-CCE_PUBLIC_OPTIONS uint8_t (*cceEngineShouldTerminate) (void);
-CCE_PUBLIC_OPTIONS void (*cceSetEngineShouldTerminate) (uint8_t);
+CCE_API uint8_t (*cceEngineShouldTerminate) (void);
+CCE_API void (*cceSetEngineShouldTerminate) (uint8_t);
 
 struct cce__string
 {
@@ -73,22 +76,22 @@ jmp_buf g_jumpOnIniFailure;
 #endif
 uint16_t commonIniCallbackID;
 
-CCE_PUBLIC_OPTIONS void cceSetAxisChangeCallback (void (*callback)(int8_t, int8_t), cce_enum axePair)
+CCE_API void cceSetAxisChangeCallback (void (*callback)(int8_t, int8_t), cce_enum axePair)
 {
    moveCallbacks[axePair] = callback;
 }
 
-CCE_PUBLIC_OPTIONS void cceSetButtonCallback (void (*callback)(uint16_t buttonState, uint16_t diff))
+CCE_API void cceSetButtonCallback (void (*callback)(uint16_t buttonState, uint16_t diff))
 {
    buttonsCallback = callback;
 }
 
-CCE_PUBLIC_OPTIONS void cceSetKeyCallback (void (*callback)(cce_enum key, cce_enum state))
+CCE_API void cceSetKeyCallback (void (*callback)(cce_enum key, cce_enum state))
 {
    cce__keyCallback = callback;
 }
 
-CCE_PUBLIC_OPTIONS uint16_t cceRegisterIniCallback (const char **lowercasenames, void *data, int (*callback)(void*, const char*, const char*), int (*init)(void*), uint8_t flags)
+CCE_API uint16_t cceRegisterIniCallback (const char **lowercasenames, void *data, int (*callback)(void*, const char*, const char*), int (*init)(void*), uint8_t flags)
 {
    CCE_REALLOC_ARRAY(iniCallbacks, iniCallbacksQuantity + 1);
    iniCallbacks[iniCallbacksQuantity].data          = data;
@@ -108,12 +111,12 @@ CCE_PUBLIC_OPTIONS uint16_t cceRegisterIniCallback (const char **lowercasenames,
    return iniCallbacksQuantity++;
 }
 
-CCE_PUBLIC_OPTIONS uint64_t cceGetDeltaTime (void)
+CCE_API uint64_t cceGetDeltaTime (void)
 {
    return cce__deltaTime;
 }
 
-CCE_PUBLIC_OPTIONS uint64_t cceGetTime (void)
+CCE_API uint64_t cceGetTime (void)
 {
    return cce__currentTime;
 }
@@ -287,14 +290,38 @@ void cce__engineUpdate (void)
    }
 }
 
-void cce__terminateEngine (void)
+static void terminateEngineCommon (void)
 {
    cce__engineBackend.terminateEngine();
    cceTerminateTemporaryDirectory();
+   for (struct cce__callbackData *it = iniCallbacks, *end = iniCallbacks + iniCallbacksQuantity; it < end; ++it)
+   {
+      free(it->names);
+   }
    free(iniCallbacks);
    iniCallbacksQuantity   = 0;
    iniCallbacksAllocated  = 0;
    iniCallbackLongestName = 11;
+}
+
+CCE_API uint16_t cceRegisterOnTerminationCallback (cce_termfun callback)
+{
+   if (terminationCallbacksQuantity >= terminationCallbacksAllocated)
+      CCE_REALLOC_ARRAY(terminationCallbacks, terminationCallbacksQuantity + 1);
+   terminationCallbacks[terminationCallbacksQuantity] = callback;
+   return terminationCallbacksQuantity++;
+}
+
+CCE_API void cceTerminateEngine (void)
+{
+   cce_termfun *it = terminationCallbacks + terminationCallbacksQuantity; // from last to first
+   do
+   {
+      --it;
+      (*it)();
+   }
+   while (it > terminationCallbacks);
+   terminateEngineCommon();
 }
 
 void cce__doNothing (void)
@@ -335,14 +362,14 @@ switch (CCE_COLOR_GET_HUE(color) / 600) \
       result = (union cce_color) {{CCE_COLOR_RGB, chroma, lightness, intermediate}}; \
 } \
 
-CCE_PUBLIC_OPTIONS union cce_color cceHSVtoRGB (union cce_color color)
+CCE_API union cce_color cceHSVtoRGB (union cce_color color)
 {
    union cce_color result;
    HSV_TO_RGB(color, result, 0, color.hsv.v * color.hsv.s, color.hsv.v - chroma)
    return result;
 }
 
-CCE_PUBLIC_OPTIONS union cce_color cceHSLtoRGB (union cce_color color)
+CCE_API union cce_color cceHSLtoRGB (union cce_color color)
 {
    union cce_color result;
    HSV_TO_RGB(color, result, 0, (255 - CCE_ABS(2 * color.hsl.l - 255)) * color.hsl.s, color.hsl.l - (chroma >> 1))
@@ -352,7 +379,7 @@ CCE_PUBLIC_OPTIONS union cce_color cceHSLtoRGB (union cce_color color)
 // R * 0.3 + G * 0.59 + B * 0.11. Approximating this fractions with point on 2^-24
 #define HCL_LUMA_RGB_SUM(rgb) ((rgb.r * 5033165 + rgb.g * 9898557 + rgb.b * 1845494) >> 24)
 
-CCE_PUBLIC_OPTIONS union cce_color cceHCLtoRGB (union cce_color color)
+CCE_API union cce_color cceHCLtoRGB (union cce_color color)
 {
    union cce_color result;
    HSV_TO_RGB(color, result, color.hcl.c, 0, 0);
@@ -364,21 +391,21 @@ CCE_PUBLIC_OPTIONS union cce_color cceHCLtoRGB (union cce_color color)
    return result;
 }
 
-CCE_PUBLIC_OPTIONS union cce_color cceHSVtoHCL (union cce_color color)
+CCE_API union cce_color cceHSVtoHCL (union cce_color color)
 {
    union cce_color iresult;
    HSV_TO_RGB(color, iresult, 0, color.hsv.v * color.hsv.s, color.hsv.v - chroma);
    return CCE_COLOR_SET_HCL(color.hsv.h, chroma, lightness + HCL_LUMA_RGB_SUM(iresult.rgb));
 }
 
-CCE_PUBLIC_OPTIONS union cce_color cceHSLtoHCL (union cce_color color)
+CCE_API union cce_color cceHSLtoHCL (union cce_color color)
 {
    union cce_color iresult;
    HSV_TO_RGB(color, iresult, 0, (255 - CCE_ABS(2 * color.hsl.l - 255)) * color.hsl.s, color.hsl.l - (chroma >> 1))
    return CCE_COLOR_SET_HCL(color.hsv.h, chroma, lightness + HCL_LUMA_RGB_SUM(iresult.rgb));
 }
 
-CCE_PUBLIC_OPTIONS union cce_color cceHCLtoHSV (union cce_color color)
+CCE_API union cce_color cceHCLtoHSV (union cce_color color)
 {
    union cce_color iresult;
    HSV_TO_RGB(color, iresult, color.hcl.c, 0, 0);
@@ -388,7 +415,7 @@ CCE_PUBLIC_OPTIONS union cce_color cceHCLtoHSV (union cce_color color)
    return CCE_COLOR_SET_HSV(color.hcl.h, chroma * 255 / (maxLight), maxLight);
 }
 
-CCE_PUBLIC_OPTIONS union cce_color cceHCLtoHSL (union cce_color color)
+CCE_API union cce_color cceHCLtoHSL (union cce_color color)
 {
    union cce_color iresult;
    HSV_TO_RGB(color, iresult, color.hcl.c, 0, 0);
@@ -399,7 +426,7 @@ CCE_PUBLIC_OPTIONS union cce_color cceHCLtoHSL (union cce_color color)
    return CCE_COLOR_SET_HSL(color.hcl.h, (maxLight - light) * 255 / CCE_MIN(light, 255 - light), light);
 }
 
-CCE_PUBLIC_OPTIONS union cce_color cceHSVtoHSL (union cce_color color)
+CCE_API union cce_color cceHSVtoHSL (union cce_color color)
 {
    union cce_color result;
    result.hsl.h = 0;
@@ -418,7 +445,7 @@ CCE_PUBLIC_OPTIONS union cce_color cceHSVtoHSL (union cce_color color)
    return result;
 }
 
-CCE_PUBLIC_OPTIONS union cce_color cceHSLtoHSV (union cce_color color)
+CCE_API union cce_color cceHSLtoHSV (union cce_color color)
 {
    union cce_color result;
    result.hsv.h = 0;
@@ -458,19 +485,19 @@ result.hsv.h |= 600 * ((max - rgb) * 2 + ((max[1] - max[2]) * 255 / chroma)); \
 result.hsv.s = saturationExp; \
 return result
 
-CCE_PUBLIC_OPTIONS union cce_color cceRGBtoHSV (union cce_color color)
+CCE_API union cce_color cceRGBtoHSV (union cce_color color)
 {
    union cce_color result;
    RGB_TO_HSV(color, result, CCE_COLOR_HSV, chroma * 255 / result.hsv.v, *max);
 }
 
-CCE_PUBLIC_OPTIONS union cce_color cceRGBtoHSL (union cce_color color)
+CCE_API union cce_color cceRGBtoHSL (union cce_color color)
 {
    union cce_color result;
    RGB_TO_HSV(color, result, CCE_COLOR_HSL, (result.hsl.l == 255) ? 0 : (*max - result.hsl.l) * 255 / CCE_MIN(result.hsl.l, 255 - result.hsl.l), (*max + min) >> 1);
 }
 
-CCE_PUBLIC_OPTIONS union cce_color cceRGBtoHCL (union cce_color color)
+CCE_API union cce_color cceRGBtoHCL (union cce_color color)
 {
    union cce_color result;
    RGB_TO_HSV(color, result, CCE_COLOR_HCL, chroma, min + HCL_LUMA_RGB_SUM(color.rgb));
