@@ -34,9 +34,9 @@ extern "C"
 
 typedef uint8_t enc_type;
 
-CCE_PUBLIC_OPTIONS int cceInitTextRendering (enc_type encoding);
-CCE_PUBLIC_OPTIONS int cceLoadBitmapFont (const char *cceFontName);
-CCE_PUBLIC_OPTIONS extern uint32_t* (*ccePrintString)(char *string, struct Map2DElementDev *elementTemplate, cce_enum elementType, uint8_t isCurrentPosition);
+CCE_API int cceInitTextRendering (enc_type encoding);
+CCE_API int cceLoadBitmapFont (const char *cceFontName);
+CCE_API extern uint32_t* (*ccePrintString)(char *string, struct Map2DElementDev *elementTemplate, cce_enum elementType, uint8_t isCurrentPosition);
 
 #ifdef __cplusplus
 }

@@ -143,7 +143,12 @@ struct UnicodeCharWithSize
    uint32_t size;
 };
 
-CCE_API char*    cceReverseMemory (char *memory, size_t size);
+typedef int cmp_fun(const void *a, const void *b);
+
+CCE_API void*    cceBinarySearchFirst (const void *key, const void *arr, size_t arr_len, size_t elem_size, cmp_fun cmp);
+CCE_API void*    cceBinarySearchLast (const void *key, const void *arr, size_t arr_len, size_t elem_size, cmp_fun cmp);
+CCE_API void*    cceLinearSearch (const void *key, const void *arr, size_t arr_len, size_t elem_size, cmp_fun cmp);
+CCE_API void*    cceReverseMemory (void *memory, size_t size);
 CCE_API uint32_t cceGetCharSizeUTF8 (const unsigned char *ch);
 CCE_API uint32_t cceGetCharUTF8 (const unsigned char *ch);
 CCE_API struct UnicodeCharWithSize cceGetCharWithSizeUTF8 (const unsigned char *ch);

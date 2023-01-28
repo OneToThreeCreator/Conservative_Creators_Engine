@@ -48,10 +48,56 @@ const uint8_t cce__debruijnToBitPosition32[32] = {31, 0,  22, 1,  28, 23, 13, 2,
 const uint64_t cce__debruijnNumberLS6 = 0x7ef3ae369961512;
 const uint32_t cce__debruijnNumberLS5 = 0xfb9ac52;
 
-CCE_API char* cceReverseMemory (char *memory, size_t size)
+#define BINARYSEARCH(arr, arr_len, elem_size, val, cmp, comp, ret) \
+do \
+{ \
+   if (arr_len < 1) \
+      ret (void*) arr; \
+   const uint8_t *iterator = (uint8_t*) arr; \
+   const uint8_t *end = ((uint8_t*) arr) + arr_len * elem_size; \
+   size_t remain = arr_len; \
+   size_t type_remain; \
+   do \
+   { \
+      remain >>= 1u; \
+      type_remain = remain * elem_size; \
+      if (iterator + type_remain + elem_size > end) \
+         continue; \
+      iterator += (cmp(key, (iterator + type_remain)) comp 0) ? (type_remain + elem_size) : 0; \
+   } \
+   while (remain > 0u); /* Checking for last valid value, because it is impossible to detect underflow of unsigned variable */ \
+   ret (void*) iterator; \
+} \
+while (0)
+   
+CCE_API void* cceBinarySearchFirst (const void *key, const void *arr, size_t arr_len, size_t elem_size, cmp_fun cmp)
+{
+   BINARYSEARCH(arr, arr_len, elem_size, key, cmp, >, return);
+}
+
+CCE_API void* cceBinarySearchLast (const void *key, const void *arr, size_t arr_len, size_t elem_size, cmp_fun cmp)
+{
+   const cce_void *result;
+   BINARYSEARCH(arr, arr_len, elem_size, key, cmp, >=, result =);
+   if (arr == result)
+      return (void*) result;
+   return (void*) (result - ((cmp(result - 1, key) == 0) ? elem_size : 0));
+}
+
+CCE_API void* cceLinearSearch (const void *key, const void *arr, size_t arr_len, size_t elem_size, cmp_fun cmp)
+{
+   for (const void *end = (cce_void*)arr + arr_len * elem_size; arr < end; arr = (cce_void*)arr + elem_size)
+   {
+      if (cmp(key, arr) == 0)
+         return (void*) arr;
+   }
+   return (void*) arr;
+}
+
+CCE_API void* cceReverseMemory (void *memory, size_t size)
 {
    size_t wordHalfQuantity = size / (sizeof(size_t) * 2);
-   size_t *iterator = (size_t*) memory, *jiterator = (size_t*) (memory + size), *end = ((size_t*) memory) + wordHalfQuantity;
+   size_t *iterator = (size_t*) memory, *jiterator = (size_t*) ((cce_void*)memory + size), *end = ((size_t*) memory) + wordHalfQuantity;
    while (iterator < end)
    {
       size_t tmp = *iterator;
@@ -68,7 +114,7 @@ CCE_API char* cceReverseMemory (char *memory, size_t size)
       ++iterator;
       --jiterator;
    }
-   for (unsigned char *it = (unsigned char*) iterator, *jit = (unsigned char*) jiterator; it < jit; ++it, --jit)
+   for (uint8_t *it = (uint8_t*) iterator, *jit = (uint8_t*) jiterator; it < jit; ++it, --jit)
    {
       unsigned char tmp = *it;
       *it = *jit;

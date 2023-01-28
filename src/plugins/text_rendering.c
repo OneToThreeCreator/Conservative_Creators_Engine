@@ -102,7 +102,7 @@ jmp_buf loadingError;
 
 CCE_ARRAY(fonts, static struct FontInfo, static uint32_t);
 static void (*cce__processStruct)(struct INIKeyHandlerStruct*);
-CCE_PUBLIC_OPTIONS uint32_t* (*ccePrintString)(char *string, struct Map2DElementDev *elementTemplate, cce_enum elementType, uint8_t isCurrentPosition);
+CCE_API uint32_t* (*ccePrintString)(char *string, struct Map2DElementDev *elementTemplate, cce_enum elementType, uint8_t isCurrentPosition);
 
 static int cce__processProperties (struct INIKeyHandlerStruct *st)
 {
@@ -448,7 +448,7 @@ static int cce__iniKeyHandler (void *structure, const char *section, const char 
    return 1;
 }
 
-CCE_PUBLIC_OPTIONS int cceLoadBitmapFont (const char *cceFontName)
+CCE_API int cceLoadBitmapFont (const char *cceFontName)
 {
    size_t nameLength = strlen(cceFontName);
    const char *resourcePath = cceGetResourcePath();
@@ -652,7 +652,7 @@ static uint32_t* ccePrintStringUTF8 (char *string, struct Map2DElementDev *eleme
    return result;
 }
 
-CCE_PUBLIC_OPTIONS int cceInitTextRendering (enc_type encoding)
+CCE_API int cceInitTextRendering (enc_type encoding)
 {
    switch (encoding)
    {

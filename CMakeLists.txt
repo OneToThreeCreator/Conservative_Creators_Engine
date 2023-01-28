@@ -20,7 +20,7 @@
 
 cmake_minimum_required(VERSION 3.0)
 
-project(CCE VERSION 0.6.1 DESCRIPTION "open 2D engine for creating games - shared library" LANGUAGES C)
+project(CCE VERSION 0.6.2 DESCRIPTION "open 2D engine for creating games" LANGUAGES C)
 
 if (NOT DEFINED CCE_BUILD_TESTING)
    option(CCE_BUILD_TESTING "Build Conservative Creator's Engine test program" ON)
@@ -37,6 +37,10 @@ endif()
 
 if ("${CCE_LIB_TYPE}" MATCHES STATIC)
    set(CCE_INSTALL OFF) 
+endif()
+
+if (NOT DEFINED CCE_BUILD_DEMOS)
+   option (CCE_BUILD_DEMOS "Build Conservative Creator's Engine demo programs" OFF)
 endif()
 
 set(CMAKE_C_STANDARD 99)
@@ -166,7 +170,7 @@ target_include_directories(cce PUBLIC
 
 if(WIN32)
    target_link_libraries(cce PRIVATE shell32 kernel32)
-   # Windows don't have standartized path for storing shared data (or libraries, or anything that isn't self-contained)
+   # Windows don't have standartized path for storing shared data (or libraries, or anything isn't self-contained)
 else()
    target_compile_definitions(cce PRIVATE SYSTEM_RESOURCE_PATH=\"${CMAKE_INSTALL_PREFIX}/share/cce/\")
    target_link_libraries(cce PRIVATE m)
@@ -189,6 +193,10 @@ if(CCE_BUILD_TESTING)
       COMMAND cce-test1)
    add_test(NAME cce-test2
       COMMAND cce-test2 "${CCE_SOURCE_DIR}")
+endif()
+
+if (CCE_BUILD_DEMOS)
+   add_subdirectory(demos)
 endif()
 
 if (NOT (CCE_LIB_TYPE MATCHES STATIC) AND CCE_INSTALL)
