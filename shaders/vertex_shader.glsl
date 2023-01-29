@@ -66,9 +66,8 @@ void main()
       isFlipped = 1 - int((data2.w >> 13u) & 0x2u);
    }
    vec3 coords = vec3(aCoords * texCoordsAndSize.zw + pos, 1);
+   coords.x *= isFlipped;
    mat3 transform = mat3(vec3(rotation.yx, 0), vec3(-rotation.x, rotation.y, 0), vec3(0, 0, 1));
-   transform[0][0] *= isFlipped;
-   transform[0][1] *= isFlipped;
    transform *= (CameraTransform * isMovedByCamera) + (mat3(vec3(1, 0, 0), vec3(0, 1, 0), vec3(0, 0, 1)) * (1u - isMovedByCamera));
    coords *= transform;
    coords += vec3(texCoordsAndSize.zw, 0.0f) * 0.5f;

@@ -57,10 +57,10 @@ struct cce_buffer* createMap (void)
    };
    struct cce_element elements[] = 
    {
-      {{-16, -16}, { 0, 0}, {11,  4}, texture, 0,   0},
-      {{-16,   0}, { 0, 4}, { 5,  3}, texture, 0,   0},
-      {{-16,   8}, { 0, 7}, { 8,  8}, texture, 0,   0},
-      {{  0, -16}, {10, 3}, { 5, 13}, texture, 192, 0},
+      {{-16, -16}, { 0, 0}, {11,  4}, 0, 0, texture, 0,   0},
+      {{-16,   0}, { 0, 4}, { 5,  3}, 0, 0, texture, 0,   0},
+      {{-16,   8}, { 0, 7}, { 8,  8}, 0, 0, texture, 0,   0},
+      {{  0, -16}, {10, 3}, { 5, 13}, 0, 0, texture, 192, 0},
    };
    memcpy(cceGetElementsPosition(0, 0, 4, map), positions, 4 * sizeof(struct cce_elementposition));
    memcpy(cceGetElements(0, 4, map),            elements,  4 * sizeof(struct cce_element));
@@ -78,6 +78,7 @@ void alterMapFrame (struct cce_buffer *map)
    element[1].flags = flags[(frames >> 5) & 3];
    element[2].rotation -= 1;
    element[3].flags ^= CCE_ELEMENT_FLIP_HORIZONTALLY & -(updateFrame);
+   element[3].rotation += 128 & -(updateFrame);
    if (frames >= 192)
       cceSetEngineShouldTerminate(1);
    cceSetElementsUpdated(cceGetRenderingInfo(map));
