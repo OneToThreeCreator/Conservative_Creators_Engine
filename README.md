@@ -1,5 +1,5 @@
 # Conservative creator's engine
-2D crossplatform game engine written in C. Very fast, but also very restricted in functionality. WIP
+2D crossplatform game engine written in C. Very fast, but also very limited in functionality. WIP
 
 # Building on unix-like system (Linux, probably MacOS):
 Required packages: cmake, python.  
@@ -16,6 +16,7 @@ git submodule update --init external/glfw/
 # Build
 cmake -B ./build && cmake --build ./build
 ```
+If glfw is used as submodule, it's dependencies must be installed or it wont build.
 Install:
 ```
 cmake --install ./build
