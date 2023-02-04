@@ -32,18 +32,16 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "../../include/cce/engine_common.h"
-#include "../../include/cce/engine_common_IO.h"
-#include "../../include/cce/utils.h"
-#include "../../include/cce/os_interaction.h"
+#include "../../../include/cce/engine_common.h"
+#include "../../../include/cce/engine_common_IO.h"
+#include "../../../include/cce/utils.h"
+#include "../../../include/cce/os_interaction.h"
 
-#include "../engine_common_internal.h"
-#include "../external/stb_image.h"
-#include "../../include/cce/map2D/map2D.h"
-#include "plugins.h"
+#include "../../external/stb_image.h"
+#include "../../../include/cce/plugins/map2D/map2D.h"
 #include "map2D_internal.h"
 
-static struct cce_u16vec2               g_textureSize;
+static struct cce_u16vec2               g_textureSize = {0, 0};
 CCE_API const struct cce_u16vec2 *const cceTextureSize = &g_textureSize;
 CCE_ARRAY(g_textures, static struct cce_loadedtextures, static uint16_t);
 static uint16_t                         g_textureBufferSize;
@@ -132,15 +130,9 @@ CCE_API void cceSetRenderingLayerMap2D (uint8_t layer, uint8_t mapLayer, struct 
 
 CCE_API void cceRenderMap2D (void)
 {
-   cce__screenUpdate(); // Sync only between draw calls
    if (cce__map2Dflags & CCE_LOADEDTEXTURES_TOBELOADED)
       cce__updateTexturesArray();
    cce__drawMap2D(g_renderingLayers, g_renderingLayersQuantity);
-}
-
-CCE_API void cceUpdateEngineMap2D (void)
-{
-   cce__engineUpdate();
 }
 
 CCE_API void cceSetTexturesPath (const char *path)
@@ -586,7 +578,7 @@ char** cce__storeTextures (void *buffer, struct cce_buffer *info)
 
 int initMap2DRenderer__openGL (const struct cce_loadedtextures **textures);
 
-static void terminateEngine2D (void)
+static void terminateMap2D (void)
 {
    cce__terminateMap2DRenderer();
    cce__terminateMap2DLoaders();
@@ -599,46 +591,32 @@ static void terminateEngine2D (void)
    free(g_renderingLayers);
    texturesPath = NULL;
    texturesPathLength = 0;
-   //cce__actionsTerminate();
+   g_textureSize = (struct cce_u16vec2){0, 0};
 }
 
-CCE_API int cceInitEngine2D (const char *gameINIpath)
+static int initMap2D (void *data)
 {
+   CCE_UNUSED(data);
    cce__map2Dflags = CCE_INIT;
-   g_textureSize = (struct cce_u16vec2){0, 0};
-   {
-      const char *names[5] = {"map2d", "map2dproperties", "engine2d", "engine2dproperties", NULL};
-      cceRegisterIniCallback(names, NULL, loadCallback, NULL, CCE_DEFAULT);
-   }
-   cceLoadPlugins();
-   {
-      char *path = getenv("CCE_GAME_PATH");
-      if (path != NULL && *path != '\0')
-         gameINIpath = path;
-   }
-   if (gameINIpath == NULL || *gameINIpath == '\0')
-   {
-      fputs("ENGINE::INIT::NO_GAME_PATH:\nEngine could not load the game without knowing where it is", stderr);
-      return -1;
-   }
-   if (cce__initEngine(gameINIpath) != 0)
-      return -1;
    
    cce__initMap2DLoaders();
    if (initMap2DRenderer__openGL((const struct cce_loadedtextures**) &g_textures) != 0)
    {
-      fputs("ENGINE::INIT::BACKEND_FAILURE:\nCan't initialize engine without backend\n", stderr);
+      fputs("MAP2D::INIT::RENDERER_FAILURE:\nCan't initialize map2D without renderer\n", stderr);
       return -1;
    }
    cceRegisterMapCustomResourceCallback(cce__loadTextures, cce__releaseTextures, cce__createTextures, cce__storeTextures, sizeof(struct cce_usedtexinfo));
-   cceRegisterOnTerminationCallback(terminateEngine2D);
    g_renderingDataSize = cce__getRenderingDataSize();
    
    CCE_ALLOC_ARRAY_ZEROED(g_textures, 1);
    CCE_ALLOC_ARRAY(g_texturesEmpty, 1);
    g_textureBufferSize = 0;
-   //cce__actionsInit();
    cce__map2Dflags &= ~CCE_INIT;
    g_renderingLayers = calloc(g_renderingLayersQuantity, sizeof(struct cce_layer));
    return 0;
+}
+
+CCE_API void cceLoadMap2Dplugin (void)
+{
+   cceRegisterPlugin("map2d", NULL, loadCallback, initMap2D, terminateMap2D, CCE_DEFAULT);
 }

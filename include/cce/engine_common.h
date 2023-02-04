@@ -134,7 +134,7 @@ struct cce_collider_rectND_X_Y
 */
 
 #define CCE_COLLIDER_CIR_ST(components, posbits, sizebits) \
-struct cce_collider_cir ## components ## D_ ## posbits ## _ ## sizebits {struct cce_i ## posbits ## vec ## components position; uint ## sizebits ## _t radius;}
+struct cce_collider_cir ## components ## D_ ## posbits ## _ ## sizebits {struct cce_i ## posbits ## vec ## components position; uint ## sizebits ## _t diameter;}
 
 #define CCE_COLLIDER_CIR_STS(posbits, sizebits) CCE_COLLIDER_CIR_ST(1, posbits, sizebits); CCE_COLLIDER_CIR_ST(2, posbits, sizebits); CCE_COLLIDER_CIR_ST(3, posbits, sizebits); CCE_COLLIDER_CIR_ST(4, posbits, sizebits)
 
@@ -149,7 +149,7 @@ CCE__COLLIDER_CIR_STS(64);
 struct cce_collider_cirND_X_Y
 {
    struct cce_iXvecN position;
-   uintY_t radius;
+   uintY_t diameter;
 };
 */
 
@@ -164,12 +164,15 @@ CCE_API uint64_t cceGetTime  (void);
 #define CCE_INI_CALLBACK_FREE_DATA 0x1
 #define CCE_INI_CALLBACK_DO_NOT_INIT 0x2
 
-CCE_API uint16_t cceRegisterIniCallback (const char **lowercasenames, void *data, int (*callback)(void*, const char*, const char*), int (*init)(void*), uint8_t flags);
+CCE_API void cceRegisterPlugin (const char *lowercaseName, void *data, int (*iniCallback)(void*, const char*, const char*), int (*init)(void*), void (*term)(void), uint8_t flags);
+CCE_API uint8_t cceCheckPlugin (const char *name);
+CCE_API uint8_t cceIsPluginLoading (const char *name);
 CCE_API void cceSetAxisChangeCallback (void (*callback)(int8_t, int8_t), cce_enum axePair);
 CCE_API void cceSetButtonCallback (void (*callback)(uint16_t buttonState, uint16_t diff));
 CCE_API void cceSetKeyCallback (void (*callback)(cce_enum key, cce_enum state));
-CCE_API uint16_t cceRegisterOnTerminationCallback (cce_termfun callback);
-CCE_API void cceTerminateEngine (void);
+CCE_API int cceInit (const char *path);
+CCE_API void cceUpdate (void);
+CCE_API void cceTerminate (void);
 CCE_API union cce_color cceHSVtoRGB (union cce_color color);
 CCE_API union cce_color cceHSLtoRGB (union cce_color color);
 CCE_API union cce_color cceHCLtoRGB (union cce_color color);
@@ -184,38 +187,38 @@ CCE_API union cce_color cceRGBtoHSL (union cce_color color);
 CCE_API union cce_color cceRGBtoHCL (union cce_color color);
 
 #define cce__checkCollisionRect(element1, element2, comp) \
-   element1.position. ## comp < (element2.position. ## comp + element2.size. ## comp) && (element1.position. ## comp + element1.size. ## comp) > element2.position. ## comp
+   (element1.position.comp < (element2.position. comp + element2.size.comp) && (element1.position. comp + element1.size.comp) > element2.position.comp)
 
 #define cceCheckCollisionRect1D(element1, element2) \
    cce__checkCollisionRect(element1, element2, x)
    
 #define cceCheckCollisionRect2D(element1, element2) \
-   cce__checkCollisionRect(element1, element2, x) && cce__checkCollision(element1, element2, y)
+   (cce__checkCollisionRect(element1, element2, x) && cce__checkCollisionRect(element1, element2, y))
 
 #define cceCheckCollisionRect3D(element1, element2) \
-   cce__checkCollisionRect(element1, element2, x) && cce__checkCollision(element1, element2, y) && cce__checkCollision(element1, element2, z)
+   (cce__checkCollisionRect(element1, element2, x) && cce__checkCollisionRect(element1, element2, y) && cce__checkCollisionRect(element1, element2, z))
 
 #define cceCheckCollisionRect4D(element1, element2) \
-   cce__checkCollisionRect(element1, element2, x) && cce__checkCollision(element1, element2, y) && cce__checkCollision(element1, element2, z) && cce__checkCollision(element1, element2, w)
+   (cce__checkCollisionRect(element1, element2, x) && cce__checkCollisionRect(element1, element2, y) && cce__checkCollisionRect(element1, element2, z) && cce__checkCollisionRect(element1, element2, w))
    
-#define cce__getCirPosDiff(element1, element2, comp) (element1.position. ## comp - element2.position. ## comp)
+#define cce__getCirPosDiff(element1, element2, comp) (element1.position.comp - element2.position.comp)
 #define cce__getCirPosDiffSqC2(element1, element2) CCE_POW2(cce__getCirPosDiff(element1, element2, x)) + CCE_POW2(cce__getCirPosDiff(element1, element2, y))
 #define cce__getCirPosDiffSqC3(element1, element2) cce__getCirPosDiffSqC2(element1, element2) + CCE_POW2(cce__getCirPosDiff(element1, element2, z))
 #define cce__getCirPosDiffSqC4(element1, element2) cce__getCirPosDiffSqC3(element1, element2) + CCE_POW2(cce__getCirPosDiff(element1, element2, w))
 
-#define cceCheckCollisionCir1D(element1, element2) (cce__getCirPosDiff(element1, element2, x)  < element1.radius + element2.radius)
-#define cceCheckCollisionCir2D(element1, element2) (cce__getCirPosDiffSqC2(element1, element2) < CCE_POW2(element1.radius + element2.radius))
-#define cceCheckCollisionCir3D(element1, element2) (cce__getCirPosDiffSqC3(element1, element2) < CCE_POW2(element1.radius + element2.radius))
-#define cceCheckCollisionCir4D(element1, element2) (cce__getCirPosDiffSqC4(element1, element2) < CCE_POW2(element1.radius + element2.radius))
+#define cceCheckCollisionCir1D(element1, element2) (cce__getCirPosDiff(element1, element2, x) *2 < element1.diameter + element2.diameter)
+#define cceCheckCollisionCir2D(element1, element2) (cce__getCirPosDiffSqC2(element1, element2)*4 < CCE_POW2(element1.diameter + element2.diameter))
+#define cceCheckCollisionCir3D(element1, element2) (cce__getCirPosDiffSqC3(element1, element2)*4 < CCE_POW2(element1.diameter + element2.diameter))
+#define cceCheckCollisionCir4D(element1, element2) (cce__getCirPosDiffSqC4(element1, element2)*4 < CCE_POW2(element1.diameter + element2.diameter))
 
-#define cce__getCirCenter(circle, comp) (circle). ## comp + (circle).radius
-#define cce__getCircleSquareDistanceSq(circle, rect, comp) CCE_POW2(cce__getCirCenter(circle, comp) - CCE_CLAMP(cce__getCirCenter(circle, comp), (rect). ## comp, (rect). ## comp + (rect).size. ## comp))
+#define cce__getCirCenter(circle, comp) (circle).position.comp*2 + (circle).diameter
+#define cce__getCircleSquareDistanceSq(circle, rect, comp) CCE_POW2(cce__getCirCenter(circle, comp) - CCE_CLAMP(cce__getCirCenter(circle, comp), (rect).position.comp*2, ((rect).position.comp + (rect).size.comp)*2))
 
-#define cceCheckCollisionCirRect1D(circle, rect) circle.position.x < (rect.position.x + rect.size.x) && (circle.position.x + circle.radius) > rect.position.x
-#define cceCheckCollisionCirRect2D(circle, rect) (cce__getCircleSquareDistanceSq(circle, rect, x) + cce__getCircleSquareDistanceSq(circle, rect, y) < CCE_POW2(circle.radius))
-#define cceCheckCollisionCirRect3D(circle, rect) (cce__getCircleSquareDistanceSq(circle, rect, x) + cce__getCircleSquareDistanceSq(circle, rect, y) + cce__getCircleSquareDistanceSq(circle, rect, z) < CCE_POW2(circle.radius))
+#define cceCheckCollisionCirRect1D(circle, rect) (circle.position.x < (rect.position.x + rect.size.x) && (circle.position.x + circle.diameter) > rect.position.x)
+#define cceCheckCollisionCirRect2D(circle, rect) (cce__getCircleSquareDistanceSq(circle, rect, x) + cce__getCircleSquareDistanceSq(circle, rect, y) < CCE_POW2(circle.diameter))
+#define cceCheckCollisionCirRect3D(circle, rect) (cce__getCircleSquareDistanceSq(circle, rect, x) + cce__getCircleSquareDistanceSq(circle, rect, y) + cce__getCircleSquareDistanceSq(circle, rect, z) < CCE_POW2(circle.diameter))
 #define cceCheckCollisionCirRect4D(circle, rect) (cce__getCircleSquareDistanceSq(circle, rect, x) + cce__getCircleSquareDistanceSq(circle, rect, y) + \
-                                                  cce__getCircleSquareDistanceSq(circle, rect, z) + cce__getCircleSquareDistanceSq(circle, rect, w) < CCE_POW2(circle.radius))
+                                                  cce__getCircleSquareDistanceSq(circle, rect, z) + cce__getCircleSquareDistanceSq(circle, rect, w) < CCE_POW2(circle.diameter))
 
 #define cceColorToRGB(color) \
 (((color.rgb.type & 0xE0) == CCE_COLOR_RGB) ? color              : ((color.rgb.type & 0xE0) == CCE_COLOR_HSV) ? cceHSVtoRGB(color) : \
@@ -240,6 +243,8 @@ CCE_API union cce_color cceRGBtoHCL (union cce_color color);
 
 CCE_API extern uint8_t (*cceEngineShouldTerminate) (void);
 CCE_API extern void (*cceSetEngineShouldTerminate) (uint8_t);
+CCE_API extern void (*cceScreenUpdate) (void);
+CCE_API extern const char *cceBackend;
 
 #define CCE_BUTTON_A 0x1
 #define CCE_BUTTON_B 0x2

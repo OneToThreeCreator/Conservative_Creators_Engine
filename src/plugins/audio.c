@@ -27,6 +27,15 @@
 
 #define toALFormat(channels) (((channels) > 1) ? AL_FORMAT_STEREO16 : AL_FORMAT_MONO16)
 
+struct alObjects
+{
+   ALCdevice *device;
+   ALCcontext *context;
+   unsigned short buffersQuantity;
+   ALuint *buffers;
+   ALuint *sources;
+};
+
 void loadAudio (const ALuint *buffer, const char *const filepath)
 {
    ALint channels;

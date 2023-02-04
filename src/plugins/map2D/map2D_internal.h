@@ -21,13 +21,10 @@
 #ifndef MAP2D_INTERNAL_H
 #define MAP2D_INTERNAL_H
 
-#include "../../include/cce/engine_common.h"
-#include "../../include/cce/utils.h"
-#include "../../include/cce/map2D/map2D.h"
-#include "../../include/cce/os_interaction.h"
-
-#include "log.h"
-#include <listlib.h>
+#include "../../../include/cce/engine_common.h"
+#include "../../../include/cce/utils.h"
+#include "../../../include/cce/plugins/map2D/map2D.h"
+#include "../../../include/cce/os_interaction.h"
 
 #ifdef __cplusplus
 extern "C"
@@ -36,7 +33,6 @@ extern "C"
 
 #define CCE_PROCESS_TEXTURES      0x010
 #define CCE_PROCESS_NEAREST_MAPS  0x020
-#define CCE_PROCESS_TIMERS        0x040
 
 #define CCE_BASIC_ACTIONS_NOT_SET 0x100
 #define CCE_INIT CCE_BASIC_ACTIONS_NOT_SET
@@ -132,8 +128,6 @@ void cce__terminateMap2DLoaders (void);
 void cce__setAttribPointerVAO (void);
 void cce__extendElementBufferIfNecessary (uint32_t minimalSize);
 
-void cce__actionsInit (void);
-void cce__actionsTerminate (void);
 void cce__releaseTexture (uint16_t textureID);
 uint8_t cce__getDynamicElementFlags (uint16_t ID);
 void cce__setToBeProcessedDynamicMap2D (void);

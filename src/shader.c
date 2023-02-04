@@ -177,9 +177,6 @@ GLuint cce__compileShader (const char *shaderSource, GLenum shaderType)
    {
       char infoLog[512];
       glGetShaderInfoLog(shader, 512, NULL, infoLog);
-      #ifndef NDEBUG
-      fprintf(stderr, "Broken shader:\n%s\n", shaderSource);
-      #endif
       fprintf(stderr, "OPENGL::SHADER::FAILED_TO_COMPILE:\nbroken shader:\n%s\n%s\n", shaderSource, infoLog);
       return 0u;
    }

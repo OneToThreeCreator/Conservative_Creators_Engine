@@ -147,7 +147,7 @@ static void processGamepads (void)
    int8_t axis;
    const uint16_t bits[2] = {CCE_TRIGGER_L, CCE_TRIGGER_R};
    const uint16_t *bit = bits;
-   // GLFW for some reason treats down as 1, and up as -1 respectively (opposite is expected)
+   // GLFW treats down as 1, and up as -1 respectively (opposite is expected by the engine)
    gamepad.axes[1] *= -1;
    gamepad.axes[3] *= -1;
    for (float *it = gamepad.axes, *end = gamepad.axes + 4; it < end; ++it, ++offset, ++lastAxeIt)
@@ -531,11 +531,17 @@ int initEngine__glfw (void *data)
    if (!gladLoadGL((GLADloadfunc)glfwGetProcAddress))
    {
       fprintf(stderr, "GLAD::INITIALIZATION::FAILED:\nOpenGL could not be loaded by GLAD.\n");
+      glfwMakeContextCurrent(NULL);
+      glfwDestroyWindow(g_window);
+      glfwTerminate();
       return -1;
    }
    if (!GLAD_GL_VERSION_3_2)
    {
       fprintf(stderr, "GLAD::INITIALIZATION::FAILED:\nOpenGL 3.2 (minimum required) could not be loaded by GLAD.\n");
+      glfwMakeContextCurrent(NULL);
+      glfwDestroyWindow(g_window);
+      glfwTerminate();
       return -1;
    }
    
@@ -570,14 +576,13 @@ int initEngine__glfw (void *data)
    glfwSetJoystickCallback(joystickCallback__glfw);
    g_gamepads = 0;
    
-   cce__engineBackend.screenUpdate = swapBuffers__glfw;
    cce__engineBackend.toWindow = toWindow__glfw;
    cce__engineBackend.toFullscreen = toFullscreen__glfw;
-   cce__engineBackend.terminateEngine = terminateEngine__glfw;
    cce__engineBackend.engineUpdate = engineUpdate__glfw;
    cce__engineBackend.getTime = getTime__glfw;
    cceEngineShouldTerminate = engineShouldTerminate__glfw;
    cceSetEngineShouldTerminate = setEngineShouldTerminate__glfw;
+   cceScreenUpdate = swapBuffers__glfw;
    cce__gameResolution = vals->resolution;
    free(vals->windowName);
    return 0;
@@ -585,6 +590,7 @@ int initEngine__glfw (void *data)
 
 static void terminateEngine__glfw (void)
 {
+   glfwMakeContextCurrent(NULL);
    glfwDestroyWindow(g_window);
    glfwTerminate();
 }
@@ -714,14 +720,11 @@ void loadBackend__glfw (void)
    props->windowName = NULL;
    props->resolution = (struct cce_u16vec2){640, 480};
    props->flags = 0;
-   const char *names[4] = {"window", "windowprops", "windowproperties", NULL};
-   cceRegisterIniCallback(names, props, iniCallback__glfw, initEngine__glfw, 0);
+   cce__registerBackend("glfw", props, iniCallback__glfw, initEngine__glfw, terminateEngine__glfw, 0);
    memset(&keys->stickL.x, 0, (uint8_t*)&keys->start.y - (uint8_t*)&keys->stickL.x + 1);
    keys->deadzone = 0.2f;
    keys->keyAxisValue = INT8_MAX;
-   names[0] = "controls";
-   names[1] = NULL;
-   cceRegisterIniCallback(names, keys, cce__keyIniCallback, loadKeys__glfw, CCE_INI_CALLBACK_FREE_DATA);
+   cceRegisterPlugin("controls", keys, cce__keyIniCallback, loadKeys__glfw, NULL, CCE_INI_CALLBACK_FREE_DATA);
 }
 
 static int16_t cceKeyToGLFWkey (uint8_t key)

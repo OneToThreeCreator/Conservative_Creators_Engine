@@ -37,26 +37,23 @@ extern "C"
 extern const uint8_t *const cce__flags;
 extern uint64_t cce__currentTime, cce__deltaTime;
 
-int cce__initEngine (const char *label);
 void cce__engineUpdate (void);
 void cce__doNothing (void);
 void cce__shortToString (char *str, const unsigned short number, const char *strEnd);
 int cce__keyIniCallback(void *data, const char *name, const char *value);
+void cce__registerBackend (const char *lowercasename, void *data, int (*iniCallback)(void*, const char*, const char*), int (*init)(void*), void (*term)(void), uint8_t flags);
 
 extern struct cce_backend_data
 {
    void (*engineUpdate) (void);
-   void (*terminateEngine) (void);
    uint64_t (*getTime) (void);
    void (*toFullscreen) (void);
    void (*toWindow) (void);
-   void (*screenUpdate) (void);
 }
 cce__engineBackend;
 
 #define cce__toFullscreen() cce__engineBackend.toFullscreen()
 #define cce__toWindow() cce__engineBackend.toWindow()
-#define cce__screenUpdate() cce__engineBackend.screenUpdate()
 
 extern uint8_t  cce__axesPairChanged;
 extern int8_t   cce__axes[8];

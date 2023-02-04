@@ -44,17 +44,18 @@ extern "C"
 #define cceNativePathDelimiter '/'
 #endif
 
-CCE_API char* cceCreateNewPathFromOldPath (const char *oldPath, const char *appendPath, size_t freeSpaceToLeave);
-CCE_API void  cceTruncateFile (FILE *file, size_t size);
-CCE_API char* cceGetAbsolutePath (const char *path, size_t spaceToLeave);
-CCE_API int   cceSetCurrentPath (const char *path);
-CCE_API char* cceGetDirectory (char *path, size_t bufferSize);
-CCE_API char* cceGetCurrentPath (size_t spaceToLeave);
-CCE_API void  cceDeleteDirectory (const char *path);
-CCE_API char* cceGetAppDataPath (const char *folderName, size_t spaceToLeave);
-CCE_API char* cceAppendPath (char *buffer, size_t bufferSize, const char *append);
-CCE_API char* cceGetTemporaryDirectory (size_t spaceToLeave);
-CCE_API void  cceTerminateTemporaryDirectory (void);
+CCE_API char*   cceCreateNewPathFromOldPath (const char *oldPath, const char *appendPath, size_t freeSpaceToLeave);
+CCE_API void    cceTruncateFile (FILE *file, size_t size);
+CCE_API char*   cceGetAbsolutePath (const char *path, size_t spaceToLeave);
+CCE_API int     cceSetCurrentPath (const char *path);
+CCE_API char*   cceGetDirectory (char *path, size_t bufferSize);
+CCE_API char*   cceGetCurrentPath (size_t spaceToLeave);
+CCE_API void    cceDeleteDirectory (const char *path);
+CCE_API char*   cceGetAppDataPath (const char *folderName, size_t spaceToLeave);
+CCE_API char*   cceAppendPath (char *buffer, size_t bufferSize, const char *append);
+CCE_API char*   cceGetTemporaryDirectory (size_t spaceToLeave);
+CCE_API void    cceTerminateTemporaryDirectory (void);
+CCE_API uint8_t cceIsDirectory (char *path);
 
 #ifdef __cplusplus
 }

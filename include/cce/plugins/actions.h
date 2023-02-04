@@ -20,13 +20,33 @@
 
 #ifndef ACTIONS_H
 #define ACTIONS_H
-#include <stdint.h>
+#include <stdio.h>
 #include "../engine_common.h"
+#include "../engine_common_IO.h"
 
 #ifdef __cplusplus
 extern "C"
 {
 #endif // __cplusplus
+
+struct cce_actioninfo
+{
+   struct cce_action *onFreeActions;
+   uint16_t          *onFreeActionsSizes;
+   uint16_t           onFreeActionsQuantity;
+};
+
+struct cce_dynamicactioninfo
+{
+   struct cce_action *onFreeActions;
+   uint16_t          *onFreeActionsSizes;
+   uint16_t           onFreeActionsQuantity;
+   uint16_t           onFreeActionsSizesAllocated;
+   uint16_t           onLoadActionsQuantity;
+   uint16_t           onLoadActionsSizesAllocated;
+   struct cce_action *onLoadActions;
+   uint16_t          *onLoadActionsSizes;
+};
 
 /*
    Every structure here has 32-bit alignment. Using 64-bit aligned structures is not recommended, due to a possibility of misaligned reading
@@ -43,70 +63,7 @@ extern "C"
 #define CCE_TRANSFORMACTION_ROTATE_WITH_OFFSET  0x1C
 #define CCE_TRANSFORMACTION_ROTATE              0x10
 
-
 typedef void (*cce_actionfun)(const void*, uint8_t);
-
-struct transformAction
-{
-   uint32_t actionID;
-   union
-   {
-      struct cce_i16vec2 move;
-      // Fixed-point (1/32) scaling factor. Negative means scaling down (dividing by this)!
-      struct cce_i16vec2 scale;
-      struct cce_i16vec2 rotationOffset;
-   } transformation;
-   uint16_t groupID;
-   uint8_t rotationAngle;
-   uint8_t flags;
-};
-
-#define CCE_COMBINEDACTION_A1_SHIFT 0x0
-#define CCE_COMBINEDACTION_A2_SHIFT 0x0
-#define CCE_COMBINEDACTION_A3_SHIFT 0x0
-#define CCE_COMBINEDACTION_A4_SHIFT 0x0
-#define CCE_COMBINEDACTION_A1_SET 0x1
-#define CCE_COMBINEDACTION_A2_SET 0x2
-#define CCE_COMBINEDACTION_A3_SET 0x4
-#define CCE_COMBINEDACTION_A4_SET 0x8
-
-#define CCE_COMBINEDTRANSFORMACTION_MOVE_SHIFT             CCE_COMBINEDACTION_A1_SHIFT
-#define CCE_COMBINEDTRANSFORMACTION_SCALE_SHIFT            CCE_COMBINEDACTION_A2_SHIFT
-#define CCE_COMBINEDTRANSFORMACTION_ROTATEWITHOFFSET_SHIFT CCE_COMBINEDACTION_A3_SHIFT
-#define CCE_COMBINEDTRANSFORMACTION_MOVE_SET               CCE_COMBINEDACTION_A1_SET
-#define CCE_COMBINEDTRANSFORMACTION_SCALE_SET              CCE_COMBINEDACTION_A2_SET
-#define CCE_COMBINEDTRANSFORMACTION_ROTATEWITHOFFSET_SET   CCE_COMBINEDACTION_A3_SET
-#define CCE_COMBINEDTRANSFORMACTION_FLIP                   0x40
-
-struct combinedTransformAction
-{
-   uint32_t actionID;
-   struct cce_i16vec2 move;
-   // Fixed-point (1/32) scaling factor. Negative means scaling down (dividing by this)!
-   struct cce_i16vec2 scale;
-   struct cce_i16vec2 rotationOffset;
-   uint16_t groupID;
-   uint8_t rotationAngle;
-   uint8_t cflags;
-};
-
-struct offsetTextureAction
-{
-   uint32_t actionID;
-   struct cce_i16vec2 offset;
-   uint8_t groupID;
-   uint8_t actionType;
-   uint16_t __pad;
-};
-
-struct changeColorAction
-{
-   uint32_t actionID;
-   union cce_color color;
-   uint8_t groupID;
-   uint8_t actionType;
-   uint16_t __pad;
-};
 
 #define CCE_CHANGETIMERSTATE_START  0x1
 #define CCE_CHANGETIMERSTATE_STOP   0x2
@@ -114,7 +71,6 @@ struct changeColorAction
 #define CCE_CHANGETIMERSTATE_ENABLE_AUTO_RESTART_ON_ALARM  0x4
 #define CCE_CHANGETIMERSTATE_DISABLE_AUTO_RESTART_ON_ALARM 0x8
 #define CCE_CHANGETIMERSTATE_SWITCH_AUTO_RESTART_ON_ALARM  0x10
-
 
 struct setTimerStateAction
 {
@@ -131,17 +87,6 @@ struct setTimerDelayAction
    uint16_t ID;
    cce_enum action;
    uint8_t __pad;
-};
-
-#define CCE_LOADMAPACTION_DONT_REPLACE_MAIN_MAP 0x01
-
-struct loadMap2Daction
-{
-   uint32_t actionID;
-   struct cce_i32vec2 offset;
-   uint16_t ID;
-   cce_enum action;
-   uint8_t flags;
 };
 
 #define CCE_DELAYACTION_EXECUTE_ONCE_PER_TIMER_ALARM 0x1
@@ -189,10 +134,13 @@ CCE_API void    cceSetTimerState (uint16_t timerID, uint8_t state);
 CCE_API void    cceDelayAction (uint16_t repeatsQuantity, uint32_t delayOrID, uint32_t actionStructSize, void *actionStruct, uint8_t flags);
 CCE_API uint8_t cceRegisterAction (uint32_t ID, cce_actionfun action, void (*endianSwap)(void*));
 
-#define CCE_TRANSFORM_ACTION 0
-#define CCE_COMBINEDTRANSFORM_ACTION 1
-#define CCE_OFFSETTEXTURE_ACTION 2
-#define CCE_CHANGECOLOR_ACTION 3
+CCE_API int     cceLoadActions        (void *buffer, uint8_t sectionSize, struct cce_buffer *info, FILE *file);
+CCE_API int     cceLoadActionsDynamic (void *buffer, uint8_t sectionSize, struct cce_buffer *info, FILE *file);
+CCE_API void    cceCreateActions      (void *buffer, struct cce_buffer *info);
+CCE_API void    cceFreeActions        (void *buffer, struct cce_buffer *info);
+CCE_API void    cceFreeActionsDynamic (void *buffer, struct cce_buffer *info);
+CCE_API uint8_t cceStoreActions       (void *buffer, struct cce_buffer *info, FILE *file);
+
 #define CCE_STARTTIMER_ACTION 4
 #define CCE_SETDYNAMICTIMERDELAY_ACTION 5
 #define CCE_SETGRIDSIZE_ACTION 6
@@ -222,7 +170,7 @@ do \
    fread(onLoad ## Sizes, sizeof(uint16_t), onLoad ## Quantity, file); \
    fread(onLoad,  1, onLoadSize, file); \
    fread(onFree ## Sizes, sizeof(uint16_t), onFree ## Quantity, file); \
-   fread(onFree,  1, onFreeSize,  file); \
+   fread(onFree,  1, onFreeSize, file); \
    \
    if (cceEndianess == CCE_BIG_ENDIAN) \
    { \

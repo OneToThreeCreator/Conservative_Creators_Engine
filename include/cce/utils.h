@@ -145,8 +145,11 @@ struct UnicodeCharWithSize
 
 typedef int cmp_fun(const void *a, const void *b);
 
+/* Binary search a sorted array. If array contains multiple elements matching the key, the first one is returned. If array does not contain the key, returns the position where it should be inserted. */
 CCE_API void*    cceBinarySearchFirst (const void *key, const void *arr, size_t arr_len, size_t elem_size, cmp_fun cmp);
+/* Binary search a sorted array. If array contains multiple elements matching the key, the last one is returned. If array does not contain the key, returns the position where it should be inserted. */
 CCE_API void*    cceBinarySearchLast (const void *key, const void *arr, size_t arr_len, size_t elem_size, cmp_fun cmp);
+/* Lineary search an array from the first to the last element. If array does not contain the key, returns lastElement + 1 */
 CCE_API void*    cceLinearSearch (const void *key, const void *arr, size_t arr_len, size_t elem_size, cmp_fun cmp);
 CCE_API void*    cceReverseMemory (void *memory, size_t size);
 CCE_API uint32_t cceGetCharSizeUTF8 (const unsigned char *ch);

@@ -23,13 +23,13 @@
 #include <stdlib.h>
 
 #include <glad/gl.h>
-#include "../shader.h"
+#include "../../shader.h"
 
-#include "../../include/cce/engine_common_IO.h"
-#include "../../include/cce/utils.h"
-#include "../../include/cce/os_interaction.h"
+#include "../../../include/cce/engine_common_IO.h"
+#include "../../../include/cce/utils.h"
+#include "../../../include/cce/os_interaction.h"
 
-#include "../engine_common_internal.h"
+#include "../../engine_common_internal.h"
 #include "map2D_internal.h"
 
 #define CCE_CAMERATRANSFORM_OFFSET 0u
@@ -454,18 +454,17 @@ int initMap2DRenderer__openGL (const struct cce_loadedtextures **textures)
       /*strlen("const vec2 inverseTextureSize = vec2(0.XXXXXXXX, 0.XXXXXXXX);") == 61*/
       char vertexShaderAdditionalString[61 + 1] = "const vec2 inverseTextureSize = vec2(";
       sprintf(vertexShaderAdditionalString + 37, "%.8f, %.8f);", 1.0f / cceTextureSize->x, 1.0f / cceTextureSize->y);
-      
       #ifdef SYSTEM_RESOURCE_PATH
-      shaderProgram = cce__makeVFshaderProgram(SYSTEM_RESOURCE_PATH "shaders/vertex_shader.glsl", SYSTEM_RESOURCE_PATH "shaders/fragment_shader.glsl", vertexShaderAdditionalString, NULL);
+      shaderProgram = cce__makeVFshaderProgram(SYSTEM_RESOURCE_PATH "shaders/map2D.vert", SYSTEM_RESOURCE_PATH "shaders/map2D.frag", vertexShaderAdditionalString, NULL);
       if (shaderProgram == 0u)
       #endif // SYSTEM_RESOURCE_PATH
       {
-         shaderProgram = cce__makeVFshaderProgram("shaders/vertex_shader.glsl", "shaders/fragment_shader.glsl", vertexShaderAdditionalString, NULL);
+         shaderProgram = cce__makeVFshaderProgram("shaders/map2D.vert", "shaders/map2D.frag", vertexShaderAdditionalString, NULL);
       }
    }
    if (!shaderProgram)
    {
-      fputs("ENGINE::INIT::SHADERS_CANNOT_BE_LOADED", stderr);
+      fputs("MAP2D::RENDERER::SHADERS_CANNOT_BE_LOADED\n", stderr);
       return -1;
    }
    g_uniformLocations[0] = glGetUniformLocation(shaderProgram, "CameraTransform");

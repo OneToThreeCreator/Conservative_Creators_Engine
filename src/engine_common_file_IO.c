@@ -18,6 +18,7 @@
     USA
 */
 
+#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -92,6 +93,7 @@ CCE_API ptrdiff_t cceGetFunctionBufferOffset (uint8_t functionID, uint16_t funct
 
 CCE_API uint8_t cceRegisterFileIOcallbacks (uint16_t functionSet, cce_freadfun onLoad, cce_dataparsefun onFree, cce_dataparsefun onCreate, cce_fwritefun onWrite, size_t bufferSize)
 {
+   assert(functionSet < IOfunctionSetQuantity);
    struct cce_IO_function_set *currentFunctions = IOfunctionSet + functionSet;
    if (currentFunctions->readingFunctionsQuantity >= currentFunctions->readingFunctionsAllocated)
    {
@@ -136,6 +138,7 @@ CCE_API struct cce_buffer* cceSetBufferSectionQuantity (struct cce_buffer *buffe
 
 CCE_API struct cce_buffer* cceCreateBuffer (uint8_t sectionsQuantity, uint16_t functionSetID)
 {
+   assert(functionSetID < IOfunctionSetQuantity);
    sectionsQuantity = CCE_MIN(sectionsQuantity, IOfunctionSet[functionSetID].readingFunctionsQuantity);
    size_t size = IOfunctionSet[functionSetID].bufferSize;
    for (size_t *iterator = IOfunctionSet[functionSetID].readingFunctionsDataBufferSizes + IOfunctionSet[functionSetID].readingFunctionsQuantity - 1,
@@ -174,6 +177,7 @@ CCE_API void cceFreeBuffer (struct cce_buffer *buffer)
 
 CCE_API struct cce_buffer* cceLoadBinaryCCF (char *path, uint16_t functionSetID)
 {
+   assert(functionSetID < IOfunctionSetQuantity);
    FILE *file = fopen(path, "rb");
    if (file == NULL)
    {

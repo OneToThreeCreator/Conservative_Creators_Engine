@@ -302,6 +302,13 @@ CCE_API char* cceGetTemporaryDirectory (size_t spaceToLeave)
    return memcpy(buffer, tmpPath, tmpPathLength + 1u);
 }
 
+CCE_API uint8_t cceIsDirectory (char *path)
+{
+   struct stat st;
+   errno = 0;
+   return stat(path, &st) != 0u && S_ISDIR(st.st_mode);
+}
+
 static int removeCallback (const char *path, const struct stat *st, int type, struct FTW *info)
 {
    CCE_UNUSED(st);
@@ -407,7 +414,7 @@ CCE_PUBLIC_OPTIONS char* cceGetCurrentPath (size_t spaceToLeave)
 
 CCE_PUBLIC_OPTIONS char* cceGetDirectory (char *path, size_t bufferSize)
 {
-   DWORD attributes = GetFileAttributesA(path);
+   DWORD attributes = 0;
    DWORD error = 0;
    
    size_t length = strnlen(path, bufferSize);
@@ -486,6 +493,13 @@ CCE_PUBLIC_OPTIONS char* cceGetAppDataPath (const char *folderName, size_t space
    memcpy(appDataPath + pathLength + 1u, folderName, folderNameLength + 1u);
    cceGetDirectory(appDataPath, pathLength + folderNameLength + spaceToLeave + 1u + 1u);
    return realloc(appDataPath, strnlen(appDataPath, pathLength + folderNameLength + spaceToLeave + 1u + 1u) + spaceToLeave + 1u);
+}
+
+CCE_API uint8_t cceIsDirectory (char *path)
+{
+   DWORD attributes = GetFileAttributesA(path);
+   GetLastError();
+   return attributes != INVALID_FILE_ATTRIBUTES && (attributes & FILE_ATTRIBUTE_DIRECTORY)
 }
 
 CCE_PUBLIC_OPTIONS char* cceGetTemporaryDirectory (size_t spaceToLeave)

@@ -28,25 +28,14 @@ extern "C"
 
 #include <stdio.h>
 #include <stdint.h>
-#include "../engine_common.h"
-#include "../engine_common_IO.h"
-#include "../utils.h"
-
-#define CCE_BASIC_ACTIONS_QUANTITY 16u
-
-#define CCE_INCORRECT_ENUM 1
-#define CCE_ATTEMPT_TO_OVERRIDE_DEFAULT_ELEMENT 2
-#define CCE_ELEMENT_DOES_NOT_EXIST 3
-#define CCE_OUT_OF_BOUNDS 4
+#include "../../engine_common.h"
+#include "../../engine_common_IO.h"
+#include "../../utils.h"
 
 #define CCE_RECTANGLE_COLLIDER                     0x000 // Default
 #define CCE_CIRCLE_COLLIDER                        0x001
 #define CCE_RETURN_FALLBACK_ON_MAP_LOADING_FAILURE 0x000
 #define CCE_RETURN_NULL_ON_MAP_LOADING_FAILURE     0x002
-#define CCE_STORE_COLOR_IN_RGB                     0x000 // Default
-#define CCE_STORE_COLOR_IN_HSV                     0x020
-#define CCE_STORE_COLOR_IN_HSL                     0x040
-#define CCE_STORE_COLOR_IN_HCL                     0x060
 
 #define CCE_MAP2D_STATIC  0x1
 #define CCE_MAP2D_DYNAMIC 0x2
@@ -67,13 +56,22 @@ typedef uint_fast32_t cce_flag;
 
 #define CCE_RESOURCE_TEXTURE 0
 
+#define CCE_COLLIDER_RECTANGLE 0
+#define CCE_COLLIDER_CIRCLE 0
+
 struct cce_action;
 struct cce_renderingdata;
 
-union cce_collidermap2D
+struct cce_collidermap2D
 {
-   struct cce_collider_rect2D_16_8 rectangle;
-   struct cce_collider_cir2D_16_16 circle;
+   union
+   {
+      struct cce_collider_rect2D_16_16 rectangle;
+      struct cce_collider_cir2D_16_16 circle;
+   } data;
+   uint16_t element;
+   uint8_t collidersQuantity;
+   uint8_t type;
 };
 
 struct cce_elementposition
@@ -127,52 +125,16 @@ struct cce_element
 
 struct cce_collisioninfo
 {
-   union Collider2D      *colliders;
-   struct ElementGroup   *transformGroups; // Groups can be used to transform colliders (Rotation of colliders is unsupported, use circle colliders instead)
-   struct ElementGroup   *collisionGroups;
-   struct CollisionGroup *collision;
-   uint64_t              *collisionCache;  // Timestamp with last bit used as actual cache. Compared with lastTransformationTime
+   struct cce_collidermap2D *colliders;
    
-   uint32_t               collidersQuantity;
-   uint16_t               transformGroupsQuantity;
-   uint16_t               collisionGroupsQuantity;
-   uint16_t               collisionQuantity;
+   uint32_t                  collidersQuantity;
 };
 
 struct cce_dynamiccollisioninfo
 {
-   union Collider2D      *colliders;
-   struct ElementGroup   *transformGroups; // Groups can be used to transform colliders (Rotation of colliders is unsupported, use circle colliders instead)
-   struct ElementGroup   *collisionGroups;
-   struct CollisionGroup *collision;
-   uint64_t              *collisionCache;  // Timestamp with last bit used as actual cache. Compared with lastTransformationTime
-   uint32_t               collidersQuantity;
-   uint16_t               transformGroupsQuantity;
-   uint16_t               collisionGroupsQuantity;
-   uint16_t               collisionQuantity;
-   uint16_t               transformGroupsAllocated;
-   uint32_t               collidersAllocated;
-   uint16_t               collisionGroupsAllocated;
-   uint16_t               collisionAllocated;
-};
-
-struct cce_actioninfo
-{
-   struct cce_action *onFreeActions;
-   uint16_t          *onFreeActionsSizes;
-   uint16_t           onFreeActionsQuantity;
-};
-
-struct cce_dynamicactioninfo
-{
-   struct cce_action *onFreeActions;
-   uint16_t          *onFreeActionsSizes;
-   uint16_t           onFreeActionsQuantity;
-   uint16_t           onFreeActionsSizesAllocated;
-   uint16_t           onLoadActionsQuantity;
-   uint16_t           onLoadActionsSizesAllocated;
-   struct cce_action *onLoadActions;
-   uint16_t          *onLoadActionsSizes;
+   struct cce_collidermap2D *colliders;
+   uint32_t                  collidersQuantity;
+   uint32_t                  collidersAllocated;
 };
 
 struct cce_usedtexinfo
@@ -186,13 +148,11 @@ typedef int (*cce_rloadfun)(void *buffer, struct cce_buffer *info, char **names)
 typedef char** (*cce_rstorefun)(void *buffer, struct cce_buffer *info);
 
 CCE_API uint32_t cceRegisterMapCustomResourceCallback (cce_rloadfun onLoad, cce_dataparsefun onFree, cce_dataparsefun onCreate, cce_rstorefun onStore, size_t bufferSize);
+CCE_API void cceRenderMap2D (void);
 CCE_API void cceSetMap2Dpath (const char *path);
-CCE_API int  cceInitEngine2D (const char *gameINIpath);
 CCE_API void cceSetTexturesPath (const char *path);
 CCE_API void cceSetRenderingLayerMap2D (uint8_t layer, uint8_t mapLayer, struct cce_buffer *map);
-CCE_API void cceRenderMap2D (void);
-CCE_API void cceUpdateEngineMap2D (void);
-CCE_API int  cceEngine2D (void);
+CCE_API void cceLoadMap2Dplugin (void);
 CCE_API void cceSetLoadedMap2D (uint16_t number, struct cce_i32vec2 globalPosition);
 CCE_API const char* cceGetResourcePath (void);
 CCE_API uint16_t cceLoadTexture (char *path, uint8_t usersQuantity);

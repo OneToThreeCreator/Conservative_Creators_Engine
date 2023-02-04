@@ -23,9 +23,9 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <cce/map2D/actions.h>
+#include <cce/plugins/actions.h>
 #include <cce/engine_common.h>
-#include <cce/map2D/map2D.h>
+#include <cce/plugins/map2D/map2D.h>
 #include <cce/os_interaction.h>
 
 uint32_t frames = 0;
@@ -57,10 +57,10 @@ struct cce_buffer* createMap (void)
    };
    struct cce_element elements[] = 
    {
-      {{-16, -16}, { 0, 0}, {11,  4}, 0, 0, texture, 0,   0},
-      {{-16,   0}, { 0, 4}, { 5,  3}, 0, 0, texture, 0,   0},
-      {{-16,   8}, { 0, 7}, { 8,  8}, 0, 0, texture, 0,   0},
-      {{  0, -16}, {10, 3}, { 5, 13}, 0, 0, texture, 192, 0},
+      {{-16, -16}, { 0, 0}, {11,  4}, texture, 0,   0},
+      {{-16,   0}, { 0, 4}, { 5,  3}, texture, 0,   0},
+      {{-16,   8}, { 0, 7}, { 8,  8}, texture, 0,   0},
+      {{  0, -16}, {10, 3}, { 5, 13}, texture, 192, 0},
    };
    memcpy(cceGetElementsPosition(0, 0, 4, map), positions, 4 * sizeof(struct cce_elementposition));
    memcpy(cceGetElements(0, 4, map),            elements,  4 * sizeof(struct cce_element));
@@ -86,7 +86,6 @@ void alterMapFrame (struct cce_buffer *map)
 
 int main (int argc, char **argv)
 {
-   char *path;
    size_t pathLength;
    if (argc >= 2)
    {
@@ -97,9 +96,9 @@ int main (int argc, char **argv)
       }
       cceSetCurrentPath(argv[0]);
    }
-   if (cceInitEngine2D("test2/game.ini") != 0)
+   cceLoadMap2Dplugin();
+   if (cceInit("test2/game.ini") != 0)
    {
-      free(path);
       printf("Initialization failure\n");
       return -1;
    }
@@ -118,11 +117,12 @@ int main (int argc, char **argv)
    while (cceEngineShouldTerminate() == 0)
    {
       cceRenderMap2D();
-      cceUpdateEngineMap2D();
+      cceUpdate();
       ++frames;
       alterMapFrame(map);
+      cceScreenUpdate();
    }
    cceFreeMap2D(map);
-   cceTerminateEngine();
+   cceTerminate();
    return 0;
 }

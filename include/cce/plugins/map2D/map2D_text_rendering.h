@@ -18,31 +18,28 @@
     USA
 */
 
-#ifndef LOG_H
-#define LOG_H
+#ifndef TEXT_RENDERING_H
+#define TEXT_RENDERING_H
 
 #ifdef __cplusplus
 extern "C"
 {
 #endif // __cplusplus
 
-/* #ifdef __APPLE__
-#include <OpenAL/al.h>
-#include <OpenAL/alc.h>
-#else
-#include <AL/al.h>
-#include <AL/alc.h>
-#endif // __APPLE__
-*/
-#include <stdlib.h>
+#include "../../engine_common.h"
+#include "map2D.h"
 
-void cce__criticalErrorPrint (const char *const msgAndFormat, ...);
-void cce__infoPrint (const char *const msgAndFormat, ...);
-void cce__errorPrint (const char *const msgAndFormat, ...);
-//void cce__openALErrorPrint (ALCenum error);
+#define CCE_ASCII_EXT_ENCODING 0x1
+#define CCE_UTF8_ENCODING      0x2
+
+typedef uint8_t enc_type;
+
+CCE_API int cceInitTextRendering (enc_type encoding);
+CCE_API int cceLoadBitmapFont (const char *cceFontName);
+CCE_API extern uint32_t* (*ccePrintString)(char *string, struct Map2DElementDev *elementTemplate, cce_enum elementType, uint8_t isCurrentPosition);
 
 #ifdef __cplusplus
 }
 #endif // __cplusplus
 
-#endif // LOG_H
+#endif // TEXT_RENDERING_H

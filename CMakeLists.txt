@@ -40,7 +40,7 @@ if ("${CCE_LIB_TYPE}" MATCHES STATIC)
 endif()
 
 if (NOT DEFINED CCE_BUILD_DEMOS)
-   option (CCE_BUILD_DEMOS "Build Conservative Creator's Engine demo programs" OFF)
+   option(CCE_BUILD_DEMOS "Build Conservative Creator's Engine demo programs" OFF)
 endif()
 
 set(CMAKE_C_STANDARD 99)
@@ -66,18 +66,15 @@ add_library(cce ${CCE_LIB_TYPE}
    src/platform/platforms.h
    src/platform/endianess.c
    include/cce/endianess.h
-   src/map2D/actions.c
-   include/cce/map2D/actions.h
-   src/map2D/map2D_modification.c
-   src/map2D/map2D.c
-   src/map2D/map2D_openGL.c
-   include/cce/map2D/map2D.h
-   src/map2D/map2D_internal.h
-   src/map2D/map2D_file_IO.c
-   src/map2D/log.c
-   src/map2D/log.h
-   src/map2D/plugins.c
-   src/map2D/plugins.h
+   src/plugins/actions.c
+   include/cce/plugins/actions.h
+   src/plugins/map2D/map2D_modification.c
+   src/plugins/map2D/map2D.c
+   src/plugins/map2D/map2D_openGL.c
+   src/plugins/map2D/map2D_collision.c
+   include/cce/plugins/map2D/map2D.h
+   src/plugins/map2D/map2D_internal.h
+   src/plugins/map2D/map2D_file_IO.c
    #src/plugins/text_rendering.c
    #src/plugins/open_world.c
    src/external/stb_libs.c

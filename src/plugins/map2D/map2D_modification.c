@@ -23,10 +23,10 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "../../include/cce/engine_common.h"
-#include "../../include/cce/engine_common_IO.h"
-#include "../../include/cce/utils.h"
-#include "../../include/cce/map2D/map2D.h"
+#include "../../../include/cce/engine_common.h"
+#include "../../../include/cce/engine_common_IO.h"
+#include "../../../include/cce/utils.h"
+#include "../../../include/cce/plugins/map2D/map2D.h"
 
 #include "map2D_internal.h"
 

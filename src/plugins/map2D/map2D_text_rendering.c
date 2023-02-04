@@ -23,12 +23,12 @@
 
 #include <ini.h>
 
-#include "../../include/cce/engine_common.h"
-#include "../../include/cce/map2D/map2D.h"
-#include "../../include/cce/map2D/actions.h"
-#include "../../include/cce/os_interaction.h"
-#include "../../include/cce/plugins/text_rendering.h"
-#include "../../include/cce/utils.h"
+#include "../../../include/cce/engine_common.h"
+#include "../../../include/cce/plugins/map2D/map2D.h"
+#include "../../../include/cce/plugins/actions.h"
+#include "../../../include/cce/os_interaction.h"
+#include "../../../include/cce/plugins/map2D/map2D_text_rendering.h"
+#include "../../../include/cce/utils.h"
 
 #define UNK 1
 
