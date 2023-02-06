@@ -53,15 +53,7 @@ struct cce_dynamicactioninfo
 */
 
 #define CCE_ACTION_SHIFT 0x0
-#define CCE_ACTION_SET 0x1
-
-#define CCE_ROTATE_FLIP 0x2
-
-#define CCE_TRANSFORMACTION_FLIP                CCE_ROTATE_FLIP
-#define CCE_TRANSFORMACTION_MOVE                0x4
-#define CCE_TRANSFORMACTION_SCALE               0x8
-#define CCE_TRANSFORMACTION_ROTATE_WITH_OFFSET  0x1C
-#define CCE_TRANSFORMACTION_ROTATE              0x10
+#define CCE_ACTION_SET   0x1
 
 typedef void (*cce_actionfun)(const void*, uint8_t);
 
@@ -72,7 +64,7 @@ typedef void (*cce_actionfun)(const void*, uint8_t);
 #define CCE_CHANGETIMERSTATE_DISABLE_AUTO_RESTART_ON_ALARM 0x8
 #define CCE_CHANGETIMERSTATE_SWITCH_AUTO_RESTART_ON_ALARM  0x10
 
-struct setTimerStateAction
+struct cceSetTimerStateAction
 {
    uint32_t actionID;
    uint16_t ID;
@@ -80,7 +72,7 @@ struct setTimerStateAction
    uint8_t __pad;
 };
 
-struct setTimerDelayAction
+struct cceSetTimerDelayAction
 {
    uint32_t actionID;
    uint32_t delay;
@@ -101,7 +93,7 @@ struct setTimerDelayAction
 #define CCE_DELAYACTION_EXECUTE_ON_START 0x20
 
 // action data should be located right after this struct
-struct delayAction
+struct cceDelayAction
 {
    uint32_t actionID;
    union
@@ -115,20 +107,21 @@ struct delayAction
    uint8_t __pad;
 };
 
-struct runActions
+// Followed by actions to run
+struct cceRunActions
 {
    uint32_t actionID;
    uint16_t actionQuantity;
    uint16_t actionSizes[1]; // Can be more than 1 - depends on quantity. Last is omitted! When even must be pad to keep everithing aligned.
 };
 
-CCE_API void    cceMoveGroup (uint8_t groupID,  struct cce_i16vec2 coords, cce_enum actionType);
-CCE_API void    cceScaleGroup (uint8_t groupID, struct cce_i16vec2 size,   cce_enum actionType);
-CCE_API uint8_t cceNormalizeAngle (float angleInDegrees);
-CCE_API void    cceRotateWithOffsetGroup (uint8_t groupID, uint8_t normalizedAngle, struct cce_i16vec2 offset, cce_enum actionType);
-CCE_API void    cceRotateGroup (uint8_t groupID, uint8_t normalizedAngle, cce_enum actionType);
-CCE_API void    cceOffsetTextureGroup (uint8_t groupID, struct cce_i16vec2 offset, cce_enum actionType);
-CCE_API void    cceChangeColorGroup (uint8_t groupID, union cce_color color, cce_enum actionType);
+struct cceSetEngineShouldTerminate
+{
+   uint32_t actionID;
+   uint8_t  state;
+   cce_enum action;
+};
+
 CCE_API void    cceSetTimerDelay (uint16_t timerID, uint32_t newDelay, uint8_t actionType);
 CCE_API void    cceSetTimerState (uint16_t timerID, uint8_t state);
 CCE_API void    cceDelayAction (uint16_t repeatsQuantity, uint32_t delayOrID, uint32_t actionStructSize, void *actionStruct, uint8_t flags);
@@ -140,13 +133,13 @@ CCE_API void    cceCreateActions      (void *buffer, struct cce_buffer *info);
 CCE_API void    cceFreeActions        (void *buffer, struct cce_buffer *info);
 CCE_API void    cceFreeActionsDynamic (void *buffer, struct cce_buffer *info);
 CCE_API uint8_t cceStoreActions       (void *buffer, struct cce_buffer *info, FILE *file);
+CCE_API void    cceLoadActionsPlugin (void);
 
-#define CCE_STARTTIMER_ACTION 4
-#define CCE_SETDYNAMICTIMERDELAY_ACTION 5
-#define CCE_SETGRIDSIZE_ACTION 6
-#define CCE_LOADMAP2D_ACTION 7
-#define CCE_DELAYACTION_ACTION 8
-#define CCE_RUNACTIONS_ACTION 9
+#define CCE_ACTION_STARTTIMER 0
+#define CCE_ACTION_SETTIMERDELAY 1
+#define CCE_ACTION_DELAYACTION 2
+#define CCE_ACTION_RUNACTIONS 3
+#define CCE_ACTION_SETENGINESHOULDTERMINATE 4
 
 #define CCE__LOAD_ACTION_METADATA(map, file, onLoad, onFree, onLoadSize, onFreeSize) \
 fread(&onLoad  ## Quantity, sizeof(uint16_t), 1, file); \

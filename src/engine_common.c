@@ -70,7 +70,7 @@ CCE_ARRAY(updateCallbacks, struct updateCallbackData, uint16_t);
 #define CCE_INI_CALLBACK_NO_TERMINATION_CALLBACK 0x8
 
 struct cce_backend_data cce__engineBackend;
-uint64_t cce__currentTime, cce__deltaTime;
+uint64_t cce__currentTime = 0, cce__deltaTime = 0;
 
 struct cce_u16vec2 cce__gameResolution;
 uint16_t cce__buttonsBitFieldDiff;
@@ -128,6 +128,14 @@ CCE_API void cceDisableUpdateCallback (uint16_t callbackID)
    updateCallbacks[callbackID].flags ^= CCE_CALLBACK_ENABLED;
 }
 
+static int emptyIniCallback (void *st, const char *name, const char *value)
+{
+   CCE_UNUSED(st);
+   CCE_UNUSED(name);
+   CCE_UNUSED(value);
+   return 0;
+}
+
 CCE_API void cceRegisterPlugin (const char *lowercaseName, void *data, int (*iniCallback)(void*, const char*, const char*), int (*init)(void*), void (*term)(void), uint8_t flags)
 {
    if (cceCheckPlugin(lowercaseName))
@@ -135,7 +143,7 @@ CCE_API void cceRegisterPlugin (const char *lowercaseName, void *data, int (*ini
    if (iniCallbacksQuantity >= iniCallbacksAllocated)
       CCE_REALLOC_ARRAY(iniCallbacks, iniCallbacksQuantity + 1);
    iniCallbacks[iniCallbacksQuantity].data          = data;
-   iniCallbacks[iniCallbacksQuantity].fn            = iniCallback;
+   iniCallbacks[iniCallbacksQuantity].fn            = (iniCallbacks != NULL) ? iniCallback : emptyIniCallback;
    iniCallbacks[iniCallbacksQuantity].flags = flags | (-(init == NULL) & CCE_INI_CALLBACK_DO_NOT_INIT) | (-(term == NULL) & CCE_INI_CALLBACK_NO_TERMINATION_CALLBACK);
    iniCallbacks[iniCallbacksQuantity].init = init;
    iniCallbacks[iniCallbacksQuantity].name = lowercaseName;
@@ -198,6 +206,8 @@ static void terminateEngineCommon (void)
    terminationCallbacksQuantity = 1;
    terminationCallbacksAllocated = 0;
    iniCallbackLongestName = 11;
+   cce__currentTime = 0;
+   cce__deltaTime = 0;
 }
 
 #define CCE_MEMEQ(x, y) (memcmp(x, y, strlen(y)) == 0)
@@ -419,6 +429,8 @@ CCE_API int cceInit (const char *gameINIpath)
    int status = parseGameINI(gameINIpath);
    if (pathFree)
       free((void*)gameINIpath);
+   cce__currentTime = cce__engineBackend.getTime();
+   cce__deltaTime = 10000; // deltaTime is trash after initialization
    return status;
 }
 

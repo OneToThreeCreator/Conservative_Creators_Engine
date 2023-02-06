@@ -164,15 +164,18 @@ CCE_API uint64_t cceGetTime  (void);
 #define CCE_INI_CALLBACK_FREE_DATA 0x1
 #define CCE_INI_CALLBACK_DO_NOT_INIT 0x2
 
-CCE_API void cceRegisterPlugin (const char *lowercaseName, void *data, int (*iniCallback)(void*, const char*, const char*), int (*init)(void*), void (*term)(void), uint8_t flags);
-CCE_API uint8_t cceCheckPlugin (const char *name);
-CCE_API uint8_t cceIsPluginLoading (const char *name);
-CCE_API void cceSetAxisChangeCallback (void (*callback)(int8_t, int8_t), cce_enum axePair);
-CCE_API void cceSetButtonCallback (void (*callback)(uint16_t buttonState, uint16_t diff));
-CCE_API void cceSetKeyCallback (void (*callback)(cce_enum key, cce_enum state));
-CCE_API int cceInit (const char *path);
-CCE_API void cceUpdate (void);
-CCE_API void cceTerminate (void);
+CCE_API void     cceRegisterPlugin (const char *lowercaseName, void *data, int (*iniCallback)(void*, const char*, const char*), int (*init)(void*), void (*term)(void), uint8_t flags);
+CCE_API uint16_t cceRegisterUpdateCallback (void (*callback)(void));
+CCE_API void     cceEnableUpdateCallback (uint16_t callbackID);
+CCE_API void     cceDisableUpdateCallback (uint16_t callbackID);
+CCE_API uint8_t  cceCheckPlugin (const char *name);
+CCE_API uint8_t  cceIsPluginLoading (const char *name);
+CCE_API void     cceSetAxisChangeCallback (void (*callback)(int8_t, int8_t), cce_enum axePair);
+CCE_API void     cceSetButtonCallback (void (*callback)(uint16_t buttonState, uint16_t diff));
+CCE_API void     cceSetKeyCallback (void (*callback)(cce_enum key, cce_enum state));
+CCE_API int      cceInit (const char *path);
+CCE_API void     cceUpdate (void);
+CCE_API void     cceTerminate (void);
 CCE_API union cce_color cceHSVtoRGB (union cce_color color);
 CCE_API union cce_color cceHSLtoRGB (union cce_color color);
 CCE_API union cce_color cceHCLtoRGB (union cce_color color);

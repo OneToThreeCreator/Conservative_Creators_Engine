@@ -28,8 +28,6 @@
 #include <cce/plugins/map2D/map2D.h>
 #include <cce/os_interaction.h>
 
-uint32_t frames = 0;
-
 void axisCallback (int8_t horizontal, int8_t vertical)
 {
    printf("Left stick position changed to %i %i\n", horizontal, vertical);
@@ -68,34 +66,57 @@ struct cce_buffer* createMap (void)
    return map;
 }
 
-void alterMapFrame (struct cce_buffer *map)
+struct cce_buffer *g_map;
+
+struct alterMapSt
 {
-   struct cce_element *element = cceGetElements(0, 3, map);
-   uint8_t updateFrame = (frames & 31) == 0;
+   uint32_t actionID;
+   uint8_t counter;
+};
+
+void alterMapFrame (const void *data, uint8_t repeats)
+{
+   struct alterMapSt *map = (void*) data;
+   map->counter += repeats;
+   struct cce_element *element = cceGetElements(1, 3, g_map);
    uint8_t offsets[] = {0, 1};
    uint8_t flags[] = {0, 0, CCE_ELEMENT_FLIP_HORIZONTALLY, CCE_ELEMENT_FLIP_VERTICALLY};
-   element[1].data.texturePosition.x = offsets[(frames >> 5) & 1];
-   element[1].flags = flags[(frames >> 5) & 3];
-   element[2].rotation -= 1;
-   element[3].flags ^= CCE_ELEMENT_FLIP_HORIZONTALLY & -(updateFrame);
-   element[3].rotation += 128 & -(updateFrame);
-   if (frames >= 192)
-      cceSetEngineShouldTerminate(1);
-   cceSetElementsUpdated(cceGetRenderingInfo(map));
+   element[0].data.texturePosition.x = offsets[map->counter & 1];
+   element[0].flags = flags[map->counter & 3];
+   element[2].flags ^= CCE_ELEMENT_FLIP_HORIZONTALLY;
+   element[2].rotation += 128;
+   cceSetElementsUpdated(cceGetRenderingInfo(g_map));
+}
+
+void delayedAction (const void *data, uint8_t repeats)
+{
+   CCE_UNUSED(data);
+   if ((repeats & 1) == 0)
+      return;
+   struct cce_element *element = cceGetElements(0, 1, g_map);
+   element->flags ^= CCE_ELEMENT_FLIP_VERTICALLY;
+   cceSetElementsUpdated(cceGetRenderingInfo(g_map));
+}
+
+void rotate (const void *data, uint8_t repeats)
+{
+   struct cce_element *element = cceGetElements(2, 1, g_map);
+   element->rotation -= repeats;
+   cceSetElementsUpdated(cceGetRenderingInfo(g_map));
 }
 
 int main (int argc, char **argv)
 {
-   size_t pathLength;
    if (argc >= 2)
    {
       if (argc > 2 || (argc == 2 && (!strcmp(argv[1], "-h") || !strcmp(argv[1], "--help"))))
       {
          printf("Usage: %s [PATH_TO_ENGINE_RESOURCES]\nWhen PATH_TO_ENGINE_RESOURCES is not provided, current directory is assumed.", argv[0]);
-         exit(argc > 2);
+         return -(argc > 2);
       }
-      cceSetCurrentPath(argv[0]);
+      cceSetCurrentPath(argv[1]);
    }
+   cceLoadActionsPlugin();
    cceLoadMap2Dplugin();
    if (cceInit("test2/game.ini") != 0)
    {
@@ -104,8 +125,8 @@ int main (int argc, char **argv)
    }
    struct cce_buffer *map = createMap();
    
-   char *tmp = cceGetTemporaryDirectory(8u);
-   strcat(tmp, "test.c2m");
+   char *tmp = cceGetTemporaryDirectory(9u);
+   strcat(tmp, "/test.c2m");
    cceWriteMap2Ddynamic(map, tmp);
    cceFreeMap2Ddynamic(map);
    map = cceLoadMap2D(tmp);
@@ -113,13 +134,22 @@ int main (int argc, char **argv)
    cceSetRenderingLayerMap2D(0, 0, map);
    cceSetAxisChangeCallback(axisCallback, CCE_AXISPAIR_LSTICK);
    cceSetButtonCallback(buttonCallback);
-   printf("Initialization complete\n");
+   cceRegisterAction(16, delayedAction, NULL);
+   cceRegisterAction(17, alterMapFrame, NULL);
+   cceRegisterAction(18, rotate, NULL);
+   g_map = map;
+   uint32_t actionID = 16;
+   struct alterMapSt st = {17, 0};
+   struct cceSetEngineShouldTerminate st2 = {CCE_ACTION_SETENGINESHOULDTERMINATE, 1, CCE_ACTION_SET};
+   cceDelayAction(6,  800000, sizeof(uint32_t),                           &actionID, CCE_DEFAULT);
+   cceDelayAction(1,  330000, sizeof(struct alterMapSt),                  &st,       CCE_DELAYACTION_NEVER_END);
+   cceDelayAction(1, 3000000, sizeof(struct cceSetEngineShouldTerminate), &st2,      CCE_DEFAULT);
+   actionID = 18;
+   cceDelayAction(1,    3000, sizeof(uint32_t),                           &actionID, CCE_DELAYACTION_NEVER_END);
    while (cceEngineShouldTerminate() == 0)
    {
       cceRenderMap2D();
       cceUpdate();
-      ++frames;
-      alterMapFrame(map);
       cceScreenUpdate();
    }
    cceFreeMap2D(map);

@@ -51,10 +51,14 @@ CCE_ARRAY(actions, static cce_actionfun, static uint32_t);
 static void (**endianSwapActions)(void*);
 static struct DelayedAction *nextDelayedActionWithoutExternalTimer;
 static struct DelayedAction *lastDelayedActionWithExternalTimer;
+static struct DelayedAction *firstDelayedActionWithVerySmallDelay;
+static struct DelayedAction *lastDelayedActionWithVerySmallDelay;
 static struct list delayedActions;
 static uint32_t delayedActionsWithExternalTimerQuantity;
+static uint32_t delayedActionsWithVerySmallDelayQuantity;
 static struct cce_timer *nextTimer;
 CCE_ARRAY(timers, static struct cce_timer, static uint16_t);
+uint64_t currentTime;
 uint8_t g_flags;
 
 #define EXEC_ACTION(action, count)(*((actions) + *(uint32_t*)(action)))(action, count)
@@ -66,8 +70,8 @@ struct Action
 
 static void runActionsAction (const void *data, uint8_t count)
 {
-   const struct runActions *params = data;
-   const cce_void *actionsToCall = (const cce_void*) data + sizeof(struct runActions) + (((params->actionQuantity - 1) | 1) - 1) * sizeof(uint16_t);
+   const struct cceRunActions *params = data;
+   const cce_void *actionsToCall = (const cce_void*) data + sizeof(struct cceRunActions) + (((params->actionQuantity - 1) | 1) - 1) * sizeof(uint16_t);
    for (const uint16_t *sizes = params->actionSizes, *end = params->actionSizes + params->actionQuantity; sizes < end; actionsToCall += *sizes++)
    {
       EXEC_ACTION(actionsToCall, count);
@@ -76,7 +80,7 @@ static void runActionsAction (const void *data, uint8_t count)
 
 static void setTimerStateAction (const void *data, uint8_t count)
 {
-   const struct setTimerStateAction *params = data;
+   const struct cceSetTimerStateAction *params = data;
    uint8_t mask = -(count & 2);
    mask &= ((((params->state & CCE_CHANGETIMERSTATE_SWITCH) + 1) & (CCE_CHANGETIMERSTATE_SWITCH + 1)) - 1) | (params->state & CCE_CHANGETIMERSTATE_SWITCH_AUTO_RESTART_ON_ALARM);
    // If switch happens twice, it cancels out
@@ -85,25 +89,31 @@ static void setTimerStateAction (const void *data, uint8_t count)
 
 static void setTimerDelayAction (const void *data, uint8_t count)
 {
-   const struct setTimerDelayAction *params = data;
+   const struct cceSetTimerDelayAction *params = data;
    cceSetTimerDelay(params->ID, params->delay * ((count & -(params->action == CCE_ACTION_SHIFT)) + params->action != CCE_ACTION_SHIFT), params->action);
 }
 
 static void delayActionAction (const void *data, uint8_t count)
 {
-   const struct delayAction *params = data;
+   const struct cceDelayAction *params = data;
    if (count == 1)
       cceDelayAction(params->timerInfo.delay, params->repeatsQuantity, params->delayedActionStructSize, ((void*) (params + 1)), params->flags);
    else
       cceDelayAction(params->timerInfo.delay / count, params->repeatsQuantity, params->delayedActionStructSize, ((void*) (params + 1)), params->flags); // Integer division is painfully slow
 }
 
+static void setEngineShouldTerminateAction (const void *data, uint8_t count)
+{
+   const struct cceSetEngineShouldTerminate *params = data;
+   cceSetEngineShouldTerminate(((cceEngineShouldTerminate() != !(count & 1)) & (params->action == CCE_ACTION_SHIFT)) != params->state);
+}
+
 static void runActionsActionSwapEndian (void *data)
 {
-   struct runActions *params = data;
+   struct cceRunActions *params = data;
    params->actionQuantity = cceSwapEndianInt16(params->actionQuantity);
    cceSwapEndianArrayIntN(params->actionSizes, params->actionQuantity - 2, sizeof(uint16_t));
-   cce_void *actionsToCall = (cce_void*) data + sizeof(struct runActions) + (((params->actionQuantity - 1) | 1) - 1) * sizeof(uint16_t);
+   cce_void *actionsToCall = (cce_void*) data + sizeof(struct cceRunActions) + (((params->actionQuantity - 1) | 1) - 1) * sizeof(uint16_t);
    for (const uint16_t *sizes = params->actionSizes, *end = params->actionSizes + params->actionQuantity - 1; sizes < end; actionsToCall += *sizes++)
    {
       *(uint32_t*) actionsToCall = cceSwapEndianInt32(*(uint32_t*) actionsToCall);
@@ -115,21 +125,20 @@ static void runActionsActionSwapEndian (void *data)
 
 static void setTimerStateActionSwapEndian (void *data)
 {
-   struct setTimerStateAction *params = data;
+   struct cceSetTimerStateAction *params = data;
    params->ID = cceSwapEndianInt16(params->ID);
 }
 
 static void setTimerDelayActionSwapEndian (void *data)
 {
-   struct setTimerDelayAction *params = data;
+   struct cceSetTimerDelayAction *params = data;
    params->ID    = cceSwapEndianInt16(params->ID);
    params->delay = cceSwapEndianInt32(params->delay);
 }
 
 static void delayActionActionSwapEndian (void *data)
 {
-   struct delayAction *params = data;
-   params->actionID = cceSwapEndianInt32(params->actionID);
+   struct cceDelayAction *params = data;
    params->delayedActionStructSize = cceSwapEndianInt32(params->delayedActionStructSize);
    params->timerInfo.delay = cceSwapEndianInt32(params->timerInfo.delay);
    params->repeatsQuantity = cceSwapEndianInt32(params->repeatsQuantity);
@@ -143,7 +152,8 @@ void cce__swapActionsEndian (uint16_t *actionSizes, void *actionsToSwap, uint16_
    while (iterator < end)
    {
       *(uint32_t*)jiterator = cceSwapEndianInt32(*(uint32_t*)jiterator);
-      (*(endianSwapActions + *(uint32_t*)jiterator))(jiterator);
+      if (*(endianSwapActions + *(uint32_t*)jiterator) != NULL)
+         (*(endianSwapActions + *(uint32_t*)jiterator))(jiterator);
       jiterator += *iterator;
    }
 }
@@ -157,6 +167,383 @@ void cce__runActions (uint16_t *actionSizes, void *actionsToCall, uint16_t actio
       EXEC_ACTION(jiterator, 1);
       jiterator += *iterator;
    }
+}
+
+#define STORE_ACTIONS_SWAP_ENDIAN(action, sizes, bytesWritten, tmpSizeStore, tmpActionStore) \
+sizes = action ## Sizes, end = action ## Sizes + action ## Quantity; \
+for (uint16_t *iterator = sizes; iterator < end; ++iterator) \
+{ \
+   tmpSizeStore = cceSwapEndianInt16(*iterator); \
+   fwrite(&tmpSizeStore, sizeof(uint16_t), 1, file); \
+} \
+for (cce_void *iterator = (cce_void*) action; sizes < end; iterator += *sizes++) \
+{ \
+   memcpy(tmpActionStore, iterator, *sizes); \
+   if (*(endianSwapActions + ((struct Action*)tmpActionStore)->ID) != NULL) \
+      (*(endianSwapActions + ((struct Action*)tmpActionStore)->ID))(tmpActionStore); \
+   fwrite(tmpActionStore, *sizes, 1, file); \
+   bytesWritten += *sizes; \
+}
+
+#define STORE_ACTIONS_PRESERVE_ENDIAN(action, sizes, bytesWritten) \
+fwrite(action ## Sizes, sizeof(uint16_t), action ## Quantity, file); \
+sizes = action ## Sizes, end = action ## Sizes + action ## Quantity; \
+for (cce_void *iterator = (cce_void*) action; sizes < end; iterator += *sizes++) \
+{ \
+   fwrite(iterator, *sizes, 1, file); \
+   bytesWritten += *sizes; \
+}
+
+void cce__actionsTerminate (void)
+{
+   llrmlist(&delayedActions);
+   free(actions);
+   free(endianSwapActions);
+   free(timers);
+}
+
+static int initActions (void *data)
+{
+   currentTime = cceGetTime();
+   CCE_UNUSED(data);
+   actionsQuantity = 1 * 2;
+   timersQuantity = 0;
+   CCE_ALLOC_ARRAY_ZEROED(timers, 1);
+   CCE_ALLOC_ARRAY_ZEROED(actions, 1);
+   delayedActionsWithExternalTimerQuantity = 0;
+   delayedActionsWithVerySmallDelayQuantity = 0;
+   delayedActions = LL_LIST_INIT(LL_SINGLELINKED);
+   endianSwapActions = (void (**)(void*)) calloc(actionsQuantity, sizeof(void (*)(void*)));
+   nextTimer = NULL;
+   nextDelayedActionWithoutExternalTimer = NULL;
+   lastDelayedActionWithExternalTimer = NULL;
+   firstDelayedActionWithVerySmallDelay = NULL;
+   lastDelayedActionWithVerySmallDelay = NULL;
+   cceRegisterAction(CCE_ACTION_DELAYACTION,              delayActionAction,              delayActionActionSwapEndian);
+   cceRegisterAction(CCE_ACTION_RUNACTIONS,               runActionsAction,               runActionsActionSwapEndian);
+   cceRegisterAction(CCE_ACTION_STARTTIMER,               setTimerStateAction,            setTimerStateActionSwapEndian);
+   cceRegisterAction(CCE_ACTION_SETTIMERDELAY,            setTimerDelayAction,            setTimerDelayActionSwapEndian);
+   cceRegisterAction(CCE_ACTION_SETENGINESHOULDTERMINATE, setEngineShouldTerminateAction, NULL);
+   return 0;
+}
+
+static void terminateActions (void)
+{
+   free(timers);
+   free(actions);
+   free(endianSwapActions);
+   timersQuantity   = 0;
+   timersAllocated  = 0;
+   actionsQuantity  = 0;
+   actionsAllocated = 0;
+   llrmlist(&delayedActions);
+}
+
+CCE_API uint8_t cceRegisterAction (uint32_t ID, cce_actionfun action, void (*endianSwap)(void*))
+{
+   if (ID >= actionsAllocated) do
+   {
+      CCE__REALLOC_ARRAY(actions, ID + 1);
+      endianSwapActions = realloc(endianSwapActions, actionsAllocated * sizeof(cce_actionfun*));
+      memset(actions           + oldAllocated, 0, (actionsAllocated - oldAllocated) * sizeof(cce_actionfun));
+      memset(endianSwapActions + oldAllocated, 0, (actionsAllocated - oldAllocated) * sizeof(cce_actionfun));
+   }
+   while (0);
+   actions[ID] = action;
+   endianSwapActions[ID] = endianSwap;
+   actionsQuantity = CCE_MAX(ID + 1, actionsQuantity + 1);
+   return 0;
+}
+
+CCE_API void cceSetTimerState (uint16_t timerID, uint8_t state)
+{
+   if (timerID >= timersAllocated)
+   {
+      CCE_REALLOC_ARRAY_ZEROED(timers, timerID + 1);
+   }
+   timers[timerID].flags &= ~(CCE_TIMER_START_STOP | ((state & CCE_CHANGETIMERSTATE_DISABLE_AUTO_RESTART_ON_ALARM) >> 1));
+   timers[timerID].flags |= (state & CCE_CHANGETIMERSTATE_SWITCH) ^ (((state & CCE_CHANGETIMERSTATE_SWITCH) == CCE_CHANGETIMERSTATE_SWITCH) << (timers[timerID].initTime == 0));
+   timers[timerID].flags |= state & CCE_CHANGETIMERSTATE_ENABLE_AUTO_RESTART_ON_ALARM;
+   timers[timerID].flags ^= ((state & CCE_CHANGETIMERSTATE_SWITCH_AUTO_RESTART_ON_ALARM) >> 2);
+   g_flags |= CCE_PROCESS_TIMERS;
+}
+
+CCE_API void cceSetTimerDelay (uint16_t timerID, uint32_t newDelay, uint8_t actionType)
+{
+   if (timerID >= timersAllocated)
+   {
+      CCE_REALLOC_ARRAY_ZEROED(timers, timerID + 1);
+   }
+   if (actionType == CCE_ACTION_SHIFT)
+   {
+      newDelay += timers[timerID].delay;
+   }
+   if (timers[timerID].initTime + timers[timerID].delay >= currentTime)
+   {
+      // Avoid making troubles to delayAction handlers
+      timers[timerID].initTime += (int64_t) timers[timerID].delay - (int64_t) newDelay;
+   }
+   else if (timers + timerID == nextTimer && timers[timerID].delay < newDelay)
+   {
+      nextTimer = NULL; // Must be found again
+   }
+   else if (timers[timerID].initTime + newDelay < nextTimer->initTime + nextTimer->delay)
+   {
+      nextTimer = timers + timerID;
+   }
+   timers[timerID].delay = newDelay;
+}
+
+CCE_API void cceDelayAction (uint16_t repeatsQuantity, uint32_t delayOrID, uint32_t actionStructSize, void *actionStruct, uint8_t flags)
+{
+   if (flags & CCE_DELAYACTION_EXECUTE_ON_START)
+      EXEC_ACTION(actionStruct, 1);
+   
+   cce_void *data = llnodealloc(sizeof(struct DelayedAction) + actionStructSize, delayedActions.type);
+   LL_NEXT(data) = NULL;
+   struct DelayedAction *head = (struct DelayedAction*) data;
+   if (flags & CCE_DELAYACTION_NEVER_END)
+      head->repeatsLeft = 1;
+   else
+      head->repeatsLeft = repeatsQuantity;
+   head->delay = delayOrID;
+   if (((flags & (CCE_DELAYACTION_EXTERNAL_TIMER | CCE_DELAYACTION_START_EXTERNAL_TIMER)) == (CCE_DELAYACTION_EXTERNAL_TIMER | CCE_DELAYACTION_START_EXTERNAL_TIMER)))
+      timers[delayOrID].flags |= CCE_TIMER_START;
+   
+   head->initTime = cceGetTime();
+   head->flags = flags & (CCE_DELAYACTION_EXTERNAL_TIMER | CCE_DELAYACTION_NEVER_END | CCE_DELAYACTION_EXECUTE_ONCE_PER_TIMER_ALARM | CCE_DELAYACTION_RESTART_EXTERNAL_TIMER_ON_ALARM);
+   memcpy(data + sizeof(struct DelayedAction), actionStruct, actionStructSize);
+   if (flags & CCE_DELAYACTION_EXTERNAL_TIMER)
+   {
+      llprependchain(&delayedActions, data);
+      if (delayedActionsWithExternalTimerQuantity == 0)
+         lastDelayedActionWithExternalTimer = head;
+      ++delayedActionsWithExternalTimerQuantity;
+      return;
+   }
+   if (head->delay < cceGetDeltaTime() * 2)
+   {
+      llinsertchainp(&delayedActions, lastDelayedActionWithExternalTimer, data);
+      if (delayedActionsWithVerySmallDelayQuantity == 0)
+         lastDelayedActionWithVerySmallDelay = head;
+      firstDelayedActionWithVerySmallDelay = head;
+      ++delayedActionsWithVerySmallDelayQuantity;
+      return;
+   }
+   if (nextDelayedActionWithoutExternalTimer == NULL || head->initTime + head->delay < nextDelayedActionWithoutExternalTimer->initTime + nextDelayedActionWithoutExternalTimer->delay)
+   {
+      llinsertchainp(&delayedActions, (lastDelayedActionWithVerySmallDelay == NULL) ? lastDelayedActionWithExternalTimer : lastDelayedActionWithVerySmallDelay, data);
+      nextDelayedActionWithoutExternalTimer = head;
+      return;
+   }
+   llappendchain(&delayedActions, data);
+}
+
+// Uses cache inefficiently (linked lists are bad at this). But arrays are out of luck here because actions have variable-size structs (making them hard to use with arrays)
+static void runDelayedActions (void)
+{
+   cce_void *prevnode = NULL, *node = delayedActions.chain;
+   struct DelayedAction *head;
+   uint32_t i = 0;
+   int64_t timerDiff;
+   uint8_t count;
+   // If no timers expired, no need to check actions dependant on them
+   if (nextTimer != NULL && (nextTimer->initTime + nextTimer->delay <= currentTime))
+   {
+      while (i < delayedActionsWithExternalTimerQuantity)
+      {
+         head = (struct DelayedAction*)node;
+         struct cce_timer *timer = timers + head->delay;
+         if (timer->initTime == 0 || (timerDiff = currentTime - (timer->initTime + timer->delay)) < 0)
+            goto CONTINUE;
+         count = 1;
+         if ((uint32_t)timerDiff >= timer->delay && !(head->flags & CCE_DELAYACTION_EXECUTE_ONCE_PER_TIMER_ALARM) &&
+            (timer->flags & CCE_TIMER_AUTO_RESTART_ON_ALARM || head->flags & CCE_DELAYACTION_RESTART_EXTERNAL_TIMER_ON_ALARM) &&
+            timer->delay != 0)
+         {
+            count = timerDiff / timer->delay + 1;
+            count = CCE_MIN(count, CCE_MIN(255, head->repeatsLeft | (uint16_t)-((head->flags & CCE_DELAYACTION_NEVER_END) > 0)));
+         }
+         EXEC_ACTION(node + sizeof(struct DelayedAction), count);
+         head->repeatsLeft -= -((head->flags & CCE_DELAYACTION_NEVER_END) == 0) & count;
+         if (head->repeatsLeft == 0)
+         {
+            node = LL_NEXT(node);
+            llrmsublistp(&delayedActions, prevnode, 1);
+            --delayedActionsWithExternalTimerQuantity;
+            continue;
+         }
+         if (head->flags & CCE_DELAYACTION_RESTART_EXTERNAL_TIMER_ON_ALARM)
+         {
+            timer->flags |= CCE_TIMER_START;
+         }
+CONTINUE:
+         prevnode = node;
+         node = LL_NEXT(node);
+         ++i;
+      }
+      // Could be changed
+      lastDelayedActionWithExternalTimer = (struct DelayedAction*)prevnode;
+   }
+   else
+   {
+      node     = (cce_void*) firstDelayedActionWithVerySmallDelay;
+      prevnode = (cce_void*) lastDelayedActionWithExternalTimer;
+   }
+   i = 0;
+   if (node != NULL) while (i < delayedActionsWithVerySmallDelayQuantity)
+   {
+      head = (struct DelayedAction*)node;
+      timerDiff = (int64_t)currentTime - (int64_t)(head->initTime + head->delay);
+      if (timerDiff < 0)
+         goto CONTINUE2;
+      count = 1;
+      if ((uint64_t)timerDiff >= head->delay && !(head->flags & CCE_DELAYACTION_EXECUTE_ONCE_PER_TIMER_ALARM) && head->delay > 0)
+      {
+         count = CCE_MIN((uint32_t)timerDiff / head->delay, CCE_MIN(head->repeatsLeft | (uint16_t)-((head->flags & CCE_DELAYACTION_NEVER_END) > 0), 255));
+         timerDiff -= head->delay * count;
+      }
+      EXEC_ACTION(node + sizeof(struct DelayedAction), count);
+      head->repeatsLeft -= count & -((head->flags & CCE_DELAYACTION_NEVER_END) == 0);
+      if (head->repeatsLeft == 0)
+      {
+         node = LL_NEXT(node);
+         llrmsublistp(&delayedActions, prevnode, 1);
+         --delayedActionsWithVerySmallDelayQuantity;           
+         if ((struct DelayedAction*)prevnode == lastDelayedActionWithExternalTimer)
+            firstDelayedActionWithVerySmallDelay = head;
+         continue;
+      }
+      head->initTime = currentTime - timerDiff;
+CONTINUE2:
+      prevnode = node;
+      node = LL_NEXT(node);
+      ++i;
+   }
+   else
+      node = (cce_void*) nextDelayedActionWithoutExternalTimer;
+   // Could be changed
+   lastDelayedActionWithVerySmallDelay = (struct DelayedAction*)prevnode;
+   head = (struct DelayedAction*)node;
+   if (node == NULL || ((int64_t)currentTime - (int64_t)(head->initTime + head->delay)) < 0)
+      return; // Skip checking remaining actions because the one with least remaining time hasn't expired
+   struct DelayedAction *prevMinDelayNode = NULL;
+   struct DelayedAction *minDelayNode = NULL;
+   uint64_t minimalTimeLeft = UINT64_MAX;
+   while (node != NULL)
+   {
+      head = (struct DelayedAction*)node;
+      timerDiff = (int64_t)currentTime - (int64_t)(head->initTime + head->delay);
+      if (timerDiff < 0)
+      {
+         if (minimalTimeLeft > (uint64_t)(-timerDiff))
+         {
+            prevMinDelayNode = (struct DelayedAction*)prevnode;
+            minDelayNode = head;
+            minimalTimeLeft = -timerDiff;
+         }
+         goto CONTINUE3;
+      }
+      count = 1;
+      if ((uint64_t)timerDiff >= head->delay && !(head->flags & CCE_DELAYACTION_EXECUTE_ONCE_PER_TIMER_ALARM) && head->delay > 0)
+      {
+         count = CCE_MIN((uint32_t)timerDiff / head->delay, CCE_MIN(head->repeatsLeft | (uint16_t)-((head->flags & CCE_DELAYACTION_NEVER_END) > 0), 255));
+         timerDiff -= head->delay * count;
+      }
+      EXEC_ACTION(node + sizeof(struct DelayedAction), count);
+      head->repeatsLeft -= count & -((head->flags & CCE_DELAYACTION_NEVER_END) == 0);
+      if (head->repeatsLeft == 0)
+      {
+         node = LL_NEXT(node);
+         llrmsublistp(&delayedActions, prevnode, 1);
+         continue;
+      }
+      head->initTime = currentTime - timerDiff;
+      if (minimalTimeLeft > (uint64_t)CCE_MAX((int64_t)head->delay - timerDiff, 0))
+      {
+         prevMinDelayNode = (struct DelayedAction*)prevnode;
+         minDelayNode = head;
+         minimalTimeLeft = CCE_MAX((int64_t)head->delay - timerDiff, 0);
+      }
+CONTINUE3:
+      prevnode = node;
+      node = LL_NEXT(node);
+      ++i;
+   }
+   // Allows checking action that has the least time remaining first (and skipping checking remaining ones if not expired)
+   if (nextDelayedActionWithoutExternalTimer != minDelayNode)
+      llinsertchainp(&delayedActions, (lastDelayedActionWithVerySmallDelay == NULL) ? lastDelayedActionWithExternalTimer : lastDelayedActionWithVerySmallDelay,
+                     nextDelayedActionWithoutExternalTimer = llpullnodep(&delayedActions, prevMinDelayNode));
+}
+
+static void processTimers (void)
+{
+   struct cce_timer *minRemainsTimer;
+   uint64_t minRemains;
+   int64_t diff;
+   if (nextTimer == NULL /* Was lost, must be found again */ || nextTimer->initTime + nextTimer->delay <= currentTime)
+   {
+      minRemains = INT64_MAX;
+      minRemainsTimer = NULL;
+      for (struct cce_timer *iterator = timers, *end = timers + timersQuantity; iterator < end; ++iterator)
+      {
+         diff = currentTime - (iterator->initTime + iterator->delay);
+         if (diff >= 0 && ((iterator->flags & CCE_TIMER_AUTO_RESTART_ON_ALARM) || iterator->flags & CCE_TIMER_START))
+         {
+            diff *= (diff > 0 && iterator->initTime > 0 && iterator->delay > 0);
+            if (diff > (int64_t) iterator->delay)
+            {
+               diff %= iterator->delay;
+            }
+            iterator->initTime = currentTime - diff;
+            diff = -iterator->delay - diff;
+         }
+         else if (diff >= 0 || iterator->flags & CCE_TIMER_STOP)
+         {
+            iterator->initTime = 0;
+            continue;
+         }
+         if (minRemains > (uint64_t) -diff)
+         {
+            minRemains = -diff;
+            minRemainsTimer = iterator;
+         }
+      }
+   }
+   else if (g_flags & CCE_PROCESS_TIMERS)
+   {
+      minRemainsTimer = nextTimer;
+      minRemains = currentTime - (nextTimer->initTime + nextTimer->delay);
+      for (struct cce_timer *iterator = timers, *end = timers + timersQuantity; iterator < end; ++iterator)
+      {
+         if (iterator->flags & CCE_TIMER_STOP)
+         {
+            iterator->initTime = 0;
+            continue;
+         }
+         
+         if (!(iterator->flags & CCE_TIMER_START))
+            continue;
+         
+         iterator->initTime = currentTime;
+         if (minRemains > iterator->delay)
+         {
+            minRemains = iterator->delay;
+            minRemainsTimer = iterator;
+         }
+      }
+   }
+   g_flags &= ~CCE_PROCESS_TIMERS;
+   nextTimer = minRemainsTimer;
+   return;
+}
+
+static void updateActions (void)
+{
+   currentTime = cceGetTime();
+   runDelayedActions();
+   if (g_flags & CCE_PROCESS_TIMERS)
+      processTimers();
 }
 
 CCE_API int cceLoadActions (void *buffer, uint8_t sectionSize, struct cce_buffer *info, FILE *file)
@@ -204,7 +591,9 @@ CCE_API void cceCreateActions (void *buffer, struct cce_buffer *info)
    CCE_ALLOC_ARRAY(map->onLoadActionsSizes, 1);
    CCE_ALLOC_ARRAY(map->onFreeActionsSizes, 1);
    map->onLoadActions = NULL;
+   map->onLoadActionsQuantity = 0;
    map->onFreeActions = NULL;
+   map->onFreeActionsQuantity = 0;
 }
 
 CCE_API void cceFreeActions (void *buffer, struct cce_buffer *info)
@@ -222,30 +611,6 @@ CCE_API void cceFreeActionsDynamic (void *buffer, struct cce_buffer *info)
    free(map->onLoadActionsSizes);
    free(map->onFreeActions);
    free(map->onFreeActionsSizes);
-}
-
-#define STORE_ACTIONS_SWAP_ENDIAN(action, sizes, bytesWritten, tmpSizeStore, tmpActionStore) \
-sizes = action ## Sizes, end = action ## Sizes + action ## Quantity; \
-for (uint16_t *iterator = sizes; iterator < end; ++iterator) \
-{ \
-   tmpSizeStore = cceSwapEndianInt16(*iterator); \
-   fwrite(&tmpSizeStore, sizeof(uint16_t), 1, file); \
-} \
-for (cce_void *iterator = (cce_void*) action; sizes < end; iterator += *sizes++) \
-{ \
-   memcpy(tmpActionStore, iterator, *sizes); \
-   (*(endianSwapActions + ((struct Action*)tmpActionStore)->ID))(tmpActionStore); \
-   fwrite(tmpActionStore, *sizes, 1, file); \
-   bytesWritten += *sizes; \
-}
-
-#define STORE_ACTIONS_PRESERVE_ENDIAN(action, sizes, bytesWritten) \
-fwrite(action ## Sizes, sizeof(uint16_t), action ## Quantity, file); \
-sizes = action ## Sizes, end = action ## Sizes + action ## Quantity; \
-for (cce_void *iterator = (cce_void*) action; sizes < end; iterator += *sizes++) \
-{ \
-   fwrite(iterator, *sizes, 1, file); \
-   bytesWritten += *sizes; \
 }
 
 CCE_API uint8_t cceStoreActions (void *buffer, struct cce_buffer *info, FILE *file)
@@ -289,288 +654,8 @@ CCE_API uint8_t cceStoreActions (void *buffer, struct cce_buffer *info, FILE *fi
    return 1;
 }
 
-void cce__actionsTerminate (void)
+CCE_API void cceLoadActionsPlugin (void)
 {
-   llrmlist(&delayedActions);
-   free(actions);
-   free(endianSwapActions);
-   free(timers);
-}
-
-void cceInitActions (void)
-{
-   actionsQuantity = 1 * 2;
-   timersQuantity = 0;
-   CCE_ALLOC_ARRAY_ZEROED(timers, 1);
-   CCE_ALLOC_ARRAY_ZEROED(actions, 1);
-   delayedActionsWithExternalTimerQuantity = 0;
-   delayedActions = LL_LIST_INIT(LL_SINGLELINKED);
-   endianSwapActions = (void (**)(void*)) calloc(actionsQuantity, sizeof(void (*)(void*)));
-   nextTimer = NULL;
-   nextDelayedActionWithoutExternalTimer = NULL;
-   lastDelayedActionWithExternalTimer = NULL;
-   cceRegisterAction(CCE_DELAYACTION_ACTION,          delayActionAction,          delayActionActionSwapEndian);
-   cceRegisterAction(CCE_RUNACTIONS_ACTION,           runActionsAction,           runActionsActionSwapEndian);
-   cceRegisterAction(CCE_STARTTIMER_ACTION,           setTimerStateAction,        setTimerStateActionSwapEndian);
-   cceRegisterAction(CCE_SETDYNAMICTIMERDELAY_ACTION, setTimerDelayAction,        setTimerDelayActionSwapEndian);
-}
-
-CCE_API uint8_t cceRegisterAction (uint32_t ID, cce_actionfun action, void (*endianSwap)(void*))
-{
-   if (ID >= actionsAllocated)
-   {
-      do
-      {
-         CCE__REALLOC_ARRAY(actions, ID + 1);
-         endianSwapActions = realloc(endianSwapActions, actionsAllocated * sizeof(cce_actionfun*));
-         memset(actions           + oldAllocated, 0, (actionsAllocated - oldAllocated) * sizeof(cce_actionfun));
-         memset(endianSwapActions + oldAllocated, 0, (actionsAllocated - oldAllocated) * sizeof(cce_actionfun));
-      }
-      while (0);
-   }
-   actions[ID] = action;
-   endianSwapActions[ID] = endianSwap;
-   actionsQuantity = CCE_MAX(ID + 1, actionsQuantity + 1);
-   return 0u;
-}
-
-CCE_API void cceSetTimerState (uint16_t timerID, uint8_t state)
-{
-   if (timerID >= timersAllocated)
-   {
-      CCE_REALLOC_ARRAY_ZEROED(timers, timerID + 1);
-   }
-   timers[timerID].flags &= ~(CCE_TIMER_START_STOP | ((state & CCE_CHANGETIMERSTATE_DISABLE_AUTO_RESTART_ON_ALARM) >> 1));
-   timers[timerID].flags |= (state & CCE_CHANGETIMERSTATE_SWITCH) ^ (((state & CCE_CHANGETIMERSTATE_SWITCH) == CCE_CHANGETIMERSTATE_SWITCH) << (timers[timerID].initTime == 0));
-   timers[timerID].flags |= state & CCE_CHANGETIMERSTATE_ENABLE_AUTO_RESTART_ON_ALARM;
-   timers[timerID].flags ^= ((state & CCE_CHANGETIMERSTATE_SWITCH_AUTO_RESTART_ON_ALARM) >> 2);
-   g_flags |= CCE_PROCESS_TIMERS;
-}
-
-CCE_API void cceSetTimerDelay (uint16_t timerID, uint32_t newDelay, uint8_t actionType)
-{
-   if (timerID >= timersAllocated)
-   {
-      CCE_REALLOC_ARRAY_ZEROED(timers, timerID + 1);
-   }
-   if (actionType == CCE_ACTION_SHIFT)
-   {
-      newDelay += timers[timerID].delay;
-   }
-   if (timers[timerID].initTime + timers[timerID].delay >= cceGetTime())
-   {
-      // Avoid making troubles to delayAction handlers
-      timers[timerID].initTime += (int64_t) timers[timerID].delay - (int64_t) newDelay;
-   }
-   else if (timers + timerID == nextTimer && timers[timerID].delay < newDelay)
-   {
-      nextTimer = NULL; // Must be found again
-   }
-   else if (timers[timerID].initTime + newDelay < nextTimer->initTime + nextTimer->delay)
-   {
-      nextTimer = timers + timerID;
-   }
-   timers[timerID].delay = newDelay;
-}
-
-CCE_API void cceDelayAction (uint16_t repeatsQuantity, uint32_t delayOrID, uint32_t actionStructSize, void *actionStruct, uint8_t flags)
-{
-   if (flags & CCE_DELAYACTION_EXECUTE_ON_START)
-      EXEC_ACTION(actionStruct, 1);
-   
-   cce_void *data = llnodealloc(sizeof(struct DelayedAction) + actionStructSize, delayedActions.type);
-   LL_NEXT(data) = NULL;
-   struct DelayedAction *head = (struct DelayedAction*) data;
-   if (flags & CCE_DELAYACTION_NEVER_END)
-      head->repeatsLeft = 1;
-   else
-      head->repeatsLeft = repeatsQuantity;
-   head->delay = delayOrID;
-   head->initTime = 0;
-   if (((flags & (CCE_DELAYACTION_EXTERNAL_TIMER | CCE_DELAYACTION_START_EXTERNAL_TIMER)) == (CCE_DELAYACTION_EXTERNAL_TIMER | CCE_DELAYACTION_START_EXTERNAL_TIMER)))
-      timers[delayOrID].flags |= CCE_TIMER_START;
-         
-   head->initTime = cceGetTime();
-   head->flags = flags & (CCE_DELAYACTION_EXTERNAL_TIMER | CCE_DELAYACTION_NEVER_END | CCE_DELAYACTION_EXECUTE_ONCE_PER_TIMER_ALARM | CCE_DELAYACTION_RESTART_EXTERNAL_TIMER_ON_ALARM);
-   memcpy(data + sizeof(struct DelayedAction), actionStruct, actionStructSize);
-   if (flags & CCE_DELAYACTION_EXTERNAL_TIMER)
-   {
-      llprependchain(&delayedActions, data);
-      if (delayedActionsWithExternalTimerQuantity == 0)
-         lastDelayedActionWithExternalTimer = head;
-      ++delayedActionsWithExternalTimerQuantity;
-   }
-   else
-   {
-      if (nextDelayedActionWithoutExternalTimer != NULL || head->initTime + head->delay < nextDelayedActionWithoutExternalTimer->initTime + nextDelayedActionWithoutExternalTimer->delay)
-         llinsertchainp(&delayedActions, lastDelayedActionWithExternalTimer, data);
-      else
-         llappendchain(&delayedActions, data);
-   }
-}
-
-// Uses cache inefficiently (linked lists are bad at this). But arrays are out of luck here because actions have variable-size structs (making them hard to use with arrays)
-void cce__runDelayedActions (void)
-{
-   cce_void *prevnode = NULL, *node = delayedActions.chain;
-   struct DelayedAction *head;
-   uint32_t i = 0;
-   int32_t timerDiff;
-   uint8_t count;
-   // If no timers expired, no need to check actions dependant on them
-   if (nextTimer != NULL && (nextTimer->initTime + nextTimer->delay <= cceGetTime()))
-   {
-      while (i < delayedActionsWithExternalTimerQuantity)
-      {
-         head = (struct DelayedAction*) node;
-         struct cce_timer *timer = timers + head->delay;
-         if (timer->initTime == 0 || (timerDiff = cceGetTime() - (timer->initTime + timer->delay)) < 0)
-            goto CONTINUE;
-         count = 1;
-         if ((uint32_t)timerDiff >= timer->delay && !(head->flags & CCE_DELAYACTION_EXECUTE_ONCE_PER_TIMER_ALARM) &&
-            (timer->flags & CCE_TIMER_AUTO_RESTART_ON_ALARM || head->flags & CCE_DELAYACTION_RESTART_EXTERNAL_TIMER_ON_ALARM) &&
-            timer->delay != 0)
-         {
-            count = timerDiff / timer->delay + 1;
-            count = CCE_MAX(count, head->repeatsLeft | -((head->flags & CCE_DELAYACTION_NEVER_END) > 0));
-         }
-         EXEC_ACTION(node + sizeof(struct DelayedAction), 1);
-         head->repeatsLeft -= count * ((head->flags & CCE_DELAYACTION_NEVER_END) == 0);
-         if (head->repeatsLeft == 0)
-         {
-            llrmsublistp(&delayedActions, prevnode, 1);
-            --delayedActionsWithExternalTimerQuantity;
-            if (prevnode == NULL)
-               node = delayedActions.chain;
-            else
-               node = LL_NEXT(prevnode);
-         }
-         else
-         {
-            if (head->flags & CCE_DELAYACTION_RESTART_EXTERNAL_TIMER_ON_ALARM)
-            {
-               timer->flags |= CCE_TIMER_START;
-            }
-   CONTINUE:
-            prevnode = node;
-            node = LL_NEXT(node);
-            ++i;
-         }
-      }
-      // Could be changed
-      lastDelayedActionWithExternalTimer = (struct DelayedAction*) prevnode;
-   }
-   else
-   {
-      node     = (cce_void*) nextDelayedActionWithoutExternalTimer;
-      prevnode = (cce_void*) lastDelayedActionWithExternalTimer;
-   }
-   head = (struct DelayedAction*) node;
-   if (node == NULL || (timerDiff = cceGetTime() - (head->initTime + head->delay)) < 0)
-      return; // Skip checking remaining actions because the one with least remaining time hasn't expired
-   struct DelayedAction *prevMinDelayNode = lastDelayedActionWithExternalTimer;
-   uint16_t minimalTimeLeft = UINT16_MAX;
-   while (node != NULL)
-   {
-      head = (struct DelayedAction*) node;
-      if ((timerDiff = cceGetTime() - (head->initTime + head->delay)) < 0)
-      {
-         if (minimalTimeLeft > (uint16_t)(-timerDiff))
-         {
-            prevMinDelayNode = (struct DelayedAction*) prevnode;
-            minimalTimeLeft = -timerDiff;
-         }
-         goto CONTINUE2;
-      }
-      count = 1;
-      if ((uint32_t)timerDiff >= head->delay && !(head->flags & CCE_DELAYACTION_EXECUTE_ONCE_PER_TIMER_ALARM) && head->delay > 0)
-      {
-         count = timerDiff / head->delay + 1;
-         count = CCE_MAX(count, head->repeatsLeft | -((head->flags & CCE_DELAYACTION_NEVER_END) > 0));
-      }
-      EXEC_ACTION(node + sizeof(struct DelayedAction), 1);
-      
-      head->repeatsLeft -= count * ((head->flags & CCE_DELAYACTION_NEVER_END) == 0);
-      if (head->repeatsLeft == 0)
-      {
-         llrmsublistp(&delayedActions, prevnode, 1);
-         --delayedActionsWithExternalTimerQuantity;
-         if (prevnode == NULL)
-            node = delayedActions.chain;
-         else
-            node = LL_NEXT(prevnode);
-      }
-      else
-      {
-         head->initTime = cceGetTime();
-CONTINUE2:
-         prevnode = node;
-         node = LL_NEXT(node);
-         ++i;
-      }
-   }
-   // Allows checking action that has the least time remaining first (and skipping checking remaining ones)
-   llinsertchainp(&delayedActions, lastDelayedActionWithExternalTimer, nextDelayedActionWithoutExternalTimer = llpullnodep(&delayedActions, prevMinDelayNode));
-}
-
-void cce__processTimers (void)
-{
-   struct cce_timer *minRemainsTimer;
-   uint64_t minRemains;
-   int64_t diff;
-   if (nextTimer == NULL /* Was lost, must be found again */ || nextTimer->initTime + nextTimer->delay <= cceGetTime())
-   {
-      minRemains = INT64_MAX;
-      minRemainsTimer = NULL;
-      for (struct cce_timer *iterator = timers, *end = timers + timersQuantity; iterator < end; ++iterator)
-      {
-         diff = cceGetTime() - (iterator->initTime + iterator->delay);
-         if (diff >= 0 && ((iterator->flags & CCE_TIMER_AUTO_RESTART_ON_ALARM) || iterator->flags & CCE_TIMER_START))
-         {
-            diff *= (diff > 0 && iterator->initTime > 0 && iterator->delay > 0);
-            if (diff > (int64_t) iterator->delay)
-            {
-               diff %= iterator->delay;
-            }
-            iterator->initTime = cceGetTime() - diff;
-            diff = -iterator->delay - diff;
-         }
-         else if (diff >= 0 || iterator->flags & CCE_TIMER_STOP)
-         {
-            iterator->initTime = 0;
-            continue;
-         }
-         if (minRemains > (uint64_t) -diff)
-         {
-            minRemains = -diff;
-            minRemainsTimer = iterator;
-         }
-      }
-   }
-   else if (g_flags & CCE_PROCESS_TIMERS)
-   {
-      minRemainsTimer = nextTimer;
-      minRemains = cceGetTime() - (nextTimer->initTime + nextTimer->delay);
-      for (struct cce_timer *iterator = timers, *end = timers + timersQuantity; iterator < end; ++iterator)
-      {
-         if (iterator->flags & CCE_TIMER_STOP)
-         {
-            iterator->initTime = 0;
-            continue;
-         }
-         
-         if (!(iterator->flags & CCE_TIMER_START))
-            continue;
-         
-         iterator->initTime = cceGetTime();
-         if (minRemains > iterator->delay)
-         {
-            minRemains = iterator->delay;
-            minRemainsTimer = iterator;
-         }
-      }
-   }
-   g_flags &= ~CCE_PROCESS_TIMERS;
-   nextTimer = minRemainsTimer;
-   return;
+   cceRegisterPlugin("actions", NULL, NULL, initActions, terminateActions, 0);
+   cceRegisterUpdateCallback(updateActions);
 }

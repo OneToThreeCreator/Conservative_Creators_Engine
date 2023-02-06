@@ -76,8 +76,8 @@ struct key_glfw
 
 #define LEFT_STICK_LEFT   13
 #define LEFT_STICK_RIGHT  14
-#define LEFT_STICK_DOWN   15
-#define LEFT_STICK_UP     16
+#define LEFT_STICK_UP     15
+#define LEFT_STICK_DOWN   16
 #define DPAD_LEFT         17
 #define DPAD_RIGHT        18
 #define DPAD_DOWN         19
@@ -147,9 +147,6 @@ static void processGamepads (void)
    int8_t axis;
    const uint16_t bits[2] = {CCE_TRIGGER_L, CCE_TRIGGER_R};
    const uint16_t *bit = bits;
-   // GLFW treats down as 1, and up as -1 respectively (opposite is expected by the engine)
-   gamepad.axes[1] *= -1;
-   gamepad.axes[3] *= -1;
    for (float *it = gamepad.axes, *end = gamepad.axes + 4; it < end; ++it, ++offset, ++lastAxeIt)
    {
       axis = getGamepadAxisValue(*it);
@@ -452,8 +449,8 @@ static void keyCallback (GLFWwindow *window, int key, int scancode, int action, 
             // fallthrough
          case LEFT_STICK_LEFT:
          case LEFT_STICK_RIGHT:
-         case LEFT_STICK_DOWN:
          case LEFT_STICK_UP:
+         case LEFT_STICK_DOWN:
          case RIGHT_STICK_LEFT:
          case RIGHT_STICK_RIGHT:
          case RIGHT_STICK_DOWN:
@@ -675,7 +672,7 @@ static int loadKeys__glfw (void *data)
    struct key_glfw *jit = g_keys;
    uint8_t *key;
    {
-      uint8_t keyButtons[] = {LEFT_STICK_LEFT,  LEFT_STICK_RIGHT,  LEFT_STICK_DOWN,  LEFT_STICK_UP, DPAD_LEFT, DPAD_RIGHT, DPAD_DOWN, DPAD_UP,
+      uint8_t keyButtons[] = {LEFT_STICK_LEFT,  LEFT_STICK_RIGHT,  LEFT_STICK_UP,  LEFT_STICK_DOWN, DPAD_LEFT, DPAD_RIGHT, DPAD_DOWN, DPAD_UP,
                               RIGHT_STICK_LEFT, RIGHT_STICK_RIGHT, RIGHT_STICK_DOWN, RIGHT_STICK_UP};
       key = keyButtons;
       for (uint8_t *it = (uint8_t*)&keys->stickL.x, *end = (uint8_t*)&keys->buttonA.x; it < end; ++key, ++it)

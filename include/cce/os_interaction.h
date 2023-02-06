@@ -56,6 +56,7 @@ CCE_API char*   cceAppendPath (char *buffer, size_t bufferSize, const char *appe
 CCE_API char*   cceGetTemporaryDirectory (size_t spaceToLeave);
 CCE_API void    cceTerminateTemporaryDirectory (void);
 CCE_API uint8_t cceIsDirectory (char *path);
+CCE_API int     cceGetRandom (void *buffer, size_t bufferSize);
 
 #ifdef __cplusplus
 }

@@ -31,6 +31,9 @@
 #include "../../../include/cce/utils.h"
 #include "../../../include/cce/plugins/map2D/map2D.h"
 
+// Integration
+#include "../../../include/cce/plugins/actions.h"
+
 #include "map2D_internal.h"
 
 static char *mapPath = NULL;
@@ -437,11 +440,17 @@ void cce__initMap2DLoaders (void)
    cce__staticMapFunctionSet = cceGetFileIOfunctionSet();
    cceRegisterFileIOcallbacks(cce__staticMapFunctionSet,  loadResourcesSection, freeResourcesSection, NULL,                   NULL,                  sizeof(struct cce_resourceinfo));
    cceRegisterFileIOcallbacks(cce__staticMapFunctionSet,  loadElements,         freeElements,         NULL,                   NULL,                  sizeof(struct cce_renderinginfo));
+   
    cce__resourceLoadersOffset = cceGetFunctionBufferOffset(0, cce__staticMapFunctionSet);
    cce__renderingInfoOffset   = cceGetFunctionBufferOffset(1, cce__staticMapFunctionSet);
    cce__dynamicMapFunctionSet = cceGetFileIOfunctionSet();
    cceRegisterFileIOcallbacks(cce__dynamicMapFunctionSet, loadResourcesSection, freeResourcesSection, createResourcesSection, storeResourcesSection, sizeof(struct cce_resourceinfo));
    cceRegisterFileIOcallbacks(cce__dynamicMapFunctionSet, loadElementsDynamic,  freeElementsDynamic,  createElements,         storeElements,         sizeof(struct cce_dynamicrenderinginfo));
+   if (cceIsPluginLoading("actions"))
+   {
+      cceRegisterFileIOcallbacks(cce__staticMapFunctionSet,  cceLoadActions,        cceFreeActions,        NULL,             NULL,            sizeof(struct cce_actioninfo));
+      cceRegisterFileIOcallbacks(cce__dynamicMapFunctionSet, cceLoadActionsDynamic, cceFreeActionsDynamic, cceCreateActions, cceStoreActions, sizeof(struct cce_dynamicactioninfo));
+   }
 }
 
 void cce__terminateMap2DLoaders (void)

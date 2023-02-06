@@ -103,6 +103,28 @@ CCE_API void cceTerminateTemporaryDirectory (void)
 #include <unistd.h>
 #include <ftw.h>
 
+#if (defined(linux) || defined(__linux) || defined(__linux__)) && !defined(CCE_GETRANDOM_POSIX)
+#include <sys/random.h>
+
+CCE_API int cceGetRandom (void *buffer, size_t bufferSize)
+{
+   return (getrandom(buffer, bufferSize, 0) == (ssize_t)bufferSize) - 1;
+}
+
+#else
+#include <fcntl.h>
+
+CCE_API int cceGetRandom (void *buffer, size_t bufferSize)
+{
+   int fd = open("/dev/urandom", O_RDONLY);
+   if (fd < 0)
+      return -1;
+   ssize_t bytesRead = read(fd, buffer, bufferSize);
+   return (close(fd) == 0 && bytesRead == (ssize_t)bufferSize) - 1;
+}
+
+#endif
+
 #define DEFAULT_PATH_LENGTH 256
 
 CCE_API void cceTruncateFile (FILE *file, size_t size)
@@ -347,8 +369,7 @@ CCE_API void cceDeleteDirectory (const char *path)
 #include <windows.h>
 #include <shlobj.h>
 #include <shellapi.h>
-#include <time.h>
-
+#include <wincrypt.h>
 
 static void printSystemError (char *message)
 {
@@ -375,7 +396,21 @@ static char* getErrorMessage (DWORD error)
    return errorString;
 }
 
-CCE_PUBLIC_OPTIONS void cceTruncateFile (FILE *file, size_t size)
+CCE_API int cceGetRandom (void *buffer, size_t bufferSize)
+{
+   HCRYPTPROV cryptProvider = NULL;
+   const char *containerName = "CCEKeyContainer";
+   if (!CryptAcquireContext(&cryptProvider, containerName, NULL, PROV_RSA_FULL, 0) &&
+       (GetLastError() != NTE_BAD_KEYSET ||
+       !CryptAcquireContext(&cryptProvider, containerName, NULL, PROV_RSA_FULL, CRYPT_NEWKEYSET)))
+   {
+      return -1;
+   }
+   uint8_t result = CryptGenRandom(cryptProvider, bufferSize, buffer);
+   return ((CryptReleaseContext(cryptProvider, 0) != 0) && result != 0) - 1;
+}
+
+CCE_API void cceTruncateFile (FILE *file, size_t size)
 {
    long position = ftell(file);
    fseek(file, size, SEEK_SET);
@@ -383,7 +418,7 @@ CCE_PUBLIC_OPTIONS void cceTruncateFile (FILE *file, size_t size)
    fseek(file, position, SEEK_SET);
 }
 
-CCE_PUBLIC_OPTIONS char* cceGetAbsolutePath (const char *path, size_t spaceToLeave)
+CCE_API char* cceGetAbsolutePath (const char *path, size_t spaceToLeave)
 {
    char *result = malloc(MAX_PATH * sizeof(char));
    size_t len = GetFullPathNameA(path, MAX_PATH, result, NULL);
@@ -395,12 +430,12 @@ CCE_PUBLIC_OPTIONS char* cceGetAbsolutePath (const char *path, size_t spaceToLea
    return realloc(result, len + 1 + spaceToLeave);
 }
 
-CCE_PUBLIC_OPTIONS int cceSetCurrentPath (const char *path)
+CCE_API int cceSetCurrentPath (const char *path)
 {
    return -(!SetCurrentDirectoryA(path));
 }
 
-CCE_PUBLIC_OPTIONS char* cceGetCurrentPath (size_t spaceToLeave)
+CCE_API char* cceGetCurrentPath (size_t spaceToLeave)
 {
    char *path = malloc(MAX_PATH * sizeof(char));
    size_t len = GetCurrentDirectoryA(MAX_PATH, path);
@@ -412,7 +447,7 @@ CCE_PUBLIC_OPTIONS char* cceGetCurrentPath (size_t spaceToLeave)
    return realloc(path, len + 1 + spaceToLeave);
 }
 
-CCE_PUBLIC_OPTIONS char* cceGetDirectory (char *path, size_t bufferSize)
+CCE_API char* cceGetDirectory (char *path, size_t bufferSize)
 {
    DWORD attributes = 0;
    DWORD error = 0;
@@ -465,7 +500,7 @@ CCE_PUBLIC_OPTIONS char* cceGetDirectory (char *path, size_t bufferSize)
    return NULL;
 }
 
-CCE_PUBLIC_OPTIONS char* cceGetAppDataPath (const char *folderName, size_t spaceToLeave)
+CCE_API char* cceGetAppDataPath (const char *folderName, size_t spaceToLeave)
 {
    char *appDataPath;
    const char *path = getenv("APPDATA");
@@ -502,7 +537,7 @@ CCE_API uint8_t cceIsDirectory (char *path)
    return attributes != INVALID_FILE_ATTRIBUTES && (attributes & FILE_ATTRIBUTE_DIRECTORY)
 }
 
-CCE_PUBLIC_OPTIONS char* cceGetTemporaryDirectory (size_t spaceToLeave)
+CCE_API char* cceGetTemporaryDirectory (size_t spaceToLeave)
 {
    if (!tmpPath)
    {
@@ -521,7 +556,9 @@ CCE_PUBLIC_OPTIONS char* cceGetTemporaryDirectory (size_t spaceToLeave)
       *(tmpPath + tmpPathLength) = '\\';
       ++tmpPathLength;
       *(tmpPath + tmpPathLength) = '\0';
-      cceConvertIntToBase64String(time(0), tmpPath + (tmpPathLength - 6u - 1u - 2u), 6u);
+      uint32_t ID;
+      cceGetRandom(&ID, 4);
+      cceConvertIntToBase64String(ID, tmpPath + (tmpPathLength - 6u - 1u - 2u), 6u);
       CreateDirectoryA(tmpPath, NULL);
    }
    char *buffer = malloc((tmpPathLength + spaceToLeave + 1u) * sizeof(char));
@@ -529,7 +566,7 @@ CCE_PUBLIC_OPTIONS char* cceGetTemporaryDirectory (size_t spaceToLeave)
    return buffer;
 }
 
-CCE_PUBLIC_OPTIONS void cceDeleteDirectory (const char *aPath)
+CCE_API void cceDeleteDirectory (const char *aPath)
 {
    WIN32_FIND_DATA fileData;
    size_t bufferSize;
@@ -606,4 +643,4 @@ CCE_PUBLIC_OPTIONS void cceDeleteDirectory (const char *aPath)
    }
 }
 
-#endif
+#endif // WINDOWS_SYSTEM
