@@ -30,7 +30,6 @@ extern "C"
 #include "config.h"
 
 #include "cce_exports.h"
-#define CCE_API CCE_EXPORTS
 
 typedef uint8_t cce_void;
 typedef uint8_t cce_enum;

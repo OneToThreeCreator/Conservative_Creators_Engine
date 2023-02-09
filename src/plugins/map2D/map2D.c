@@ -145,24 +145,20 @@ static int loadTexture (char *path, uint16_t position)
    unsigned int width, height;
    void *data;
    size_t length = 0;
-   if (path[0] != '/'
-   #ifdef WINDOWS_SYSTEM
-   && path[0] != '\\' && path[1] != ':'
-   #endif // WINDOWS_SYSTEM
-   )
+   if (!cceIsPathAbsolute(path) && texturesPath != NULL)
    {
       length = strlen(path);
-      if (length <= 16)
-      {
-         memcpy(texturesPath + texturesPathLength, path, length + 1);
-         path = texturesPath;
-      }
-      else
+      if (length > 16)
       {
          char *newPath = malloc(length + texturesPathLength + 1);
          memcpy(newPath, texturesPath, texturesPathLength);
          memcpy(newPath + texturesPathLength, path, length + 1);
          path = newPath;
+      }
+      else
+      {
+         memcpy(texturesPath + texturesPathLength, path, length + 1);
+         path = texturesPath;
       }
    }
    data = stbi_load(path, (int*) &width, (int*) &height, NULL, 4);
@@ -171,7 +167,7 @@ static int loadTexture (char *path, uint16_t position)
       fprintf(stderr, "ENGINE::TEXTURE::DECODING_ERROR:\n%s\nFile located at %s\n", stbi_failure_reason(), path);
       if (length >= 16)
          free(path);
-      else if (length > 0)
+      else if (texturesPath != NULL)
          texturesPath[texturesPathLength] = '\0';
       return -1;
    }
@@ -185,7 +181,7 @@ static int loadTexture (char *path, uint16_t position)
    (g_textures + position)->size.y = height;
    if (length >= 16)
       free(path);
-   else if (length > 0)
+   else if (texturesPath != NULL)
       texturesPath[texturesPathLength] = '\0';
    return 0;
 }
@@ -196,38 +192,32 @@ static int setTextureAttributes (uint16_t ID)
       return 0;
    int width = 0, height = 0, channels, result;
    char *path = g_textures[ID].path;
-   size_t length = 0;
-   if (*path != '/' 
-   #ifdef WINDOWS_SYSTEM
-       && *path != '\\'  && path[1] != ':'
-   #endif // WINDOWS_SYSTEM
-   )
+   size_t length = strlen(path);
+   if (!cceIsPathAbsolute(path) && texturesPath != NULL)
    {
-      length = strlen(path);
-      if (length <= 16)
-      {
-         memcpy(texturesPath + texturesPathLength, path, length + 1);
-         path = texturesPath;
-      }
-      else
+      if (length > CCE_PATH_RESERVED)
       {
          char *newPath = malloc(length + texturesPathLength + 1);
          memcpy(newPath, texturesPath, texturesPathLength);
          memcpy(newPath + texturesPathLength, path, length + 1);
          path = newPath;
       }
+      else
+      {
+         memcpy(texturesPath + texturesPathLength, path, length + 1);
+         path = texturesPath;
+      }
    }
-   result = stbi_info(g_textures[ID].path, &width, &height, &channels);
-   *(texturesPath + texturesPathLength) = '\0';
+   result = stbi_info(path, &width, &height, &channels);
    if (!width || !height)
    {
       width = g_textureSize.x;
       height = g_textureSize.y;
    }
    g_textures[ID].size = (struct cce_u16vec2){width, height};
-   if (length >= 16)
+   if (length > CCE_PATH_RESERVED)
       free(path);
-   else if (length > 0)
+   else if (texturesPath != NULL)
       texturesPath[texturesPathLength] = '\0';
    return result;
 }
@@ -236,7 +226,7 @@ CCE_API void* cceGenDummyTextureRGBA8 (uint16_t width, uint16_t height)
 {
    struct cce_u8vec4 colors[2] = {{CCE_DUMMY_TEXTURE_SECONDARY_COLOR, 255}, {CCE_DUMMY_TEXTURE_PRIMARY_COLOR, 255}};
    struct cce_u8vec4 *image = malloc(width * height * sizeof(struct cce_u8vec4));
-   uint8_t colorToUse = 0, flipEveryRow = !(width & 1);
+   uint8_t colorToUse = 0, flipEveryRow = (width & 1) == 0;
    for (struct cce_u8vec4 *iterator = image, *rowEnd = image + width * height; iterator < rowEnd;)
    {
       for (struct cce_u8vec4 *columnEnd = iterator + width; iterator < columnEnd; ++iterator)
@@ -289,7 +279,6 @@ static void cce__updateTexturesArray (void)
                cce__loadTexture(data, g_textureSize.x, g_textureSize.y, iterator - g_textures);
                free(data);
             }
-            *(texturesPath + texturesPathLength) = '\0';
             iterator->flags &= ~CCE_LOADEDTEXTURES_TOBELOADED;
          }
          else if (arrayResized)

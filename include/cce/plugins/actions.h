@@ -55,7 +55,7 @@ struct cce_dynamicactioninfo
 #define CCE_ACTION_SHIFT 0x0
 #define CCE_ACTION_SET   0x1
 
-typedef void (*cce_actionfun)(const void*, uint8_t);
+typedef void (*cce_actionfun)(const void*, uint16_t);
 
 #define CCE_CHANGETIMERSTATE_START  0x1
 #define CCE_CHANGETIMERSTATE_STOP   0x2

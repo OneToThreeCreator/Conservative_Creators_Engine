@@ -1,4 +1,4 @@
-/*
+#[[
     Conservative Creator's Engine - open source engine for making games.
     Copyright (C) 2020-2022 Andrey Gaivoronskiy
 
@@ -16,7 +16,13 @@
     License along with this library; if not, write to the Free Software
     Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301
     USA
-*/
+]]
 
-#define CCE_VERSION_MAJOR @CCE_VERSION_MAJOR@
-#define CCE_VERSION_MINOR @CCE_VERSION_MINOR@
+cmake_minimum_required(VERSION 3.0)
+
+add_executable(cce-2048
+   2048/main.c
+)
+target_link_libraries(cce-2048 cce)
+
+

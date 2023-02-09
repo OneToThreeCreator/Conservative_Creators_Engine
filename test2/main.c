@@ -74,7 +74,7 @@ struct alterMapSt
    uint8_t counter;
 };
 
-void alterMapFrame (const void *data, uint8_t repeats)
+void alterMapFrame (const void *data, uint16_t repeats)
 {
    struct alterMapSt *map = (void*) data;
    map->counter += repeats;
@@ -88,7 +88,7 @@ void alterMapFrame (const void *data, uint8_t repeats)
    cceSetElementsUpdated(cceGetRenderingInfo(g_map));
 }
 
-void delayedAction (const void *data, uint8_t repeats)
+void delayedAction (const void *data, uint16_t repeats)
 {
    CCE_UNUSED(data);
    if ((repeats & 1) == 0)
@@ -98,7 +98,7 @@ void delayedAction (const void *data, uint8_t repeats)
    cceSetElementsUpdated(cceGetRenderingInfo(g_map));
 }
 
-void rotate (const void *data, uint8_t repeats)
+void rotate (const void *data, uint16_t repeats)
 {
    struct cce_element *element = cceGetElements(2, 1, g_map);
    element->rotation -= repeats;

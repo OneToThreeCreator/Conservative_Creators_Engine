@@ -40,7 +40,7 @@ if ("${CCE_LIB_TYPE}" MATCHES STATIC)
 endif()
 
 if (NOT DEFINED CCE_BUILD_DEMOS)
-   option(CCE_BUILD_DEMOS "Build Conservative Creator's Engine demo programs" OFF)
+   option(CCE_BUILD_DEMOS "Build Conservative Creator's Engine demo programs" ON)
 endif()
 
 set(CMAKE_C_STANDARD 99)
@@ -152,7 +152,8 @@ configure_file(src/config.h.in include/cce/config.h)
 configure_file(cce.pc.in cce.pc @ONLY)
 include(GenerateExportHeader)
 generate_export_header(cce
-   EXPORT_MACRO_NAME CCE_EXPORTS
+   EXPORT_MACRO_NAME CCE_API
+   DEPRECATED_MACRO_NAME CCE_DEPRECATED
    EXPORT_FILE_NAME ${CCE_BINARY_DIR}/include/cce/cce_exports.h
    INCLUDE_GUARD_NAME CCE_EXPORTS_H
 )

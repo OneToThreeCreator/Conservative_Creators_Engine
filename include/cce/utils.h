@@ -22,7 +22,6 @@
 #define UTILS_H
 
 #include "cce_exports.h"
-#define CCE_API CCE_EXPORTS
 #include <stdint.h>
 
 #define CCE_UNUSED(x) (void)(x)

@@ -31,7 +31,6 @@ extern "C"
 #include <stdio.h>
 
 #include "cce_exports.h"
-#define CCE_API CCE_EXPORTS
 
 #if defined(_WIN32) || defined(__WIN32__) || defined(_WIN64) || defined(__TOS_WIN__) || defined(__WINDOWS__) || \
     defined(__MINGW32__) || defined(__MINGW64__) || defined(__CYGWIN__)

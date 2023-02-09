@@ -29,7 +29,6 @@ extern "C"
 #include <stdint.h>
 #include <stddef.h>
 #include "cce_exports.h"
-#define CCE_API CCE_EXPORTS
 
 typedef uint8_t cce_endianess;
 

@@ -116,6 +116,7 @@ cce__renderingFunctions.map2DElementsToRenderingBuffer(layers, layersQuantity, e
 newPath = cceGetAbsolutePath(newPath, CCE_PATH_RESERVED + 1); \
 if (newPath == NULL) \
    return; \
+free(pathVar); \
 pathVar = (char*)newPath; \
 lengthVar = strlen(pathVar); \
 lengthVar += !cceIsPathDelimiter(pathVar[lengthVar]); \

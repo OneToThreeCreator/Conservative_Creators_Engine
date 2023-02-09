@@ -31,7 +31,6 @@ extern "C"
 #include <stddef.h>
 
 #include "cce_exports.h"
-#define CCE_API CCE_EXPORTS
 
 struct cce_buffer
 {
