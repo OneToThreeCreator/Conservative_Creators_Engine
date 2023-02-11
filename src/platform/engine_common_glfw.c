@@ -107,10 +107,10 @@ static uint64_t getTime__glfw (void)
    return currentTime;
 }
 
-static int keycompare (const void *__a, const void *__b)
+static int keycompare (const void *_a, const void *_b)
 {
-   const struct key_glfw *a = __a;
-   const struct key_glfw *b = __b;
+   const struct key_glfw *a = _a;
+   const struct key_glfw *b = _b;
    return (a->key > b->key) - (a->key < b->key);
 }
 
@@ -544,19 +544,18 @@ int initEngine__glfw (void *data)
    
    struct cce_i32vec2 fbSize;
    glfwGetFramebufferSize(g_window, &fbSize.x, &fbSize.y);
-   
    switch (vals->flags & CCE_SCALING)
    {
       case CCE_INTEGER_SCALING:
          glfwSetFramebufferSizeCallback(g_window, framebufferSizeCallback_integer);
-         g_windowBaseResolution = (struct cce_i32vec2){vals->resolution.x * vals->resolution.x / fbSize.x, vals->resolution.y * vals->resolution.y / fbSize.y};
-         glfwSetWindowSize(g_window, g_windowBaseResolution.x, g_windowBaseResolution.y);
+         g_windowBaseResolution = (struct cce_i32vec2){vals->resolution.x, vals->resolution.y};
+         framebufferSizeCallback_integer(g_window, fbSize.x, fbSize.y);
          break;
       case CCE_NO_SCALING:
          glfwSetFramebufferSizeCallback(g_window, framebufferSizeCallback_fixed);
          g_windowBaseResolution = (struct cce_i32vec2){vals->resolution.x, vals->resolution.y};
-         g_windowResolution = (struct cce_i32vec2){vals->resolution.x * vals->resolution.x / fbSize.x, vals->resolution.y * vals->resolution.y / fbSize.y};
-         glfwSetWindowSize(g_window, g_windowResolution.x, g_windowResolution.y);
+         g_windowResolution = (struct cce_i32vec2){vals->resolution.x * vals->resolution.x, vals->resolution.y * vals->resolution.y};
+         framebufferSizeCallback_integer(g_window, fbSize.x, fbSize.y);
          break;
       case CCE_ASPECT_PRESERVING_SCALING:
          glfwSetWindowAspectRatio(g_window, vals->resolution.x, vals->resolution.y);
@@ -565,13 +564,14 @@ int initEngine__glfw (void *data)
          // fallthrough
       case CCE_UNRESTRICTED_SCALING:
          glfwSetFramebufferSizeCallback(g_window, framebufferSizeCallback_unrestricted);
+         framebufferSizeCallback_unrestricted(g_window, fbSize.x, fbSize.y);
          break;
    }
-   glViewport(0, 0, fbSize.x, fbSize.y);
    glfwSetKeyCallback(g_window, keyCallback);
    glfwSwapInterval((vals->flags & CCE_VERTICAL_SYNC) > 0);
    glfwSetJoystickCallback(joystickCallback__glfw);
    g_gamepads = 0;
+   g_flags = vals->flags & CCE_SCALING;
    
    cce__engineBackend.toWindow = toWindow__glfw;
    cce__engineBackend.toFullscreen = toFullscreen__glfw;

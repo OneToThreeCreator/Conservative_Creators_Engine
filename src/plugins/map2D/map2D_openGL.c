@@ -217,7 +217,7 @@ do \
    { \
       ITERATOR->x = position->position.x; \
       ITERATOR->y = -position->position.y; \
-      ITERATOR->z = (position->__reserved | (position->textureDataOffsetGroup << 8)) - (1 << (sizeof(uint16_t) * 8 - 1)); \
+      ITERATOR->z = (position->cce__reserved | (position->textureDataOffsetGroup << 8)) - (1 << (sizeof(uint16_t) * 8 - 1)); \
       ITERATOR->w = position->textureDataID - (1 << (sizeof(uint16_t) * 8 - 1)); /* We need to get it back as unsigned in glsl (simple reinterpret cast won't work - glsl doesn't have 16-bit types) */ \
    } \
 } \
@@ -383,14 +383,14 @@ static void drawMap2D__openGL (struct cce_layer *layers, uint32_t layersQuantity
             GL_CHECK_ERRORS;
             if ((iterator->flags & CCE_LAYER_DYNAMIC) && info->elementsAllocated > info->data[0].elementsQuantity)
             {
-               glBufferData(GL_TEXTURE_BUFFER, info->elementsAllocated * sizeof(struct cce_element), NULL, GL_DYNAMIC_DRAW);
+               glBufferData(GL_TEXTURE_BUFFER, (info->elementsAllocated + 1) * sizeof(struct cce_element), NULL, GL_DYNAMIC_DRAW);
                UPDATE_ELEMENTS(info->elements, info->elementsQuantity, glMapBuffer(GL_TEXTURE_BUFFER, GL_WRITE_ONLY));
                info->data[0].elementsQuantity = info->elementsAllocated;
             }
             else
             {
                // Invalidate buffer
-               UPDATE_ELEMENTS(info->elements, info->elementsQuantity, glMapBufferRange(GL_TEXTURE_BUFFER, 0, info->elementsQuantity * sizeof(struct cce_element), GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_BUFFER_BIT));
+               UPDATE_ELEMENTS(info->elements, info->elementsQuantity, glMapBufferRange(GL_TEXTURE_BUFFER, 0, (info->elementsQuantity + 1) * sizeof(struct cce_element), GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_BUFFER_BIT));
             }
             info->flags &= ~CCE_ELEMENT_UPDATED;
          }

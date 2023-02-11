@@ -79,7 +79,7 @@ struct cce_elementposition
    struct cce_i16vec2 position;
    uint16_t           textureDataID;
    uint8_t            textureDataOffsetGroup;
-   uint8_t            __reserved;
+   uint8_t            cce__reserved;
 };
 
 CCE_ARRAY_STRUCT(cce_elementpositionarray, struct cce_elementposition, uint32_t);

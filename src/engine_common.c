@@ -429,9 +429,11 @@ CCE_API int cceInit (const char *gameINIpath)
    int status = parseGameINI(gameINIpath);
    if (pathFree)
       free((void*)gameINIpath);
+   if (status != 0)
+       return status;
    cce__currentTime = cce__engineBackend.getTime();
    cce__deltaTime = 10000; // deltaTime is trash after initialization
-   return status;
+   return 0;
 }
 
 CCE_API void cceUpdate (void)

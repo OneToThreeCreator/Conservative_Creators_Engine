@@ -534,7 +534,7 @@ CCE_API uint8_t cceIsDirectory (char *path)
 {
    DWORD attributes = GetFileAttributesA(path);
    GetLastError();
-   return attributes != INVALID_FILE_ATTRIBUTES && (attributes & FILE_ATTRIBUTE_DIRECTORY)
+   return attributes != INVALID_FILE_ATTRIBUTES && (attributes & FILE_ATTRIBUTE_DIRECTORY);
 }
 
 CCE_API char* cceGetTemporaryDirectory (size_t spaceToLeave)

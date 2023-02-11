@@ -69,7 +69,7 @@ struct cceSetTimerStateAction
    uint32_t actionID;
    uint16_t ID;
    cce_enum state;
-   uint8_t __pad;
+   uint8_t cce__pad;
 };
 
 struct cceSetTimerDelayAction
@@ -78,7 +78,7 @@ struct cceSetTimerDelayAction
    uint32_t delay;
    uint16_t ID;
    cce_enum action;
-   uint8_t __pad;
+   uint8_t cce__pad;
 };
 
 #define CCE_DELAYACTION_EXECUTE_ONCE_PER_TIMER_ALARM 0x1
@@ -104,7 +104,7 @@ struct cceDelayAction
    uint32_t delayedActionStructSize;
    uint16_t repeatsQuantity;
    uint8_t flags;
-   uint8_t __pad;
+   uint8_t cce__pad;
 };
 
 // Followed by actions to run
