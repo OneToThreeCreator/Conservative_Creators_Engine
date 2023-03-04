@@ -6,10 +6,6 @@
 
 #include <cce/os_interaction.h>
 
-#ifndef CCE_API
-#define CCE_API
-#endif
-
 #include <cce/plugins/actions.h>
 #include <cce/engine_common.h>
 #include <cce/plugins/map2D/map2D.h>

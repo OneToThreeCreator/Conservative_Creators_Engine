@@ -104,7 +104,7 @@ if (((struct cce_resourceinfo*)((cce_void*) info + cce__resourceLoadersOffset))-
          iterator->textureID = usedTextures[iterator->textureID - 1]; \
 }
 
-static int loadElements (void *buffer, uint8_t sectionSize, struct cce_buffer *info, FILE *file)
+static int loadElements (void *buffer, uint16_t sectionSize, struct cce_buffer *info, FILE *file)
 {
    struct cce_renderinginfo *map = buffer;
    uint32_t *elementsQuantity;
@@ -130,7 +130,7 @@ static int loadElements (void *buffer, uint8_t sectionSize, struct cce_buffer *i
    return 0;
 }
 
-static int loadElementsDynamic (void *buffer, uint8_t sectionSize, struct cce_buffer *info, FILE *file)
+static int loadElementsDynamic (void *buffer, uint16_t sectionSize, struct cce_buffer *info, FILE *file)
 {
    struct cce_dynamicrenderinginfo *map = buffer;
    uint32_t *elementsQuantity;
@@ -188,11 +188,11 @@ static void freeElementsDynamic (void *buffer, struct cce_buffer *info)
    free(map->elements);
 }
 
-static uint8_t storeElements (void *buffer, struct cce_buffer *info, FILE *file)
+static uint16_t storeElements (void *buffer, struct cce_buffer *info, FILE *file)
 {
    struct cce_dynamicrenderinginfo *map = buffer;
    
-   uint8_t sectionSize = map->layersQuantity;
+   uint16_t sectionSize = map->layersQuantity;
    if (sectionSize == 0)
       return 0;
    {
@@ -269,7 +269,7 @@ TEXTUREID_SET:
    return sectionSize;
 }
 
-static int loadResourcesSection (void *buffer, uint8_t sectionSize, struct cce_buffer *info, FILE *file)
+static int loadResourcesSection (void *buffer, uint16_t sectionSize, struct cce_buffer *info, FILE *file)
 {
    struct cce_resourceinfo *map = buffer;
    uint32_t resourceSizes[256]; // VLA support across C compilers is still bad (and most likely wont improve)
@@ -375,11 +375,11 @@ static void freeResourcesSection (void *buffer, struct cce_buffer *info)
    free(map->resourceData);
 }
 
-static uint8_t storeResourcesSection (void *buffer, struct cce_buffer *info, FILE *file)
+static uint16_t storeResourcesSection (void *buffer, struct cce_buffer *info, FILE *file)
 {
    struct cce_resourceinfo *map = buffer;
    uint32_t resourceSizes[256] = {0};
-   uint8_t sectionSize = map->resourcesQuantity;
+   uint16_t sectionSize = map->resourcesQuantity;
    size_t *sizes = resourceLoadingFunctionsBufferSizes;
    size_t bytesWritten = 0, size;
    cce_void *data = (cce_void*) map->resourceData;
@@ -438,19 +438,19 @@ void cce__initMap2DLoaders (void)
    resourceLoadingFunctionsBufferSizes = malloc((resourceLoadingFunctionsAllocated + 1) * sizeof(size_t));
    resourceLoadingFunctionsBufferSizes[0] = 0;
    cce__staticMapFunctionSet = cceGetFileIOfunctionSet();
-   cceRegisterFileIOcallbacks(cce__staticMapFunctionSet,  loadResourcesSection, freeResourcesSection, NULL,                   NULL,                  sizeof(struct cce_resourceinfo));
-   cceRegisterFileIOcallbacks(cce__staticMapFunctionSet,  loadElements,         freeElements,         NULL,                   NULL,                  sizeof(struct cce_renderinginfo));
+   cceRegisterFileIOcallbacks(cce__staticMapFunctionSet, "m2Dres",  loadResourcesSection, freeResourcesSection, NULL,                   NULL,                  sizeof(struct cce_resourceinfo));
+   cceRegisterFileIOcallbacks(cce__staticMapFunctionSet, "m2Drend", loadElements,         freeElements,         NULL,                   NULL,                  sizeof(struct cce_renderinginfo));
    
    cce__resourceLoadersOffset = cceGetFunctionBufferOffset(0, cce__staticMapFunctionSet);
    cce__renderingInfoOffset   = cceGetFunctionBufferOffset(1, cce__staticMapFunctionSet);
    cce__dynamicMapFunctionSet = cceGetFileIOfunctionSet();
-   cceRegisterFileIOcallbacks(cce__dynamicMapFunctionSet, loadResourcesSection, freeResourcesSection, createResourcesSection, storeResourcesSection, sizeof(struct cce_resourceinfo));
-   cceRegisterFileIOcallbacks(cce__dynamicMapFunctionSet, loadElementsDynamic,  freeElementsDynamic,  createElements,         storeElements,         sizeof(struct cce_dynamicrenderinginfo));
-   if (cceIsPluginLoading("actions"))
-   {
-      cceRegisterFileIOcallbacks(cce__staticMapFunctionSet,  cceLoadActions,        cceFreeActions,        NULL,             NULL,            sizeof(struct cce_actioninfo));
-      cceRegisterFileIOcallbacks(cce__dynamicMapFunctionSet, cceLoadActionsDynamic, cceFreeActionsDynamic, cceCreateActions, cceStoreActions, sizeof(struct cce_dynamicactioninfo));
-   }
+   cceRegisterFileIOcallbacks(cce__dynamicMapFunctionSet, "m2Dres",  loadResourcesSection, freeResourcesSection, createResourcesSection, storeResourcesSection, sizeof(struct cce_resourceinfo));
+   cceRegisterFileIOcallbacks(cce__dynamicMapFunctionSet, "m2Drend", loadElementsDynamic,  freeElementsDynamic,  createElements,         storeElements,         sizeof(struct cce_dynamicrenderinginfo));
+   //if (cceIsPluginLoading("actions"))
+   //{
+   //   cceRegisterFileIOcallbacks(cce__staticMapFunctionSet,  cceLoadActions,        cceFreeActions,        NULL,             NULL,            sizeof(struct cce_actioninfo));
+   //   cceRegisterFileIOcallbacks(cce__dynamicMapFunctionSet, cceLoadActionsDynamic, cceFreeActionsDynamic, cceCreateActions, cceStoreActions, sizeof(struct cce_dynamicactioninfo));
+   //}
 }
 
 void cce__terminateMap2DLoaders (void)

@@ -58,7 +58,7 @@ struct cce_loadedtextures
 struct cce_resourceinfo
 {
    void *resourceData;
-   uint8_t resourcesQuantity;
+   uint16_t resourcesQuantity;
 };
 
 #define CCE_LAYER_STATIC  0x0

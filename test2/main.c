@@ -120,7 +120,7 @@ int main (int argc, char **argv)
    cceLoadMap2Dplugin();
    if (cceInit("test2/game.ini") != 0)
    {
-      printf("Initialization failure\n");
+      fputs("Initialization failure\n", stderr);
       return -1;
    }
    struct cce_buffer *map = createMap();
@@ -131,6 +131,11 @@ int main (int argc, char **argv)
    cceFreeMap2Ddynamic(map);
    map = cceLoadMap2D(tmp);
    free(tmp);
+   if (map == NULL || map->sectionsQuantity == 0)
+   {
+      fputs("Loading failure\n", stderr);
+      return -1;
+   }
    cceSetRenderingLayerMap2D(0, 0, map);
    cceSetAxisChangeCallback(axisCallback, CCE_AXISPAIR_LSTICK);
    cceSetButtonCallback(buttonCallback);

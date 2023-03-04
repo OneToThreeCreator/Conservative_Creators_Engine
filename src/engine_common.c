@@ -334,7 +334,7 @@ static int parseGameINI (const char *path)
          j += !(iniCallbacks[i].flags & CCE_INI_CALLBACK_NO_TERMINATION_CALLBACK);
          if (result == 0)
             continue;
-         fprintf(stderr, "ENGINE::INIT::PLUGIN_INITIALIZATION_FAILURE:\nplugin %s failed to initialize", iniCallbacks[i].name);
+         fprintf(stderr, "ENGINE::INIT::PLUGIN_INITIALIZATION_FAILURE:\nplugin \"%s\" failed to initialize\n", iniCallbacks[i].name);
          for (; i < iniCallbacksQuantity; ++i)
          {
             if (iniCallbacks[i].flags & CCE_INI_CALLBACK_FREE_DATA)
@@ -360,7 +360,7 @@ static int parseGameINI (const char *path)
    else
    {
       result = -1;
-      fputs("ENGINE::INI::PARSING_FAILURE:\nfunction indicated critical error while parsing", stderr);
+      fputs("ENGINE::INI::PARSING_FAILURE:\nfunction indicated critical error while parsing\n", stderr);
       for (struct iniCallbackData *it = iniCallbacks, *end = iniCallbacks + iniCallbacksQuantity; it < end; ++it)
       {
          if (it->flags & CCE_INI_CALLBACK_FREE_DATA)
