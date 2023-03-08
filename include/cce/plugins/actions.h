@@ -1,21 +1,19 @@
 /*
-    Conservative Creator's Engine - open source engine for making games.
-    Copyright (C) 2020-2022 Andrey Gaivoronskiy
+   Conservative Creator's Engine - open source engine for making games.
+   Copyright © 2020-2023 Andrey Gaivoronskiy
 
-    This library is free software; you can redistribute it and/or
-    modify it under the terms of the GNU Lesser General Public
-    License as published by the Free Software Foundation; either
-    version 2.1 of the License, or any later version.
+   This file is part of Conservative Creator's Engine.
 
-    This library is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
-    Lesser General Public License for more details.
+   Conservative Creator's Engine is free software: you can redistribute it and/or modify it under 
+   the terms of the GNU Lesser General Public License as published by the Free Software Foundation,
+   either version 2 of the License, or (at your option) any later version.
 
-    You should have received a copy of the GNU Lesser General Public
-    License along with this library; if not, write to the Free Software
-    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301
-    USA
+   Conservative Creator's Engine is distributed in the hope that it will be useful, but WITHOUT
+   ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR 
+   PURPOSE. See the GNU Lesser General Public License for more details.
+
+   You should have received a copy of the GNU Lesser General Public License along
+   with Conservative Creator's Engine. If not, see <https://www.gnu.org/licenses/>.
 */
 
 #ifndef ACTIONS_H
@@ -122,18 +120,18 @@ struct cceSetEngineShouldTerminate
    cce_enum action;
 };
 
-CCE_API void    cceSetTimerDelay (uint16_t timerID, uint32_t newDelay, uint8_t actionType);
-CCE_API void    cceSetTimerState (uint16_t timerID, uint8_t state);
-CCE_API void    cceDelayAction (uint16_t repeatsQuantity, uint32_t delayOrID, uint32_t actionStructSize, void *actionStruct, uint8_t flags);
+CCE_API void    cceSetTimerDelay  (uint16_t timerID, uint32_t newDelay, uint8_t actionType);
+CCE_API void    cceSetTimerState  (uint16_t timerID, uint8_t state);
+CCE_API void    cceDelayAction    (uint16_t repeatsQuantity, uint32_t delayOrID, uint32_t actionStructSize, void *actionStruct, uint8_t flags);
 CCE_API uint8_t cceRegisterAction (uint32_t ID, cce_actionfun action, void (*endianSwap)(void*));
 
-CCE_API int     cceLoadActions        (void *buffer, uint8_t sectionSize, struct cce_buffer *info, FILE *file);
-CCE_API int     cceLoadActionsDynamic (void *buffer, uint8_t sectionSize, struct cce_buffer *info, FILE *file);
-CCE_API void    cceCreateActions      (void *buffer, struct cce_buffer *info);
-CCE_API void    cceFreeActions        (void *buffer, struct cce_buffer *info);
-CCE_API void    cceFreeActionsDynamic (void *buffer, struct cce_buffer *info);
-CCE_API uint8_t cceStoreActions       (void *buffer, struct cce_buffer *info, FILE *file);
-CCE_API void    cceLoadActionsPlugin (void);
+CCE_API int      cceLoadActions        (void *buffer, uint16_t sectionSize, struct cce_buffer *info, FILE *file);
+CCE_API int      cceLoadActionsDynamic (void *buffer, uint16_t sectionSize, struct cce_buffer *info, FILE *file);
+CCE_API void     cceCreateActions      (void *buffer, struct cce_buffer *info);
+CCE_API void     cceFreeActions        (void *buffer, struct cce_buffer *info);
+CCE_API void     cceFreeActionsDynamic (void *buffer, struct cce_buffer *info);
+CCE_API uint16_t cceStoreActions       (void *buffer, struct cce_buffer *info, FILE *file);
+CCE_API void     cceLoadActionsPlugin  (void);
 
 #define CCE_ACTION_STARTTIMER 0
 #define CCE_ACTION_SETTIMERDELAY 1

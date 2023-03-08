@@ -446,11 +446,11 @@ void cce__initMap2DLoaders (void)
    cce__dynamicMapFunctionSet = cceGetFileIOfunctionSet();
    cceRegisterFileIOcallbacks(cce__dynamicMapFunctionSet, "m2Dres",  loadResourcesSection, freeResourcesSection, createResourcesSection, storeResourcesSection, sizeof(struct cce_resourceinfo));
    cceRegisterFileIOcallbacks(cce__dynamicMapFunctionSet, "m2Drend", loadElementsDynamic,  freeElementsDynamic,  createElements,         storeElements,         sizeof(struct cce_dynamicrenderinginfo));
-   //if (cceIsPluginLoading("actions"))
-   //{
-   //   cceRegisterFileIOcallbacks(cce__staticMapFunctionSet,  cceLoadActions,        cceFreeActions,        NULL,             NULL,            sizeof(struct cce_actioninfo));
-   //   cceRegisterFileIOcallbacks(cce__dynamicMapFunctionSet, cceLoadActionsDynamic, cceFreeActionsDynamic, cceCreateActions, cceStoreActions, sizeof(struct cce_dynamicactioninfo));
-   //}
+   if (cceIsPluginLoading("actions"))
+   {
+      cceRegisterFileIOcallbacks(cce__staticMapFunctionSet,  "actions", cceLoadActions,        cceFreeActions,        NULL,             NULL,            sizeof(struct cce_actioninfo));
+      cceRegisterFileIOcallbacks(cce__dynamicMapFunctionSet, "actions", cceLoadActionsDynamic, cceFreeActionsDynamic, cceCreateActions, cceStoreActions, sizeof(struct cce_dynamicactioninfo));
+   }
 }
 
 void cce__terminateMap2DLoaders (void)

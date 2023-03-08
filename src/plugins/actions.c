@@ -552,7 +552,7 @@ static void updateActions (void)
       processTimers();
 }
 
-CCE_API int cceLoadActions (void *buffer, uint8_t sectionSize, struct cce_buffer *info, FILE *file)
+CCE_API int cceLoadActions (void *buffer, uint16_t sectionSize, struct cce_buffer *info, FILE *file)
 {
    CCE_UNUSED(info);
    CCE_UNUSED(sectionSize);
@@ -572,7 +572,7 @@ CCE_API int cceLoadActions (void *buffer, uint8_t sectionSize, struct cce_buffer
    return 0;
 }
 
-CCE_API int cceLoadActionsDynamic (void *buffer, uint8_t sectionSize, struct cce_buffer *info, FILE *file)
+CCE_API int cceLoadActionsDynamic (void *buffer, uint16_t sectionSize, struct cce_buffer *info, FILE *file)
 {
    CCE_UNUSED(info);
    CCE_UNUSED(sectionSize);
@@ -619,7 +619,7 @@ CCE_API void cceFreeActionsDynamic (void *buffer, struct cce_buffer *info)
    free(map->onFreeActionsSizes);
 }
 
-CCE_API uint8_t cceStoreActions (void *buffer, struct cce_buffer *info, FILE *file)
+CCE_API uint16_t cceStoreActions (void *buffer, struct cce_buffer *info, FILE *file)
 {
    CCE_UNUSED(info);
    struct cce_dynamicactioninfo *map = buffer;

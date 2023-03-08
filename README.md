@@ -43,3 +43,6 @@ Run test:
 ```
 ctest --test-dir ./build
 ```
+
+# License
+Conservative creator's engine is licensed under the GNU LGPL v2 or any later version, with some files under GNU All-Permissive License (check license notice at the head of individual file)

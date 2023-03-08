@@ -1,3 +1,15 @@
+/*
+   Conservative Creator's Engine - open source engine for making games.
+   Copyright © 2020-2023 Andrey Gaivoronskiy
+
+   This file is part of Conservative Creator's Engine.
+
+   Copying and distribution of this file, with or without modification,
+   are permitted in any medium without royalty provided the copyright
+   notice and this notice are preserved.  This file is offered as-is,
+   without any warranty.
+*/
+
 #include "map2D.h"
 
 2Dmap file structure:
@@ -5,12 +17,18 @@
 uint8_t headSize
 
 HEAD:
-uint8_t resourcesToLoadQuantity
-uint8_t renderingInformationHeadSize
-uint8_t colliderInformationHeadSize
-uint8_t logicHeadSize
-uint8_t openWorldHeadSize
-SOME_GAME-SPECIFIC_INFORMATION_HEAD_SIZE
+char resourcesToLoad[8];
+uint16_t resourcesToLoadQuantity
+char renderingInformation[8]
+uint16_t renderingInformationHeadSize
+char colliderInformation[8]
+uint16_t colliderInformationHeadSize
+char actionInformation[8]
+uint16_t actionInformationHeadSize
+char openWorldInformation[8]
+uint16_t openworldInformationHeadSize
+char SOME_GAME-SPECIFIC_INFORMATION[8];
+uint16_t SOME_GAME-SPECIFIC_INFORMATION_HEAD_SIZE
 
 RESOURCES:
 uint32_t texturesNamesSize
@@ -40,7 +58,7 @@ struct ElementGroup   transformGroups [transformGroupsQuantity]  // Groups can b
 struct ElementGroup   collisionGroups [collisionGroupsQuantity]
 struct CollisionGroup collision       [collisionQuantity]
 
-LOGIC:
+ACTIONS:
 uint16_t      onLoadActionsQuantity
 uint16_t      onFreeActionsQuantity
 uint32_t      onLoadActionsSize
