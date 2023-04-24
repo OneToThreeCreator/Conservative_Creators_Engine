@@ -71,7 +71,7 @@ struct Action
 static void runActionsAction (const void *data, uint16_t count)
 {
    const struct cceRunActions *params = data;
-   const cce_void *actionsToCall = (const cce_void*) data + sizeof(struct cceRunActions) + ((params->actionQuantity | 1) - 1) * sizeof(uint16_t);
+   const cce_void *actionsToCall = (const cce_void*) data + sizeof(struct cceRunActions) + (((params->actionQuantity - 1) | 1) - 1) * sizeof(uint16_t);
    for (const uint16_t *sizes = params->actionSizes, *end = params->actionSizes + params->actionQuantity; sizes < end; actionsToCall += *sizes++)
    {
       EXEC_ACTION(actionsToCall, count);

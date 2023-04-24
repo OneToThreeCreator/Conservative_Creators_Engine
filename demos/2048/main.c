@@ -29,7 +29,10 @@
 #include <cce/plugins/map2D/map2D.h>
 
 #define BOARD_SIZE 4
-#define CONTROL_UPDATE 1
+#define CONTROL_UPDATE 0x1
+#define LOCK_CONTROLS  0x2
+#define TEXSIDE 64
+#define MOVE_DURATION 96000
 
 static uint8_t g_board[CCE_POW2(BOARD_SIZE)] = {0};
 static struct cce_buffer *g_map;
@@ -40,8 +43,8 @@ uint8_t flags;
 struct movecell_t
 {
    uint32_t ID;
-   int8_t   xDiff;
-   int8_t   yDiff;
+   int16_t   xDiff;
+   int16_t   yDiff;
    uint8_t  cell;
 };
 
@@ -66,6 +69,7 @@ static void controls (int8_t horizontal, int8_t vertical)
 static void calculateCellMove (void)
 {
    struct movecell_t moveInfo;
+   flags |= LOCK_CONTROLS;
    moveInfo.ID = 17;
    int8_t verticalAxis = (controlAxes.x == 0) ? controlAxes.y : 0;
    int8_t diff = ((int8_t)(verticalAxis | controlAxes.x) < 0) * 2 - 1;
@@ -75,14 +79,13 @@ static void calculateCellMove (void)
    runActions->actionQuantity = 3;
    runActions->actionSizes[0] = sizeof(struct movecell_t);
    runActions->actionSizes[1] = sizeof(struct setcelltype_t);
-   runActions->actionSizes[2] = sizeof(struct setcelltype_t);
    struct movecell_t *move = (struct movecell_t*) (tmp + sizeof(struct cceRunActions) + 2 * sizeof(uint16_t));
    move->ID = 17;
    struct setcelltype_t *setType1 = (struct setcelltype_t*)(move + 1);
    setType1->ID = 18;
    struct setcelltype_t *setType2 = (setType1 + 1);
    setType2->ID = 18;
-   uint8_t maxMoveDuration = 0, isNewCell = 0;
+   uint8_t isNewCell = 0, isMoved = 0;
    switch (((verticalAxis > 0) << 1) | ((controlAxes.x > 0) << 1) | (controlAxes.x != 0))
    {
       case 0:
@@ -105,21 +108,21 @@ static void calculateCellMove (void)
                }
                if (cells == 0)
                   continue;
-               maxMoveDuration = CCE_MAX(maxMoveDuration, cells);
+               isMoved = 1;
                moveInfo.cell = i;
                moveInfo.xDiff = 0;
-               moveInfo.yDiff = -1;
-               cceDelayAction(cells * 16, 6000, sizeof(struct movecell_t), &moveInfo, CCE_DEFAULT);
+               moveInfo.yDiff = -cells;
+               cceDelayAction(TEXSIDE, MOVE_DURATION/TEXSIDE, sizeof(struct movecell_t), &moveInfo, CCE_DEFAULT);
                move->cell = i;
                move->xDiff = 0;
-               move->yDiff = 16 * cells;
+               move->yDiff = TEXSIDE * cells;
                setType1->cell = i;
                setType1->type = 0;
                setType2->cell = i - cells * BOARD_SIZE;
                setType2->type = g_board[i] + isNewCell;
                g_board[i - cells * BOARD_SIZE] = (g_board[i] + isNewCell) | isNewCell << 7;
                g_board[i] = 0;
-               cceDelayAction(1, 96000 * cells, sizeof(tmp), runActions, CCE_DEFAULT);
+               cceDelayAction(1, MOVE_DURATION, sizeof(tmp), runActions, CCE_DEFAULT);
                freeCells += isNewCell;
             }
          }
@@ -145,21 +148,21 @@ static void calculateCellMove (void)
                }
                if (cells == 0)
                   continue;
-               maxMoveDuration = CCE_MAX(maxMoveDuration, cells);
+               isMoved = 1;
                moveInfo.cell = i;
                moveInfo.xDiff = 0;
-               moveInfo.yDiff = 1;
-               cceDelayAction(cells * 16, 6000, sizeof(struct movecell_t), &moveInfo, CCE_DEFAULT);
-               move->xDiff = 0;
-               move->yDiff = -16 * cells;
+               moveInfo.yDiff = cells;
+               cceDelayAction(TEXSIDE, MOVE_DURATION/TEXSIDE, sizeof(struct movecell_t), &moveInfo, CCE_DEFAULT);
                move->cell = i;
+               move->xDiff = 0;
+               move->yDiff = -TEXSIDE * cells;
                setType1->cell = i;
                setType1->type = 0;
                setType2->cell = i + cells * BOARD_SIZE;
                setType2->type = g_board[i] + isNewCell;
                g_board[i + cells * BOARD_SIZE] = (g_board[i] + isNewCell) | isNewCell << 7;
                g_board[i] = 0;
-               cceDelayAction(1, 96000 * cells, sizeof(tmp), runActions, CCE_DEFAULT);
+               cceDelayAction(1, MOVE_DURATION, sizeof(tmp), runActions, CCE_DEFAULT);
                freeCells += isNewCell;
             }
          }
@@ -186,13 +189,13 @@ static void calculateCellMove (void)
                   }
                   if (cells == 0)
                      continue;
-                  maxMoveDuration = CCE_MAX(maxMoveDuration, cells);
+                  isMoved = 1;
                   moveInfo.cell = i;
-                  moveInfo.xDiff = -1;
+                  moveInfo.xDiff = -cells;
                   moveInfo.yDiff = 0;
-                  cceDelayAction(cells * 16, 6000, sizeof(struct movecell_t), &moveInfo, CCE_DEFAULT);
+                  cceDelayAction(TEXSIDE, MOVE_DURATION/TEXSIDE, sizeof(struct movecell_t), &moveInfo, CCE_DEFAULT);
                   move->cell = i;
-                  move->xDiff = 16 * cells;
+                  move->xDiff = TEXSIDE * cells;
                   move->yDiff = 0;
                   setType1->cell = i;
                   setType1->type = 0;
@@ -200,14 +203,14 @@ static void calculateCellMove (void)
                   setType2->type = g_board[i] + isNewCell;
                   g_board[i - cells] = (g_board[i] + isNewCell) | isNewCell << 7;
                   g_board[i] = 0;
-                  cceDelayAction(1, 96000 * cells, sizeof(tmp), runActions, CCE_DEFAULT);
+                  cceDelayAction(1, MOVE_DURATION, sizeof(tmp), runActions, CCE_DEFAULT);
                   freeCells += isNewCell;
                }
             }
          }
          break;
       case 3:
-         for (unsigned i = CCE_POW2(BOARD_SIZE); i > 0; )
+         for (unsigned i = BOARD_SIZE * BOARD_SIZE; i > 0; )
          {
             --i;
             for (unsigned end = i - BOARD_SIZE + 1; i > end;)
@@ -230,13 +233,13 @@ static void calculateCellMove (void)
                   }
                   if (cells == 0)
                      continue;
-                  maxMoveDuration = CCE_MAX(maxMoveDuration, cells);
+                  isMoved = 1;
                   moveInfo.cell = i;
-                  moveInfo.xDiff = 1;
+                  moveInfo.xDiff = cells;
                   moveInfo.yDiff = 0;
-                  cceDelayAction(cells * 16, 6000, sizeof(struct movecell_t), &moveInfo, CCE_DEFAULT);
+                  cceDelayAction(TEXSIDE, MOVE_DURATION/TEXSIDE, sizeof(struct movecell_t), &moveInfo, CCE_DEFAULT);
                   move->cell = i;
-                  move->xDiff = -16 * cells;
+                  move->xDiff = -TEXSIDE * cells;
                   move->yDiff = 0;
                   setType1->cell = i;
                   setType1->type = 0;
@@ -244,17 +247,24 @@ static void calculateCellMove (void)
                   setType2->type = g_board[i] + isNewCell;
                   g_board[i + cells] = (g_board[i] + isNewCell) | isNewCell << 7;
                   g_board[i] = 0;
-                  cceDelayAction(1, 96000 * cells, sizeof(tmp), runActions, CCE_DEFAULT);
+                  cceDelayAction(1, MOVE_DURATION, sizeof(tmp), runActions, CCE_DEFAULT);
                   freeCells += isNewCell;
                }
             }
          }
          break;
    }
-   if (maxMoveDuration > 0)
+   if (isMoved)
    {
-      uint32_t action = 16;
-      cceDelayAction(1, 96000 * maxMoveDuration, sizeof(uint32_t), &action, CCE_DEFAULT);
+      runActions->actionQuantity = 2;
+      runActions->actionSizes[0] = sizeof(uint32_t);
+      *(uint32_t*)(tmp + sizeof(struct cceRunActions)) = 16;
+      *(uint32_t*)(tmp + sizeof(struct cceRunActions) + sizeof(uint32_t)) = 19;
+      cceDelayAction(1, 96000, sizeof(struct cceRunActions) + 2 * sizeof(uint32_t), runActions, CCE_DEFAULT);
+   }
+   else
+   {
+      flags &= ~LOCK_CONTROLS;
    }
    for (unsigned i = 0; i < CCE_POW2(BOARD_SIZE); ++i)
       g_board[i] &= ~0x80; // Avoiding recursive merge (ununtended mechanic for this clone)
@@ -290,25 +300,25 @@ static struct cce_buffer* genBoard (void)
    };
    struct cce_element elements[] = 
    {
-      {{-32, -32}, {0, 0}, {16, 16}, texture, 0, 0},
-      {{-16, -32}, {0, 0}, {16, 16}, texture, 0, 0},
-      {{  0, -32}, {0, 0}, {16, 16}, texture, 0, 0},
-      {{ 16, -32}, {0, 0}, {16, 16}, texture, 0, 0},
-      {{-32, -16}, {0, 0}, {16, 16}, texture, 0, 0},
-      {{-16, -16}, {0, 0}, {16, 16}, texture, 0, 0},
-      {{  0, -16}, {0, 0}, {16, 16}, texture, 0, 0},
-      {{ 16, -16}, {0, 0}, {16, 16}, texture, 0, 0},
-      {{-32,   0}, {0, 0}, {16, 16}, texture, 0, 0},
-      {{-16,   0}, {0, 0}, {16, 16}, texture, 0, 0},
-      {{  0,   0}, {0, 0}, {16, 16}, texture, 0, 0},
-      {{ 16,   0}, {0, 0}, {16, 16}, texture, 0, 0},
-      {{-32,  16}, {0, 0}, {16, 16}, texture, 0, 0},
-      {{-16,  16}, {0, 0}, {16, 16}, texture, 0, 0},
-      {{  0,  16}, {0, 0}, {16, 16}, texture, 0, 0},
-      {{ 16,  16}, {0, 0}, {16, 16}, texture, 0, 0},
+      {{-2*TEXSIDE, -2*TEXSIDE}, {0, 0}, {TEXSIDE, TEXSIDE}, texture, 0, 0},
+      {{-1*TEXSIDE, -2*TEXSIDE}, {0, 0}, {TEXSIDE, TEXSIDE}, texture, 0, 0},
+      {{ 0,         -2*TEXSIDE}, {0, 0}, {TEXSIDE, TEXSIDE}, texture, 0, 0},
+      {{ 1*TEXSIDE, -2*TEXSIDE}, {0, 0}, {TEXSIDE, TEXSIDE}, texture, 0, 0},
+      {{-2*TEXSIDE, -1*TEXSIDE}, {0, 0}, {TEXSIDE, TEXSIDE}, texture, 0, 0},
+      {{-1*TEXSIDE, -1*TEXSIDE}, {0, 0}, {TEXSIDE, TEXSIDE}, texture, 0, 0},
+      {{ 0        , -1*TEXSIDE}, {0, 0}, {TEXSIDE, TEXSIDE}, texture, 0, 0},
+      {{ 1*TEXSIDE, -1*TEXSIDE}, {0, 0}, {TEXSIDE, TEXSIDE}, texture, 0, 0},
+      {{-2*TEXSIDE,  0        }, {0, 0}, {TEXSIDE, TEXSIDE}, texture, 0, 0},
+      {{-1*TEXSIDE,  0        }, {0, 0}, {TEXSIDE, TEXSIDE}, texture, 0, 0},
+      {{ 0        ,  0        }, {0, 0}, {TEXSIDE, TEXSIDE}, texture, 0, 0},
+      {{ 1*TEXSIDE,  0        }, {0, 0}, {TEXSIDE, TEXSIDE}, texture, 0, 0},
+      {{-2*TEXSIDE,  1*TEXSIDE}, {0, 0}, {TEXSIDE, TEXSIDE}, texture, 0, 0},
+      {{-1*TEXSIDE,  1*TEXSIDE}, {0, 0}, {TEXSIDE, TEXSIDE}, texture, 0, 0},
+      {{ 0,          1*TEXSIDE}, {0, 0}, {TEXSIDE, TEXSIDE}, texture, 0, 0},
+      {{ 1*TEXSIDE,  1*TEXSIDE}, {0, 0}, {TEXSIDE, TEXSIDE}, texture, 0, 0},
    };
-   memcpy(cceGetElementsPosition(0, 0, 16, map), positions, 16 * sizeof(struct cce_elementposition));
-   memcpy(cceGetElements(0, 16, map),            elements,  16 * sizeof(struct cce_element));
+   memcpy(cceGetElementsPosition(0, 0, BOARD_SIZE*BOARD_SIZE, map), positions, BOARD_SIZE*BOARD_SIZE * sizeof(struct cce_elementposition));
+   memcpy(cceGetElements(0,            BOARD_SIZE*BOARD_SIZE, map), elements,  BOARD_SIZE*BOARD_SIZE * sizeof(struct cce_element));
    struct cce_renderinginfo *info = cceGetRenderingInfo(map);
    return map;
 }
@@ -331,7 +341,7 @@ static void createCell (const void *data, uint16_t count)
       --realPos;
       g_board[realPos] = 1 + type;
       struct cce_element *element = cceGetElements(realPos, 1, g_map);
-      element->data.texturePosition.x = 16 * (1 + type);
+      element->data.texturePosition.x = TEXSIDE * (1 + type);
       --freeCells;
       --count;
    }
@@ -343,8 +353,8 @@ static void moveCell (const void *data, uint16_t count)
 {
    const struct movecell_t *vals = data;
    struct cce_elementposition *position = cceGetElementsPosition(0, vals->cell, 1, g_map);
-   position->position.x += vals->xDiff * count;
-   position->position.y += vals->yDiff * count;
+   position->position.x += vals->xDiff * (int16_t)count;
+   position->position.y += vals->yDiff * (int16_t)count;
    cceSetElementsPositionsUpdated(cceGetElementPositionArray(0, g_map));
 }
 
@@ -353,9 +363,16 @@ static void setElementType (const void *data, uint16_t count)
    CCE_UNUSED(count);
    const struct setcelltype_t *vals = data;
    struct cce_element *element = cceGetElements(vals->cell, 1, g_map);
-   element->data.texturePosition.x = (vals->type % 4) * 16;
-   element->data.texturePosition.y = (vals->type / 4) * 16;
+   element->data.texturePosition.x = (vals->type % BOARD_SIZE) * TEXSIDE;
+   element->data.texturePosition.y = (vals->type / BOARD_SIZE) * TEXSIDE;
    cceSetElementsUpdated(cceGetRenderingInfo(g_map));
+}
+
+static void unlockControls (const void *data, uint16_t count)
+{
+   CCE_UNUSED(data);
+   CCE_UNUSED(count);
+   flags &= ~LOCK_CONTROLS;
 }
 
 int main (int argc, char **argv)
@@ -384,6 +401,7 @@ int main (int argc, char **argv)
    cceRegisterAction(16, createCell, NULL);
    cceRegisterAction(17, moveCell, NULL);
    cceRegisterAction(18, setElementType, NULL);
+   cceRegisterAction(19, unlockControls, NULL);
    {
       unsigned seed;
       cceGetRandom(&seed, sizeof(unsigned));
@@ -394,7 +412,7 @@ int main (int argc, char **argv)
    while (cceEngineShouldTerminate() == 0)
    {
       cceRenderMap2D();
-      if (flags & CONTROL_UPDATE)
+      if ((flags & (CONTROL_UPDATE | LOCK_CONTROLS)) == CONTROL_UPDATE)
       {
          calculateCellMove();
       }
