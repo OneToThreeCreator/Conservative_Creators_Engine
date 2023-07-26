@@ -53,7 +53,7 @@ add_library(cce ${CCE_LIB_TYPE}
    src/engine_common.c
    src/engine_common_file_IO.c
    include/cce/engine_common.h
-   src/engine_common_internal.h
+   include/cce/engine_common_internal.h
    src/utils.c
    include/cce/utils.h
    src/platform/engine_common_glfw.c
@@ -66,6 +66,8 @@ add_library(cce ${CCE_LIB_TYPE}
    include/cce/endianess.h
    src/plugins/actions.c
    include/cce/plugins/actions.h
+   include/cce/plugins/actions_internal.h
+   include/cce/plugins/actions_runactions.h
    src/plugins/map2D/map2D_modification.c
    src/plugins/map2D/map2D.c
    src/plugins/map2D/map2D_openGL.c
@@ -166,7 +168,7 @@ target_include_directories(cce PUBLIC
 
 if(WIN32)
    target_link_libraries(cce PRIVATE shell32 kernel32)
-   # Windows don't have standartized path for storing shared data (or libraries, or anything isn't self-contained)
+   # Windows don't have standartized path for storing shared data (or libraries, or anything that isn't self-contained)
 else()
    target_compile_definitions(cce PRIVATE SYSTEM_RESOURCE_PATH=\"${CMAKE_INSTALL_PREFIX}/share/cce/\")
    target_link_libraries(cce PRIVATE m)

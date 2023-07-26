@@ -28,7 +28,7 @@
 #include "../include/cce/os_interaction.h"
 #include "../include/cce/utils.h"
 
-#include "engine_common_internal.h"
+#include "../include/cce/engine_common_internal.h"
 
 struct cce_IO_function_set
 {
@@ -37,8 +37,8 @@ struct cce_IO_function_set
    cce_dataparsefun *creatingFunctions;
    cce_fwritefun    *writingFunctions;
    size_t           *readingFunctionsDataBufferOffsets;
-   char            (*sectionNames)[8];
-   char            **sectionNamesSorted;
+   uint32_t        (*sectionUIDs);
+   uint32_t        **sectionUIDsSorted;
    uint16_t          readingFunctionsQuantity;
    uint16_t          readingFunctionsAllocated;
 };
@@ -74,25 +74,28 @@ CCE_API uint16_t cceGetFileIOfunctionSet (void)
    IOfunctionSet[IOfunctionSetQuantity].creatingFunctions =                 malloc( IOfunctionSet[IOfunctionSetQuantity].readingFunctionsAllocated * sizeof(cce_dataparsefun*));
    IOfunctionSet[IOfunctionSetQuantity].writingFunctions  =                 malloc( IOfunctionSet[IOfunctionSetQuantity].readingFunctionsAllocated * sizeof(cce_fwritefun*));
    IOfunctionSet[IOfunctionSetQuantity].readingFunctionsDataBufferOffsets = malloc((IOfunctionSet[IOfunctionSetQuantity].readingFunctionsAllocated + 1) * sizeof(size_t));
-   IOfunctionSet[IOfunctionSetQuantity].sectionNames =                      malloc( IOfunctionSet[IOfunctionSetQuantity].readingFunctionsAllocated * 8 * sizeof(char));
-   IOfunctionSet[IOfunctionSetQuantity].sectionNamesSorted =                malloc( IOfunctionSet[IOfunctionSetQuantity].readingFunctionsAllocated * sizeof(char*));
+   IOfunctionSet[IOfunctionSetQuantity].sectionUIDs =                       malloc( IOfunctionSet[IOfunctionSetQuantity].readingFunctionsAllocated * sizeof(uint64_t));
+   IOfunctionSet[IOfunctionSetQuantity].sectionUIDsSorted =                 malloc( IOfunctionSet[IOfunctionSetQuantity].readingFunctionsAllocated * sizeof(uint64_t*));
    IOfunctionSet[IOfunctionSetQuantity].readingFunctionsDataBufferOffsets[0] = 0;
    return IOfunctionSetQuantity++;
 }
 
-CCE_API ptrdiff_t cceGetFunctionBufferOffset (uint16_t functionID, uint16_t functionSetID)
+CCE_API ptrdiff_t cceGetFunctionBufferOffset (uint32_t functionUID, uint16_t functionSetID)
 {
-   if (functionID >= IOfunctionSet[functionSetID].readingFunctionsQuantity)
-      return 0;
-   return sizeof(struct cce_buffer) + IOfunctionSet[functionSetID].readingFunctionsDataBufferOffsets[functionID];
+   struct cce_IO_function_set *currentFunctions = IOfunctionSet + functionSetID;
+   ptrdiff_t result;
+   #ifdef NDEBUG
+   #define ERROR_HANDLER return -1;
+   #else
+   #define ERROR_HANDLER fprintf(stderr, "cceGetFunctionBufferOffset was called with functionUID %llx which was not registered in functionSetID %u", \
+                         (unsigned long long)functionUID, functionSetID); abort();
+   #endif
+   CCE_FIND_FROM_UID_ARRAY(functionUID, currentFunctions->sectionUIDs, currentFunctions->sectionUIDsSorted, currentFunctions->readingFunctionsQuantity, result, ERROR_HANDLER);
+   #undef ERROR_HANDLER
+   return sizeof(struct cce_buffer) + currentFunctions->readingFunctionsDataBufferOffsets[result];
 }
 
-static int str_comp (const void *_a, const void *_b)
-{
-   return memcmp(*(char**)_a, *(char**)_b, 8);
-}
-
-CCE_API uint8_t cceRegisterFileIOcallbacks (uint16_t functionSet, char sectionName[8], cce_freadfun onLoad, cce_dataparsefun onFree, cce_dataparsefun onCreate, cce_fwritefun onWrite, size_t bufferSize)
+CCE_API int cceRegisterFileIOcallbacks (uint16_t functionSet, uint32_t functionUID, cce_freadfun onLoad, cce_dataparsefun onFree, cce_dataparsefun onCreate, cce_fwritefun onWrite, size_t bufferSize)
 {
    assert(functionSet < IOfunctionSetQuantity);
    struct cce_IO_function_set *currentFunctions = IOfunctionSet + functionSet;
@@ -103,27 +106,16 @@ CCE_API uint8_t cceRegisterFileIOcallbacks (uint16_t functionSet, char sectionNa
       currentFunctions->creatingFunctions = realloc(currentFunctions->creatingFunctions, currentFunctions->readingFunctionsAllocated * sizeof(cce_dataparsefun*));
       currentFunctions->writingFunctions  = realloc(currentFunctions->writingFunctions,  currentFunctions->readingFunctionsAllocated * sizeof(cce_fwritefun*));
       currentFunctions->readingFunctionsDataBufferOffsets = realloc(currentFunctions->readingFunctionsDataBufferOffsets, (currentFunctions->readingFunctionsAllocated + 1) * sizeof(size_t));
-      char *oldPtr = (char*) currentFunctions->sectionNames;
-      currentFunctions->sectionNames = realloc(currentFunctions->sectionNames, currentFunctions->readingFunctionsAllocated * 8 * sizeof(char));
-      ptrdiff_t diff = (char*)currentFunctions->sectionNames - oldPtr;
-      currentFunctions->sectionNamesSorted = realloc(currentFunctions->sectionNamesSorted, currentFunctions->readingFunctionsAllocated * sizeof(char*));
-      // Pointers became invalid, update 'em! (Kludge)
-      for (char **iterator = currentFunctions->sectionNamesSorted, **end = currentFunctions->sectionNamesSorted + currentFunctions->readingFunctionsQuantity; iterator < end; ++iterator)
-      {
-         *iterator += diff;
-      }
+      CCE_REALLOC_UID_ARRAY(currentFunctions->sectionUIDs, currentFunctions->sectionUIDsSorted, currentFunctions->readingFunctionsQuantity, currentFunctions->readingFunctionsAllocated);
    }
    currentFunctions->readingFunctions[currentFunctions->readingFunctionsQuantity]  = onLoad;
    currentFunctions->freeingFunctions[currentFunctions->readingFunctionsQuantity]  = onFree;
    currentFunctions->creatingFunctions[currentFunctions->readingFunctionsQuantity] = onCreate;
    currentFunctions->writingFunctions[currentFunctions->readingFunctionsQuantity]  = onWrite;
    currentFunctions->readingFunctionsDataBufferOffsets[currentFunctions->readingFunctionsQuantity + 1] = bufferSize + currentFunctions->readingFunctionsDataBufferOffsets[currentFunctions->readingFunctionsQuantity];
-   strncpy(currentFunctions->sectionNames[currentFunctions->readingFunctionsQuantity], sectionName, 8);
-   char *ptr = currentFunctions->sectionNames[currentFunctions->readingFunctionsQuantity];
-   char **namePosition = cceBinarySearchFirst(&ptr, currentFunctions->sectionNamesSorted, currentFunctions->readingFunctionsQuantity, sizeof(char*), str_comp);
-   memmove(namePosition + 1, namePosition, (currentFunctions->readingFunctionsQuantity - (namePosition - currentFunctions->sectionNamesSorted)) * sizeof(char*));
-   *namePosition = &currentFunctions->sectionNames[currentFunctions->readingFunctionsQuantity][0];
-   return currentFunctions->readingFunctionsQuantity++;
+   CCE_INSERT_INTO_UID_ARRAY(functionUID, currentFunctions->sectionUIDs, currentFunctions->sectionUIDsSorted, currentFunctions->readingFunctionsQuantity);
+   ++currentFunctions->readingFunctionsQuantity;
+   return 0;
 }
 
 CCE_API struct cce_buffer* cceSetBufferSectionQuantity (struct cce_buffer *buffer, uint8_t newSectionsQuantity)
@@ -190,23 +182,20 @@ CCE_API struct cce_buffer* cceLoadBinaryCCF (char *path, uint16_t functionSetID)
    uint8_t errorLoader = 0;
    struct cce_buffer *buffer = NULL;
    fread(&loaders, sizeof(uint8_t), 1, file);
-   char names[255][8] = {0};
    uint16_t sectionSizes[255];
    uint8_t  sectionsInitialized[255] = {0};
+   uint16_t ids[255];
    headSize = 0;
-   for (unsigned i = 0; i < loaders; ++i)
    {
-      fread(names[i], sizeof(char), 8, file);
-      fread(sectionSizes + i, sizeof(uint16_t), 1, file);
-      char *key = names[i];
-      char **position = bsearch(&key, currentFunctions->sectionNamesSorted, currentFunctions->readingFunctionsQuantity, sizeof(char*), str_comp);
-      if (position == NULL)
+      uint32_t uids[255] = {0};
+      fread(uids, sizeof(uint32_t), loaders, file);
+      fread(sectionSizes, sizeof(uint16_t), loaders, file);
+      for (unsigned i = 0; i < loaders; ++i)
       {
-         fclose(file);
-         abort();
-         return NULL;
+         CCE_FIND_FROM_UID_ARRAY(uids[i], currentFunctions->sectionUIDs, currentFunctions->sectionUIDsSorted, \
+                                 currentFunctions->readingFunctionsQuantity, ids[i], fclose(file); return NULL);
+         headSize = CCE_MAX(headSize, ids[i] + 1);
       }
-      headSize = CCE_MAX(headSize, (*position - currentFunctions->sectionNames[0]) / 8 + 1);
    }
    size_t size = currentFunctions->readingFunctionsDataBufferOffsets[headSize];
    if (headSize == 0)
@@ -222,20 +211,17 @@ CCE_API struct cce_buffer* cceLoadBinaryCCF (char *path, uint16_t functionSetID)
    size_t *offsets = currentFunctions->readingFunctionsDataBufferOffsets;
    cce_void *data = (cce_void*)(buffer + 1);
    
-   for (uint8_t i = 0, j; i < loaders; ++i)
+   for (unsigned i = 0; i < loaders; ++i)
    {
-      char *key = names[i];
-      char **position = bsearch(&key, currentFunctions->sectionNamesSorted, currentFunctions->readingFunctionsQuantity, sizeof(char*), str_comp);
-      j = (*position - currentFunctions->sectionNames[0]) / 8;
-      sectionsInitialized[j] = 1;
-      if ((currentFunctions->readingFunctions[j])(data + offsets[j], sectionSizes[i], buffer, file) == 0)
+      sectionsInitialized[ids[i]] = 1;
+      if ((currentFunctions->readingFunctions[ids[i]])(data + offsets[ids[i]], sectionSizes[i], buffer, file) == 0)
          continue;
       
-      errorLoader = j;
+      errorLoader = ids[i];
       goto ERROR;
    }
    fclose(file);
-   for (uint8_t i = 0; i < headSize; ++i)
+   for (unsigned i = 0; i < headSize; ++i)
    {
       if (sectionsInitialized[i] != 0 || currentFunctions->creatingFunctions[i] == NULL)
          continue;
@@ -265,7 +251,7 @@ CCE_API int cceWriteBinaryCCF (struct cce_buffer *buffer, char *path)
    struct cce_IO_function_set *currentFunctions = IOfunctionSet + buffer->loadingFunctionBlockID;
    uint16_t sectionSizes[255] = {0};
    uint8_t headSize = buffer->sectionsQuantity;
-   fseek(file, (headSize) * (sizeof(uint16_t) + 8 * sizeof(char)) + sizeof(uint8_t), SEEK_SET);
+   fseek(file, (headSize) * (sizeof(uint16_t) + sizeof(uint32_t)) + sizeof(uint8_t), SEEK_SET);
    size_t *offsets = currentFunctions->readingFunctionsDataBufferOffsets;
    size_t bytesWritten = 0;
    uint16_t *sectionSizesIt = sectionSizes;
@@ -276,32 +262,28 @@ CCE_API int cceWriteBinaryCCF (struct cce_buffer *buffer, char *path)
       *sectionSizesIt = (*fun)((cce_void*)(buffer + 1) + *offsets, buffer, file);
    }
    bytesWritten = ftell(file) - headSize * (sizeof(uint16_t) + 8 * sizeof(char)) - sizeof(uint8_t);
-   uint8_t newHeadSize = headSize;
    fseek(file, (headSize + 1) * sizeof(uint8_t), SEEK_SET);
+   uint32_t uids[255];
    {
-      uint16_t *iterator = sectionSizes + headSize;
-      do
+      unsigned zeroSum = 0;
+      for (unsigned i = 0; i < headSize; ++i)
       {
-         --iterator;
-         newHeadSize -= (*iterator == 0);
+         uids[i - zeroSum] = currentFunctions->sectionUIDs[i];
+         sectionSizes[i - zeroSum] = sectionSizes[i];
+         zeroSum += (sectionSizes[i] == 0);
       }
-      while (iterator > sectionSizes);
-      if (newHeadSize != headSize)
+      
+      if (zeroSum > 0)
       {
-         cceMoveFileContent(file, (newHeadSize - headSize) * (sizeof(uint16_t) + 8 * sizeof(char)), SEEK_CUR, bytesWritten);
-         cceTruncateFile(file, bytesWritten + sizeof(uint8_t) + newHeadSize * (sizeof(uint16_t) + 8 * sizeof(char)));
+         headSize -= zeroSum;
+         cceMoveFileContent(file, zeroSum * (sizeof(uint16_t) + 8 * sizeof(char)), SEEK_CUR, bytesWritten);
+         cceTruncateFile(file, bytesWritten + sizeof(uint8_t) + headSize * (sizeof(uint16_t) + 8 * sizeof(char)));
       }
    }
    fseek(file, 0, SEEK_SET);
-   fwrite(&newHeadSize, sizeof(uint8_t), 1, file);
-   for (unsigned i = 0; i < headSize; ++i)
-   {
-      if (sectionSizes[i] != 0)
-      {
-         fwrite(currentFunctions->sectionNames[i], sizeof(char), 8, file);
-         fwrite(sectionSizes + i, sizeof(uint16_t), 1, file);
-      }
-   }
+   fwrite(&headSize, sizeof(uint8_t), 1, file);
+   fwrite(uids, sizeof(uint32_t), headSize, file);
+   fwrite(sectionSizes, sizeof(uint16_t), headSize, file);
    fclose(file);
    return 0;
 }

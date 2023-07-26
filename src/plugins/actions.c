@@ -1,23 +1,22 @@
 ﻿/*
-    Conservative Creator's Engine - open source engine for making games.
-    Copyright (C) 2020-2022 Andrey Gaivoronskiy
+   Conservative Creator's Engine - open source engine for making games.
+   Copyright © 2020-2023 Andrey Gaivoronskiy
 
-    This library is free software; you can redistribute it and/or
-    modify it under the terms of the GNU Lesser General Public
-    License as published by the Free Software Foundation; either
-    version 2.1 of the License, or any later version.
+   This file is part of Conservative Creator's Engine.
 
-    This library is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
-    Lesser General Public License for more details.
+   Conservative Creator's Engine is free software: you can redistribute it and/or modify it under 
+   the terms of the GNU Lesser General Public License as published by the Free Software Foundation,
+   either version 2.1 of the License, or (at your option) any later version.
 
-    You should have received a copy of the GNU Lesser General Public
-    License along with this library; if not, write to the Free Software
-    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301
-    USA
+   Conservative Creator's Engine is distributed in the hope that it will be useful, but WITHOUT
+   ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR 
+   PURPOSE. See the GNU Lesser General Public License for more details.
+
+   You should have received a copy of the GNU Lesser General Public License along
+   with Conservative Creator's Engine. If not, see <https://www.gnu.org/licenses/old-licenses/lgpl-2.1.html>.
 */
 
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stddef.h>
@@ -31,140 +30,291 @@
 #include "../../include/cce/utils.h"
 #include "../../include/cce/endianess.h"
 #include "../../include/cce/plugins/actions.h"
+#include "../../include/cce/plugins/actions_internal.h"
 
-#define CCE_TIMER_START 0x1
-#define CCE_TIMER_STOP  0x2
-#define CCE_TIMER_START_STOP 0x3
-#define CCE_TIMER_AUTO_RESTART_ON_ALARM 0x4
+CCE_ARRAY_STRUCT(cce_uidsResizable,    uint32_t, uint32_t);
+CCE_ARRAY_STRUCT(cce_actionsResizable, struct cceaAction, uint32_t);
 
-#define CCE_PROCESS_TIMERS              0x040
-
-struct DelayedAction
+struct ccea_actioninfo
 {
-   uint64_t initTime;
+   struct list                      delayedActions;
+   uint32_t                         currentMapTime;
+   uint16_t                         eventsQuantity;
+   
+   // Slow linear-time performance for insertion and deletion. 
+   // The only way to improve it (I found) is to use binary trees (not yet implemented). At least it is cache-friendly...
+   struct cce_uidsResizable    *actionSubsUIDs;
+   struct cce_actionsResizable *onEventActions;
+};
+
+struct ccea_runActionsDelayed
+{
+   uint32_t actionID;
+   uint32_t totalSize;
+   uint32_t timeout;
+};
+
+struct ccea_runActionsPeriodic
+{
+   uint32_t actionID;
+   uint32_t totalSize;
+   uint32_t timeout;
    uint32_t delay;
-   uint16_t repeatsLeft;
-   uint8_t  flags;
 };
 
-CCE_ARRAY(actions, static cce_actionfun, static uint32_t);
-static void (**endianSwapActions)(void*);
-static struct DelayedAction *nextDelayedActionWithoutExternalTimer;
-static struct DelayedAction *lastDelayedActionWithExternalTimer;
-static struct DelayedAction *firstDelayedActionWithVerySmallDelay;
-static struct DelayedAction *lastDelayedActionWithVerySmallDelay;
-static struct list delayedActions;
-static uint32_t delayedActionsWithExternalTimerQuantity;
-static uint32_t delayedActionsWithVerySmallDelayQuantity;
-static struct cce_timer *nextTimer;
-CCE_ARRAY(timers, static struct cce_timer, static uint16_t);
-uint64_t currentTime;
-uint8_t g_flags;
-
-#define EXEC_ACTION(action, count)(*((actions) + *(uint32_t*)(action)))(action, count)
-
-struct Action
+struct ccea_runActionsDelayedRepeated
 {
-   uint32_t ID;
+   uint32_t actionID;
+   uint32_t totalSize;
+   uint32_t timeout;
+   uint32_t delay;
+   uint32_t repeatsLeft;
 };
 
-static void runActionsAction (const void *data, uint16_t count)
+
+#define CCE_ACTIONS_SWAPPING_FROM_HOST_ENDIAN 0x1
+#define CCE_ACTIONS_INITIALIZING 0x2
+
+CCE_ARRAY(g_actions, static ccea_actionfun, static uint32_t);
+static void   (**g_endianSwapActions)(void*) = NULL;
+static uint32_t *g_actionSizes = NULL;
+
+// Becomes hash table after initialization to speed up searches (designed to do A LOT of them).
+// It would be better to avoid this, but then saving it all in a file would need a lot of mess to be created. #KISS
+static uint32_t *g_actionUIDs = NULL;
+
+CCE_ARRAY(g_eventUIDs, static uint32_t, static uint16_t);
+
+CCE_API uint32_t cceaBasicActionUIDs[16];
+
+CCE_API uint32_t cceaBasicEventsUIDs[3];
+
+CCE_API uint32_t cceaPluginUID = 0;
+
+static uint32_t **g_eventUIDsSorted = NULL;
+static uint8_t g_flags;
+
+static void runActions (void *data, uint32_t count, struct cce_buffer *state)
 {
-   const struct cceRunActions *params = data;
-   const cce_void *actionsToCall = (const cce_void*) data + sizeof(struct cceRunActions) + (((params->actionQuantity - 1) | 1) - 1) * sizeof(uint16_t);
-   for (const uint16_t *sizes = params->actionSizes, *end = params->actionSizes + params->actionQuantity; sizes < end; actionsToCall += *sizes++)
+   struct cceaRunActions *params = data;
+   ccea__runActions((struct cceaAction*)(params + 1), params->totalSize - sizeof(struct cceaRunActions), count, state);
+}
+
+static void runActionsOnce (void *data, uint32_t count, struct cce_buffer *state)
+{
+   CCE_UNUSED(count);
+   struct cceaRunActions *params = data;
+   ccea__runActions((struct cceaAction*)(params + 1), params->totalSize - sizeof(struct cceaRunActions), 1, state);
+}
+
+static void runActionsNTimes (void *data, uint32_t count, struct cce_buffer *state)
+{
+   struct cceaRunActionsNTimes *params = data;
+   ccea__runActions((struct cceaAction*)(params + 1), params->totalSize - sizeof(struct cceaRunActionsNTimes), count * params->n, state);
+}
+
+static void runDelayedActions (void *data, uint32_t count, struct cce_buffer *state)
+{
+   struct ccea_runActionsDelayed *params = data;
+   ccea__runActions((struct cceaAction*)(params + 1), params->totalSize - sizeof(struct ccea_runActionsDelayed), count, state);
+}
+
+static void runPeriodicActions (void *data, uint32_t count, struct cce_buffer *state)
+{
+   struct ccea_runActionsPeriodic *params = data;
+   uint32_t currentTime = ((struct ccea_actioninfo*)CCE_GET_FUNCTION_BUFFER(state, cceaPluginUID))->currentMapTime;
+   count *= (currentTime - params->timeout) / params->delay + 1;
+   params->timeout = currentTime - (currentTime - params->timeout) % params->delay + params->delay;
+   ccea__runActions((struct cceaAction*)(params + 1), params->totalSize - sizeof(struct ccea_runActionsPeriodic), count, state);
+}
+
+static void runRepeatedlyDelayedActions (void *data, uint32_t count, struct cce_buffer *state)
+{
+   struct ccea_runActionsDelayedRepeated *params = data;
+   uint32_t currentTime = ((struct ccea_actioninfo*)CCE_GET_FUNCTION_BUFFER(state, cceaPluginUID))->currentMapTime;
+   count *= CCE_MIN((currentTime - params->timeout) / params->delay + 1, params->repeatsLeft);
+   if (count < params->repeatsLeft)
+      params->timeout = currentTime - (currentTime - params->timeout) % params->delay + params->delay;
+   ccea__runActions((struct cceaAction*)(params + 1), params->totalSize - sizeof(struct ccea_runActionsDelayedRepeated), count, state);
+   params->repeatsLeft -= count;
+}
+
+static void delayActions (void *data, uint32_t count, struct cce_buffer *state)
+{
+   CCE_UNUSED(count);
+   struct cceaDelayActions *params = data;
+   uint32_t currentTime = ((struct ccea_actioninfo*)CCE_GET_FUNCTION_BUFFER(state, cceaPluginUID))->currentMapTime;
+   ccea__delayDynamicAction(cceaBasicActionUIDs[CCEA_RUN_DELAYED_ACTIONS], params->delay + currentTime, params + 1, params->totalSize - sizeof(struct cceaDelayActions), state);
+}
+
+static void delayActionsPeriodic (void *data, uint32_t count, struct cce_buffer *state)
+{
+   CCE_UNUSED(count);
+   struct cceaDelayActionsPeriodic *params = data;
+   uint32_t currentTime = ((struct ccea_actioninfo*)CCE_GET_FUNCTION_BUFFER(state, cceaPluginUID))->currentMapTime;
+   ccea__delayDynamicAction(cceaBasicActionUIDs[CCEA_RUN_PERIODIC_ACTIONS], params->delay + currentTime, (cce_void*)params + 2 * sizeof(uint32_t), params->totalSize - 2 * sizeof(uint32_t), state);
+}
+
+static void delayActionsRepeated (void *data, uint32_t count, struct cce_buffer *state)
+{
+   CCE_UNUSED(count);
+   struct cceaDelayActionsRepeated *params = data;
+   uint32_t currentTime = ((struct ccea_actioninfo*)CCE_GET_FUNCTION_BUFFER(state, cceaPluginUID))->currentMapTime;
+   ccea__delayDynamicAction(cceaBasicActionUIDs[CCEA_RUN_REPEATED_ACTIONS], params->delay + currentTime, (cce_void*)params + 2 * sizeof(uint32_t), params->totalSize - 2 * sizeof(uint32_t), state);
+}
+
+static void terminateEngine (void *data, uint32_t count, struct cce_buffer *state)
+{
+   CCE_UNUSED(data);
+   CCE_UNUSED(count);
+   CCE_UNUSED(state);
+   cceSetEngineShouldTerminate(1);
+}
+
+#define UID_TO_ID(_uid, _id) \
+do \
+{ \
+   _id = cceUIDToHash(_uid, g_actionsAllocated); \
+   while (g_actionUIDs[_id] != _uid) \
+   { \
+      _id += 1; \
+      if (_id >= g_actionsAllocated) \
+         _id = 0; \
+   } \
+} \
+while (0)
+
+static void addActionsOnEvent (void *data, uint32_t count, struct cce_buffer *state)
+{
+   struct cceaAddActionsOnEvent *params = data;
+   
+   if (count > 1)
    {
-      EXEC_ACTION(actionsToCall, count);
+      struct cceaRunActionsNTimes wrapper;
+      wrapper.UID = cceaBasicActionUIDs[CCEA_RUN_ACTIONS_N_TIMES];
+      wrapper.totalSize = sizeof(struct cceaRunActionsNTimes);
+      wrapper.n = count;
+      ccea__addActionsOnEvent(params->eventUID, params->actionSubsUID, params->totalSize - sizeof(struct cceaAddActionsOnEvent),
+                              (struct cceaAction*)(params + 1), (struct cceaActionRunner*)&wrapper, state);
+      return;
+   }
+   struct cceaDynamicAction *action = (struct cceaDynamicAction*)(params + 1);
+   uint32_t actionID;
+   UID_TO_ID(action->UID, actionID);
+   uint32_t size = (g_actionSizes[actionID] == 0) ? action->size : g_actionSizes[actionID];
+   if (params->totalSize == size + sizeof(struct cceaAddActionsOnEvent))
+   {
+      ccea__addActionsOnEvent(params->eventUID, params->actionSubsUID, params->totalSize - sizeof(struct cceaAddActionsOnEvent),
+                              (struct cceaAction*)(params + 1), NULL, state);
+      return;
+   }
+   struct cceaRunActions wrapper;
+   wrapper.UID = cceaBasicActionUIDs[CCEA_RUN_ACTIONS];
+   wrapper.totalSize = sizeof(struct cceaRunActions);
+   ccea__addActionsOnEvent(params->eventUID, params->actionSubsUID, params->totalSize - sizeof(struct cceaAddActionsOnEvent),
+                           (struct cceaAction*)(params + 1), (struct cceaActionRunner*)&wrapper, state);
+}
+
+static void removeActionsOnEvent (void *data, uint32_t count, struct cce_buffer *state)
+{
+   CCE_UNUSED(count);
+   struct cceaRemoveActionOnEvent *params = data;
+   cceaRemoveActionOnEvent(params->eventUID, params->actionSubsUID, state);
+}
+
+static void invokeEvent (void *data, uint32_t count, struct cce_buffer *state)
+{
+   struct cceaInvokeEvent *params = data;
+   cceaInvokeEvent(params->eventUID, count, state);
+}
+
+static void appendListOfRunDelayedAction (void *data, uint32_t count, struct cce_buffer *state)
+{
+   CCE_UNUSED(count);
+   struct cceaAppendListOfRunDelayedActions *params = data;
+   struct ccea_actioninfo *actionInfo = (struct ccea_actioninfo*)CCE_GET_FUNCTION_BUFFER(state, cceaPluginUID);
+   uint32_t size = 0;
+   for (cce_void *it = (cce_void*)(params + 1), *end = (cce_void*)(params + 1) + params->totalSize - sizeof(struct cceaAppendListOfRunDelayedActions); it < end; it += size)
+   {
+      struct cceaDelayedDynamicAction *action = (struct cceaDelayedDynamicAction*)it;
+      uint32_t ID;
+      UID_TO_ID(action->UID, ID);
+      size = (g_actionSizes[ID] == 0) ? action->size : g_actionSizes[ID];
+      #ifndef NDEBUG
+      if (size == 0)
+         fprintf(stderr, "ENGINE::ACTIONS_PLUGIN::INFINITE_LOOP: action (uid: %u) has 0 size. Something went very wrong...", action->UID), abort();
+      #endif
+      void *node = llnodealloc(size, LL_SINGLELINKED);
+      memcpy(node, action, size);
+      llappendchain(&actionInfo->delayedActions, node);
    }
 }
 
-static void setTimerStateAction (const void *data, uint16_t count)
-{
-   const struct cceSetTimerStateAction *params = data;
-   uint8_t mask = -(count & 1);
-   mask &= ((((params->state & CCE_CHANGETIMERSTATE_SWITCH) + 1) & (CCE_CHANGETIMERSTATE_SWITCH + 1)) - 1) | (params->state & CCE_CHANGETIMERSTATE_SWITCH_AUTO_RESTART_ON_ALARM);
-   // If switch happens twice, it cancels out
-   cceSetTimerState(params->ID, params->state & ~mask);
-}
-
-static void setTimerDelayAction (const void *data, uint16_t count)
-{
-   const struct cceSetTimerDelayAction *params = data;
-   cceSetTimerDelay(params->ID, params->delay * ((count & -(params->action == CCE_ACTION_SHIFT)) + params->action != CCE_ACTION_SHIFT), params->action);
-}
-
-static void delayActionAction (const void *data, uint16_t count)
-{
-   const struct cceDelayAction *params = data;
-   if (count == 1)
-      cceDelayAction(params->timerInfo.delay, params->repeatsQuantity, params->delayedActionStructSize, ((void*) (params + 1)), params->flags);
-   else
-      cceDelayAction(params->timerInfo.delay / count, params->repeatsQuantity, params->delayedActionStructSize, ((void*) (params + 1)), params->flags); // Integer division is painfully slow
-}
-
-static void setEngineShouldTerminateAction (const void *data, uint16_t count)
-{
-   const struct cceSetEngineShouldTerminate *params = data;
-   cceSetEngineShouldTerminate(((cceEngineShouldTerminate() != !(count & 1)) & (params->action == CCE_ACTION_SHIFT)) != params->state);
-}
+#define RUNACTIONS_SWAP_ENDIAN(data, params, paramsSize) \
+if (g_flags & CCE_ACTIONS_SWAPPING_FROM_HOST_ENDIAN) \
+{ \
+   ccea__fromHostEndianActionsArray((struct cceaAction*)((cce_void*)(params) + (paramsSize)), (params)->totalSize - (paramsSize)); \
+   g_flags |= CCE_ACTIONS_SWAPPING_FROM_HOST_ENDIAN; \
+} \
+else \
+   ccea__toHostEndianActionsArray((struct cceaAction*)((cce_void*)(params) + (paramsSize)), (params)->totalSize - (paramsSize))
 
 static void runActionsActionSwapEndian (void *data)
 {
-   struct cceRunActions *params = data;
-   params->actionQuantity = cceSwapEndianInt16(params->actionQuantity);
-   cceSwapEndianArrayIntN(params->actionSizes, params->actionQuantity - 2, sizeof(uint16_t));
-   cce_void *actionsToCall = (cce_void*) data + sizeof(struct cceRunActions) + (((params->actionQuantity - 1) | 1) - 1) * sizeof(uint16_t);
-   for (const uint16_t *sizes = params->actionSizes, *end = params->actionSizes + params->actionQuantity - 1; sizes < end; actionsToCall += *sizes++)
-   {
-      *(uint32_t*) actionsToCall = cceSwapEndianInt32(*(uint32_t*) actionsToCall);
-      (*(endianSwapActions + *(uint32_t*) actionsToCall))(actionsToCall);
-   }
-   *(uint32_t*) actionsToCall = cceSwapEndianInt32(*(uint32_t*) actionsToCall);
-   (*(endianSwapActions + *(uint32_t*) actionsToCall))(actionsToCall);
+   struct cceaRunActions *params = data;
+   RUNACTIONS_SWAP_ENDIAN(data, params, sizeof(params));
 }
 
-static void setTimerStateActionSwapEndian (void *data)
+static void runActionsSwapEndianInt1 (void *data)
 {
-   struct cceSetTimerStateAction *params = data;
-   params->ID = cceSwapEndianInt16(params->ID);
+   uint32_t *params = data;
+   params[2] = cceSwapEndianInt32(params[2]);
+   RUNACTIONS_SWAP_ENDIAN(data, (struct cceaRunActions*)params, 3 * sizeof(uint32_t));
 }
 
-static void setTimerDelayActionSwapEndian (void *data)
+static void runActionsSwapEndianInt2 (void *data)
 {
-   struct cceSetTimerDelayAction *params = data;
-   params->ID    = cceSwapEndianInt16(params->ID);
-   params->delay = cceSwapEndianInt32(params->delay);
+   uint32_t *params = data;
+   params[2] = cceSwapEndianInt32(params[2]);
+   params[3] = cceSwapEndianInt32(params[3]);
+   RUNACTIONS_SWAP_ENDIAN(data, (struct cceaRunActions*)params, 4 * sizeof(uint32_t));
 }
 
-static void delayActionActionSwapEndian (void *data)
+static void runActionsSwapEndianInt3 (void *data)
 {
-   struct cceDelayAction *params = data;
-   params->delayedActionStructSize = cceSwapEndianInt32(params->delayedActionStructSize);
-   params->timerInfo.delay = cceSwapEndianInt32(params->timerInfo.delay);
-   params->repeatsQuantity = cceSwapEndianInt32(params->repeatsQuantity);
-   (*(endianSwapActions + params->actionID))((void*) (params + 1));
+   uint32_t *params = data;
+   params[2] = cceSwapEndianInt32(params[2]);
+   params[3] = cceSwapEndianInt32(params[3]);
+   params[4] = cceSwapEndianInt32(params[4]);
+   RUNACTIONS_SWAP_ENDIAN(data, (struct cceaRunActions*)params, 5 * sizeof(uint32_t));
 }
 
-void cce__swapActionsEndian (uint16_t *actionSizes, void *actionsToSwap, uint16_t actionsToSwapQuantity)
+static void swapEndianInt1 (void *data)
+{
+   uint32_t *params = data;
+   cceSwapEndianArrayInt32(params + 1, 1);
+}
+
+static void swapEndianInt2 (void *data)
+{
+   uint32_t *params = data;
+   cceSwapEndianArrayInt32(params + 1, 2);
+}
+
+static void noSwapEndian (void *data)
+{
+   CCE_UNUSED(data);
+}
+
+void ccea__swapActionsEndian (uint16_t *actionSizes, void *actionsToSwap, uint16_t actionsToSwapQuantity)
 {
    uint16_t *iterator = actionSizes, *end = actionSizes + actionsToSwapQuantity;
    cce_void *jiterator = actionsToSwap;
    while (iterator < end)
    {
       *(uint32_t*)jiterator = cceSwapEndianInt32(*(uint32_t*)jiterator);
-      if (*(endianSwapActions + *(uint32_t*)jiterator) != NULL)
-         (*(endianSwapActions + *(uint32_t*)jiterator))(jiterator);
-      jiterator += *iterator;
-   }
-}
-
-void cce__runActions (uint16_t *actionSizes, void *actionsToCall, uint16_t actionsToCallQuantity)
-{
-   uint16_t *iterator = actionSizes, *end = actionSizes + actionsToCallQuantity;
-   cce_void *jiterator = actionsToCall;
-   while (iterator < end)
-   {
-      EXEC_ACTION(jiterator, 1);
+      if (*(g_endianSwapActions + *(uint32_t*)jiterator) != NULL)
+         (*(g_endianSwapActions + *(uint32_t*)jiterator))(jiterator);
       jiterator += *iterator;
    }
 }
@@ -179,8 +329,8 @@ for (uint16_t *iterator = sizes; iterator < end; ++iterator) \
 for (cce_void *iterator = (cce_void*) action; sizes < end; iterator += *sizes++) \
 { \
    memcpy(tmpActionStore, iterator, *sizes); \
-   if (*(endianSwapActions + ((struct Action*)tmpActionStore)->ID) != NULL) \
-      (*(endianSwapActions + ((struct Action*)tmpActionStore)->ID))(tmpActionStore); \
+   if (*(g_endianSwapActions + ((struct Action*)tmpActionStore)->ID) != NULL) \
+      (*(g_endianSwapActions + ((struct Action*)tmpActionStore)->ID))(tmpActionStore); \
    fwrite(tmpActionStore, *sizes, 1, file); \
    bytesWritten += *sizes; \
 }
@@ -194,474 +344,530 @@ for (cce_void *iterator = (cce_void*) action; sizes < end; iterator += *sizes++)
    bytesWritten += *sizes; \
 }
 
-void cce__actionsTerminate (void)
+#define EXEC_ACTION_GET_ID(action, count, state, _id) \
+UID_TO_ID(((struct cceaAction*)action)->UID, _id); \
+(g_actions[_id])(action, count, state)
+
+#define EXEC_ACTION(action, count, state) \
+do \
+{ \
+   uint32_t _id; \
+   EXEC_ACTION_GET_ID(action, count, state, _id); \
+} \
+while (0)
+
+CCE_API void ccea__runActions (struct cceaAction *actions, uint32_t totalActionsSize, uint32_t count, struct cce_buffer *state)
 {
-   llrmlist(&delayedActions);
-   free(actions);
-   free(endianSwapActions);
-   free(timers);
+   cce_void *action;
+   uint32_t actionID;
+   for (uint32_t size = 0; size < totalActionsSize; size += (g_actionSizes[actionID] == 0) ? ((struct cceaDynamicAction*)actions)->size : g_actionSizes[actionID])
+   {
+      action = ((cce_void*)actions) + size;
+      EXEC_ACTION_GET_ID(action, count, state, actionID);
+   }
+}
+
+CCE_API void cceaRunAction (struct cceaAction *action, uint32_t count, struct cce_buffer *state)
+{
+   EXEC_ACTION(action, count, state);
+}
+
+CCE_API uint8_t ccea__doActionsSwapFromHostEndian (void)
+{
+   return (g_flags & CCE_ACTIONS_SWAPPING_FROM_HOST_ENDIAN) != 0;
+}
+
+CCE_API void ccea__fromHostEndianActionsArray (struct cceaAction *actions, uint32_t totalActionsSize)
+{
+   g_flags |= CCE_ACTIONS_SWAPPING_FROM_HOST_ENDIAN;
+   uint32_t size = 0;
+   while (size < totalActionsSize)
+   {
+      uint32_t ID;
+      UID_TO_ID(actions->UID, ID);
+      (*((g_endianSwapActions) + ID))(actions);
+      size += g_actionSizes[ID];
+      if (g_actionSizes[ID] == 0)
+      {
+         size += ((struct cceaDynamicAction*)actions)->size;
+         ((struct cceaDynamicAction*)actions)->size = cceSwapEndianInt32(((struct cceaDynamicAction*)actions)->size);
+      }
+      actions->UID = cceSwapEndianInt32(actions->UID);
+      actions += size;
+   }
+   g_flags &= ~CCE_ACTIONS_SWAPPING_FROM_HOST_ENDIAN;
+}
+
+CCE_API void ccea__toHostEndianActionsArray (struct cceaAction *actions, uint32_t totalActionsSize)
+{
+   uint32_t size = 0;
+   while (size < totalActionsSize)
+   {
+      actions->UID = cceSwapEndianInt32(actions->UID);
+      uint32_t ID;
+      UID_TO_ID(actions->UID, ID);
+      (*((g_endianSwapActions) + ID))(actions);
+      size += g_actionSizes[ID];
+      if (g_actionSizes[ID] == 0)
+      {
+         ((struct cceaDynamicAction*)actions)->size = cceSwapEndianInt32(((struct cceaDynamicAction*)actions)->size);
+         size += ((struct cceaDynamicAction*)actions)->size;
+      }
+      actions += size;
+   }
+}
+
+#define ADD_TO_HASH_TABLE(_uid, _hash) \
+_hash = cceUIDToHash(_uid, g_actionsAllocated); \
+while (g_actionUIDs[_hash] != 0) \
+{ \
+   _hash += 1; \
+   if (_hash >= g_actionsAllocated) \
+      _hash = 0; \
+} \
+g_actionUIDs[_hash] = _uid
+
+static void resizeHashTable (uint32_t newSize)
+{
+   g_actionsAllocated = newSize;
+   uint32_t *oldTable = g_actionUIDs;
+   ccea_actionfun *oldActions = g_actions;
+   uint32_t *oldSizes = g_actionSizes;
+   void (**oldActionsSwapEndian)(void*) = g_endianSwapActions;
+   g_actionUIDs        = calloc(newSize, sizeof(uint32_t));
+   g_actions           = calloc(newSize, sizeof(ccea_actionfun));
+   g_endianSwapActions = calloc(newSize, sizeof(void (*)(void*)));
+   g_actionSizes       = calloc(newSize, sizeof(uint32_t));
+   
+   uint32_t hash;
+   for (uint32_t i = 0, j = 0; j < g_actionsQuantity; ++i)
+   {
+      if (oldTable[i] == 0)
+         continue;
+      ADD_TO_HASH_TABLE(oldTable[i], hash);
+      g_actions[hash] = oldActions[i];
+      g_endianSwapActions[hash] = oldActionsSwapEndian[i];
+      g_actionSizes[hash] = oldSizes[i];
+      ++j;
+   }
+   free(oldTable);
+   free(oldActions);
+   free(oldActionsSwapEndian);
+   free(oldSizes);
+}
+
+CCE_API void cceaRegisterAction (uint32_t actionUID, ccea_actionfun action, void (*endianSwap)(void*), uint32_t actionSize)
+{
+   // Let's not build hash table until we know (at least approximately) how big it should be
+   if (g_flags & CCE_ACTIONS_INITIALIZING)
+   {
+      if (g_actionsQuantity >= g_actionsAllocated) do
+      {
+         CCE__REALLOC_ARRAY(g_actions, g_actionsQuantity + 1u);
+         g_endianSwapActions = realloc(g_endianSwapActions, g_actionsAllocated * sizeof(void (*)(void*)));
+         g_actionSizes       = realloc(g_actionSizes,       g_actionsAllocated * sizeof(uint32_t));
+         if (g_flags & CCE_ACTIONS_INITIALIZING)
+            g_actionUIDs     = realloc(g_actionUIDs,        g_actionsAllocated * sizeof(uint32_t));
+         memset(g_actions           + oldAllocated, 0, (g_actionsAllocated - oldAllocated) * sizeof(ccea_actionfun));
+         memset(g_endianSwapActions + oldAllocated, 0, (g_actionsAllocated - oldAllocated) * sizeof(void (*)(void*)));
+         memset(g_actionSizes       + oldAllocated, 0, (g_actionsAllocated - oldAllocated) * sizeof(uint32_t));
+      }
+      while (0);
+      g_actionUIDs[g_actionsQuantity] = actionUID;
+      g_actions[g_actionsQuantity] = action;
+      g_endianSwapActions[g_actionsQuantity] = (endianSwap == NULL) ? noSwapEndian : endianSwap;
+      g_actionSizes[g_actionsQuantity] = actionSize;
+      ++g_actionsQuantity;
+      return;
+   }
+   // g_actionUIDsAllocated * 0.625. Maximum effective load factor for this type of hash table is 0.7
+   if (g_actionsQuantity > (g_actionsAllocated >> 1 | g_actionsAllocated >> 3))
+      resizeHashTable(g_actionsAllocated << 1);
+   uint32_t hash;
+   ADD_TO_HASH_TABLE(actionUID, hash);
+   g_actions[hash] = action;
+   g_endianSwapActions[hash] = (endianSwap == NULL) ? noSwapEndian : endianSwap;
+   g_actionSizes[hash] = actionSize;
+   ++g_actionsQuantity;
+}
+
+// Expects POINTERS to actions, not actions themselves
+CCE_API void* cceaRunActionsCreateDynamic (uint32_t runActionsUID, uint32_t runActionsStructSize, uint32_t actionsQuantity, ...)
+{
+   va_list args, argcp;
+   va_start(args, actionsQuantity);
+   va_copy(argcp, args);
+   size_t totalSize = runActionsStructSize;
+   uint32_t *actionsSize = malloc(actionsQuantity * sizeof(uint32_t));
+   for (uint32_t i = 0; i < actionsQuantity; ++i)
+   {
+      struct cceaDynamicAction *action = va_arg(argcp, void*);
+      uint32_t id;
+      UID_TO_ID(action->UID, id);
+      actionsSize[i] = (g_actionSizes[id] == 0) ? action->size : g_actionSizes[id];
+      totalSize += actionsSize[i];
+   }
+   va_end(argcp);
+   cce_void *runActions = malloc(totalSize);
+   *(uint32_t*)runActions = runActionsUID;
+   *(uint32_t*)(runActions + sizeof(uint32_t)) = totalSize;
+   cce_void *pos = runActions + runActionsStructSize;
+   for (uint32_t i = 0; i < actionsQuantity; pos += actionsSize[i++])
+   {
+      struct cceaDynamicAction *action = va_arg(args, void*);
+      memcpy(pos, action, actionsSize[i]);
+   }
+   va_end(args);
+   return runActions;
+}
+
+CCE_API void cceaRegisterEvent (uint32_t eventUID)
+{
+   if (g_eventUIDsQuantity >= g_eventUIDsAllocated)
+   {
+      CCE_CEIL_TO_POWER_OF_TWO(g_eventUIDsQuantity + 1, g_eventUIDsAllocated);
+      CCE_REALLOC_UID_ARRAY(g_eventUIDs, g_eventUIDsSorted, g_eventUIDsQuantity, g_eventUIDsAllocated);
+   }
+   CCE_INSERT_INTO_UID_ARRAY(eventUID, g_eventUIDs, g_eventUIDsSorted, g_eventUIDsQuantity);
+   ++g_eventUIDsQuantity;
+}
+
+CCE_API void cceaInvokeEvent (uint32_t eventUID, uint32_t count, struct cce_buffer *map)
+{
+   struct ccea_actioninfo *actionInfo = (struct ccea_actioninfo*)CCE_GET_FUNCTION_BUFFER(map, cceaPluginUID);
+   uint32_t eventID;
+   CCE_FIND_FROM_UID_ARRAY(eventUID, g_eventUIDs, g_eventUIDsSorted, g_eventUIDsQuantity, eventID, 
+                           fprintf(stderr, "ENGINE::ACTIONS_PLUGIN::EVENT_NOT_FOUND:\nCan't find event %s (uid: %u)\n", cceUIDToName(eventUID), eventUID); return);
+   ccea__runActions(actionInfo->onEventActions[eventID].data, actionInfo->onEventActions[eventID].dataQuantity, count, map);
+}
+
+CCE_API void ccea__addActionsOnEvent (uint32_t eventUID, uint32_t actionSubsUID, uint32_t totalActionsSize, struct cceaAction *actions, struct cceaActionRunner *wrapper, struct cce_buffer *map)
+{
+   struct ccea_actioninfo *actionInfo = (struct ccea_actioninfo*)CCE_GET_FUNCTION_BUFFER(map, cceaPluginUID);
+   uint32_t eventID;
+   CCE_FIND_FROM_UID_ARRAY(eventUID, g_eventUIDs, g_eventUIDsSorted, g_eventUIDsQuantity, eventID, 
+                           fprintf(stderr, "ENGINE::ACTIONS_PLUGIN::EVENT_NOT_FOUND:\nCan't find event %s (uid: %u)\n", cceUIDToName(eventUID), eventUID); return);
+   if (actionInfo->actionSubsUIDs[eventID].dataQuantity >= actionInfo->actionSubsUIDs[eventID].dataAllocated)
+      CCE_REALLOC_ARRAY(actionInfo->actionSubsUIDs[eventID].data, actionInfo->actionSubsUIDs[eventID].dataQuantity + 1);
+   struct cce_actionsResizable *actionsOnEvent = &actionInfo->onEventActions[eventID];
+   uint32_t size = totalActionsSize + (wrapper == NULL ? 0 : wrapper->totalSize);
+   if (actionsOnEvent->dataQuantity + size / sizeof(struct cceaAction)  > actionsOnEvent->dataAllocated)
+      CCE_REALLOC_ARRAY(actionsOnEvent->data, actionsOnEvent->dataQuantity + size / sizeof(struct cceaAction));
+   actionInfo->actionSubsUIDs[eventID].data[actionInfo->actionSubsUIDs[eventID].dataQuantity++] = actionSubsUID;
+   cce_void *it = ((cce_void*)actionsOnEvent->data) + actionsOnEvent->dataQuantity;
+   if (wrapper != NULL)
+   {
+      memcpy(it, wrapper, wrapper->totalSize);
+      ((struct cceaActionRunner*)it)->totalSize += totalActionsSize;
+      it += wrapper->totalSize;
+   }
+   memcpy(it, actions, totalActionsSize);
+   actionsOnEvent->dataQuantity += size;
+}
+
+CCE_API void cceaAddActionOnEvent (uint32_t eventUID, uint32_t actionSubsUID, struct cceaAction *action, struct cce_buffer *map)
+{
+   uint32_t actionID;
+   UID_TO_ID(action->UID, actionID);
+   uint32_t size = (g_actionSizes[actionID] == 0) ? ((struct cceaDynamicAction*)action)->size : g_actionSizes[actionID];
+   ccea__addActionsOnEvent(eventUID, actionSubsUID, size, action, NULL, map);
+}
+
+CCE_API void cceaRemoveActionOnEvent (uint32_t eventUID, uint32_t actionSubsUID, struct cce_buffer *map)
+{
+   struct ccea_actioninfo *actionInfo = (struct ccea_actioninfo*)CCE_GET_FUNCTION_BUFFER(map, cceaPluginUID);
+   uint32_t eventID;
+   CCE_FIND_FROM_UID_ARRAY(eventUID, g_eventUIDs, g_eventUIDsSorted, g_eventUIDsQuantity, eventID, 
+                           fprintf(stderr, "ENGINE::ACTIONS_PLUGIN::EVENT_NOT_FOUND:\nCan't find event %s (uid: %u)\n", cceUIDToName(eventUID), eventUID); return);
+   if (actionInfo->actionSubsUIDs[eventID].dataQuantity == 0)
+      return;
+   // Linear search. The next search is linear anyway, but even if it would not, we still need to resize array which is again linear. The only real exit is making binary tree
+   uint32_t actionSubsID = 0;
+   while (actionInfo->actionSubsUIDs[eventID].data[actionSubsID] != actionSubsUID)
+   {
+      ++actionSubsID;
+      if (actionSubsID >= actionInfo->actionSubsUIDs[eventID].dataQuantity)
+         return;
+   }
+   memmove(actionInfo->actionSubsUIDs[eventID].data + actionSubsID, actionInfo->actionSubsUIDs[eventID].data + actionSubsID + 1, --actionInfo->actionSubsUIDs[eventID].dataQuantity - actionSubsID);
+   uint32_t offset = 0;
+   struct cce_actionsResizable *actions = &actionInfo->onEventActions[eventID];
+   for (uint32_t i = 0; i < actionSubsID; ++i)
+   {
+      struct cceaDynamicAction *action = (struct cceaDynamicAction*)(((cce_void*)actions->data) + offset);
+      uint32_t actionID;
+      UID_TO_ID(action->UID, actionID);
+      offset += g_actionSizes[actionID] == 0 ? action->size : g_actionSizes[actionID];
+   }
+   struct cceaDynamicAction *action = (struct cceaDynamicAction*)(((cce_void*)actions->data) + offset);
+   uint32_t actionID;
+   UID_TO_ID(action->UID, actionID);
+   uint32_t size = g_actionSizes[actionID] == 0 ? action->size : g_actionSizes[actionID];
+   memmove(((cce_void*)actions->data) + offset, ((cce_void*)actions->data) + offset + size, (actions->dataQuantity -= size) - offset);
+}
+
+CCE_API void ccea__delayDynamicAction (uint32_t UID, uint32_t timeout, void *data, uint32_t dataSize, struct cce_buffer *map)
+{
+   struct ccea_actioninfo *actionInfo = (struct ccea_actioninfo*)CCE_GET_FUNCTION_BUFFER(map, cceaPluginUID);
+   struct cceaDelayedDynamicAction *action = llnodealloc(sizeof(struct cceaDelayedDynamicAction) + dataSize, LL_SINGLELINKED);
+   action->UID = UID;
+   action->timeout = timeout;
+   action->size = sizeof(struct cceaDelayedDynamicAction) + dataSize;
+   memcpy(action + 1, data, dataSize);
+   llappendchain(&actionInfo->delayedActions, action);
+}
+
+CCE_API void cceaRunDelayedActions (struct cce_buffer *map)
+{
+   struct ccea_actioninfo *actionInfo = (struct ccea_actioninfo*)CCE_GET_FUNCTION_BUFFER(map, cceaPluginUID);
+   uint32_t currentTime = (actionInfo->currentMapTime += cceGetFrameDeltaTime());
+   struct list *delayedActions = &actionInfo->delayedActions;
+   // TODO: sort delayedActions according to remaining time
+   void *node = delayedActions->chain, *prevnode = NULL;
+   while (node != NULL)
+   {
+      struct cceaDelayedDynamicAction *action = node;
+      if (cceIsTimeout(currentTime, action->timeout))
+      {
+         EXEC_ACTION(action, 1, map);
+         if (cceIsTimeout(currentTime, action->timeout))
+         {
+            node = LL_NEXT(node);
+            llnodefree(llpullnodep(delayedActions, prevnode), LL_SINGLELINKED);
+            continue;
+         }
+      }
+      prevnode = node;
+      node = LL_NEXT(node);
+   }
+}
+
+int loadActions (void *buffer, uint16_t sectionSize, struct cce_buffer *info, FILE *file)
+{
+   struct ccea_actioninfo *map = buffer;
+   fread(&map->currentMapTime, sizeof(uint32_t), 1, file);
+   // 8K of stack memory! May not run well on some platforms with small stack sizes.
+   uint32_t uids[0xFF];
+   fread(uids, sizeof(uint32_t), sectionSize, file);
+   map->actionSubsUIDs = calloc(g_eventUIDsQuantity, sizeof(struct cce_uidsResizable));
+   for (uint32_t i = 0; i < sectionSize; ++i)
+   {
+      uint32_t size, eventID;
+      fread(&size, sizeof(uint32_t), 1, file);
+      CCE_FIND_FROM_UID_ARRAY(uids[i], g_eventUIDs, g_eventUIDsSorted, g_eventUIDsQuantity, eventID, 
+                              fprintf(stderr, "ENGINE::ACTIONS_PLUGIN::EVENT_NOT_FOUND:\nCan't find event %s (uid: %u)\n", cceUIDToName(uids[i]), uids[i]); return -1);
+      uids[i] = eventID;
+      map->actionSubsUIDs[eventID].dataAllocated = (map->actionSubsUIDs[eventID].dataQuantity = size);
+      if (size == 0)
+      {
+         map->actionSubsUIDs[eventID].data = NULL;
+         continue;
+      }
+      map->actionSubsUIDs[eventID].data = malloc(size * sizeof(uint32_t));
+      fread(map->actionSubsUIDs[eventID].data, sizeof(uint32_t), size, file);
+   }
+   map->onEventActions = calloc(g_eventUIDsQuantity, sizeof(struct cce_actionsResizable));
+   map->delayedActions = LL_LIST_INIT(LL_SINGLELINKED);
+   for (uint32_t i = 0; i < sectionSize; ++i)
+   {
+      uint32_t size;
+      uint32_t UID = 0;
+      fread(&size, sizeof(uint32_t), 1, file);
+      if (g_eventUIDs[i] == cceaBasicEventsUIDs[0] && (fread(&UID, sizeof(uint32_t), 1, file), UID) == cceaBasicActionUIDs[CCEA_APPEND_LIST_OF_RUNDELAYED_ACTIONS])
+      {
+         uint32_t delayedActionsSize;
+         fread(&delayedActionsSize, sizeof(uint32_t), 1, file);
+         struct cceaDynamicAction *actions = malloc(delayedActionsSize);
+         actions->UID = UID;
+         actions->size = delayedActionsSize;
+         fread(actions + 1, delayedActionsSize - sizeof(struct cceaAppendListOfRunDelayedActions), 1, file);
+         EXEC_ACTION(actions, 1, info);
+         size -= delayedActionsSize;
+         map->onEventActions[uids[i]].dataAllocated = map->onEventActions[uids[i]].dataQuantity = size;
+         if (size == 0 || size > delayedActionsSize)
+         {
+            free(actions);
+            if (size == 0)
+               continue;
+            map->onEventActions[uids[i]].data = malloc(size);
+         }
+         else
+         {
+            map->onEventActions[uids[i]].data = realloc(actions, size);
+         }
+         fread(map->onEventActions[uids[i]].data, size, 1, file);
+         continue;
+      }
+      if (size == 0)
+      {
+         map->onEventActions[uids[i]].dataAllocated = map->onEventActions[uids[i]].dataQuantity = size;
+         map->onEventActions[uids[i]].data = NULL;
+         continue;
+      }
+      if (UID != 0)
+      {
+         size -= sizeof(uint32_t);
+         fseek(file, -sizeof(uint32_t), SEEK_CUR);
+      }
+      map->onEventActions[uids[i]].dataAllocated = map->onEventActions[uids[i]].dataQuantity = size;
+      map->onEventActions[uids[i]].data = malloc(size);
+      fread(map->onEventActions[uids[i]].data, size, 1, file);
+   }
+   map->eventsQuantity = g_eventUIDsQuantity;
+   cceaInvokeEvent(cceaBasicEventsUIDs[0], 1, info);
+   return 0;
+}
+
+void createActions (void *buffer, struct cce_buffer *info)
+{
+   CCE_UNUSED(info);
+   struct ccea_actioninfo *map = buffer;
+   map->delayedActions = LL_LIST_INIT(LL_SINGLELINKED);
+   map->eventsQuantity = g_eventUIDsQuantity;
+   map->actionSubsUIDs = calloc(g_eventUIDsQuantity, sizeof(struct cce_uidsResizable));
+   map->onEventActions = calloc(g_eventUIDsQuantity, sizeof(struct cce_actionsResizable));
+   map->currentMapTime = 0;
+}
+
+void freeActions (void *buffer, struct cce_buffer *info)
+{
+   cceaInvokeEvent(g_eventUIDs[1], 1, info);
+   struct ccea_actioninfo *map = buffer;
+   llrmlist(&map->delayedActions);
+   for (uint16_t i = 0; i < map->eventsQuantity; ++i)
+   {
+      free(map->actionSubsUIDs[i].data);
+      free(map->onEventActions[i].data);
+   }
+   free(map->actionSubsUIDs);
+   free(map->onEventActions);
+}
+
+uint16_t storeActions (void *buffer, struct cce_buffer *info, FILE *file)
+{
+   struct ccea_actioninfo *map = buffer;
+   cceaInvokeEvent(cceaBasicEventsUIDs[2], 1, info);
+   fwrite(&map->currentMapTime, sizeof(uint32_t), 1, file);
+   uint16_t eventsQuantity = 0, i = 0;
+   for (struct cce_actionsResizable *it = map->onEventActions; i < map->eventsQuantity; ++it, ++i)
+   {
+      if (it->dataQuantity == 0 && !(g_eventUIDs[i] == cceaBasicEventsUIDs[CCEA_EVENT_LOAD] && map->delayedActions.size > 0))
+         continue;
+      ++eventsQuantity;
+      fwrite(&g_eventUIDs[i], sizeof(uint32_t), 1, file);
+   }
+   for (i = 0; i < map->eventsQuantity; ++i)
+   {
+      if (map->actionSubsUIDs[i].dataQuantity == 0 && !(g_eventUIDs[i] == cceaBasicEventsUIDs[CCEA_EVENT_LOAD] && map->delayedActions.size > 0))
+         continue;
+      fwrite(&map->actionSubsUIDs[i].dataQuantity, sizeof(uint32_t), 1, file);
+      fwrite(map->actionSubsUIDs[i].data, sizeof(uint32_t), map->actionSubsUIDs[i].dataQuantity, file);
+   }
+   for (i = 0; i < map->eventsQuantity; ++i)
+   {
+      if (g_eventUIDs[i] == cceaBasicEventsUIDs[CCEA_EVENT_LOAD] && map->delayedActions.size > 0)
+      {
+         uint32_t totalSize = sizeof(struct cceaAppendListOfRunDelayedActions);
+         fseek(file, sizeof(uint32_t) + sizeof(struct cceaAppendListOfRunDelayedActions), SEEK_CUR);
+         for (struct cceaDelayedDynamicAction *node = map->delayedActions.chain; node != NULL; node = LL_NEXT(node))
+         {
+            uint32_t ID;
+            UID_TO_ID(node->UID, ID);
+            uint32_t size = g_actionSizes[ID] == 0 ? node->size : g_actionSizes[ID];
+            fwrite(node, size, 1, file);
+            totalSize += size;
+         }
+         fseek(file, -(int32_t)sizeof(uint32_t) - ((int32_t)totalSize), SEEK_CUR);
+         {
+            uint32_t size = totalSize + map->onEventActions[i].dataQuantity;
+            fwrite(&size, sizeof(uint32_t), 1, file);
+         }
+         fwrite(&cceaBasicActionUIDs[CCEA_APPEND_LIST_OF_RUNDELAYED_ACTIONS], sizeof(uint32_t), 1, file);
+         fwrite(&totalSize, sizeof(uint32_t), 1, file);
+         fseek(file, totalSize - sizeof(struct cceaAppendListOfRunDelayedActions), SEEK_CUR);
+         if (map->onEventActions[i].dataQuantity == 0)
+            continue;
+      }
+      else
+      {
+         if (map->onEventActions[i].dataQuantity == 0)
+            continue;
+         fwrite(&map->onEventActions[i].dataQuantity, sizeof(uint32_t), 1, file);
+      }
+      fwrite(map->onEventActions[i].data, map->onEventActions[i].dataQuantity, 1, file);
+   }
+   return eventsQuantity;
 }
 
 static int initActions (void *data)
 {
-   currentTime = cceGetTime();
    CCE_UNUSED(data);
-   actionsQuantity = 1 * 2;
-   timersQuantity = 0;
-   CCE_ALLOC_ARRAY_ZEROED(timers, 1);
-   CCE_ALLOC_ARRAY_ZEROED(actions, 1);
-   delayedActionsWithExternalTimerQuantity = 0;
-   delayedActionsWithVerySmallDelayQuantity = 0;
-   delayedActions = LL_LIST_INIT(LL_SINGLELINKED);
-   endianSwapActions = (void (**)(void*)) calloc(actionsQuantity, sizeof(void (*)(void*)));
-   nextTimer = NULL;
-   nextDelayedActionWithoutExternalTimer = NULL;
-   lastDelayedActionWithExternalTimer = NULL;
-   firstDelayedActionWithVerySmallDelay = NULL;
-   lastDelayedActionWithVerySmallDelay = NULL;
-   cceRegisterAction(CCE_ACTION_DELAYACTION,              delayActionAction,              delayActionActionSwapEndian);
-   cceRegisterAction(CCE_ACTION_RUNACTIONS,               runActionsAction,               runActionsActionSwapEndian);
-   cceRegisterAction(CCE_ACTION_STARTTIMER,               setTimerStateAction,            setTimerStateActionSwapEndian);
-   cceRegisterAction(CCE_ACTION_SETTIMERDELAY,            setTimerDelayAction,            setTimerDelayActionSwapEndian);
-   cceRegisterAction(CCE_ACTION_SETENGINESHOULDTERMINATE, setEngineShouldTerminateAction, NULL);
+   g_endianSwapActions = (void (**)(void*)) calloc(g_actionsQuantity, sizeof(void (*)(void*)));
+   cceaBasicActionUIDs[CCEA_RUN_ACTIONS] = cceNameToUID("ccern");
+   cceaBasicActionUIDs[CCEA_RUN_ACTIONS_ONCE] = cceNameToUID("ccern1t");
+   cceaBasicActionUIDs[CCEA_RUN_ACTIONS_N_TIMES] = cceNameToUID("ccernnt");
+   
+   cceaBasicActionUIDs[CCEA_DELAY_ACTIONS] = cceNameToUID("ccedl");
+   cceaBasicActionUIDs[CCEA_DELAY_ACTIONS_PERIODIC] = cceNameToUID("ccedlpr");
+   cceaBasicActionUIDs[CCEA_DELAY_ACTIONS_REPEATED] = cceNameToUID("ccedlrp");
+   
+   cceaBasicActionUIDs[CCEA_RUN_DELAYED_ACTIONS] = cceNameToUID("ccerndl");
+   cceaBasicActionUIDs[CCEA_RUN_PERIODIC_ACTIONS] = cceNameToUID("ccerndp");
+   cceaBasicActionUIDs[CCEA_RUN_REPEATED_ACTIONS] = cceNameToUID("ccerndr");
+   
+   cceaBasicActionUIDs[CCEA_APPEND_LIST_OF_RUNDELAYED_ACTIONS] = cceNameToUID("ccealrd");
+   cceaBasicActionUIDs[CCEA_TERMINATE_ENGINE] = cceNameToUID("cceterm");
+   
+   cceaBasicActionUIDs[CCEA_ADD_ACTIONS_ON_EVENT] = cceNameToUID("cceaaoe");
+   cceaBasicActionUIDs[CCEA_REMOVE_ACTIONS_ON_EVENT] = cceNameToUID("cceraoe");
+   cceaBasicActionUIDs[CCEA_INVOKE_EVENT] = cceNameToUID("cceinve");
+   
+   cceaRegisterAction(cceaBasicActionUIDs[CCEA_RUN_ACTIONS],                       runActions,                   runActionsActionSwapEndian, CCEA_ACTION_SIZE_VARIABLE);
+   cceaRegisterAction(cceaBasicActionUIDs[CCEA_RUN_ACTIONS_ONCE],                  runActionsOnce,               runActionsActionSwapEndian, CCEA_ACTION_SIZE_VARIABLE);
+   cceaRegisterAction(cceaBasicActionUIDs[CCEA_RUN_ACTIONS_N_TIMES],               runActionsNTimes,             runActionsSwapEndianInt1,   CCEA_ACTION_SIZE_VARIABLE);
+   cceaRegisterAction(cceaBasicActionUIDs[CCEA_DELAY_ACTIONS],                     delayActions,                 runActionsSwapEndianInt1,   CCEA_ACTION_SIZE_VARIABLE);
+   cceaRegisterAction(cceaBasicActionUIDs[CCEA_DELAY_ACTIONS_PERIODIC],            delayActionsPeriodic,         runActionsSwapEndianInt1,   CCEA_ACTION_SIZE_VARIABLE);
+   cceaRegisterAction(cceaBasicActionUIDs[CCEA_DELAY_ACTIONS_REPEATED],            delayActionsRepeated,         runActionsSwapEndianInt2,   CCEA_ACTION_SIZE_VARIABLE);
+   cceaRegisterAction(cceaBasicActionUIDs[CCEA_RUN_DELAYED_ACTIONS],               runDelayedActions,            runActionsSwapEndianInt1,   CCEA_ACTION_SIZE_VARIABLE);
+   cceaRegisterAction(cceaBasicActionUIDs[CCEA_RUN_PERIODIC_ACTIONS],              runPeriodicActions,           runActionsSwapEndianInt2,   CCEA_ACTION_SIZE_VARIABLE);
+   cceaRegisterAction(cceaBasicActionUIDs[CCEA_RUN_REPEATED_ACTIONS],              runRepeatedlyDelayedActions,  runActionsSwapEndianInt3,   CCEA_ACTION_SIZE_VARIABLE);
+   cceaRegisterAction(cceaBasicActionUIDs[CCEA_APPEND_LIST_OF_RUNDELAYED_ACTIONS], appendListOfRunDelayedAction, runActionsActionSwapEndian, CCEA_ACTION_SIZE_VARIABLE);
+   cceaRegisterAction(cceaBasicActionUIDs[CCEA_ADD_ACTIONS_ON_EVENT],              addActionsOnEvent,            runActionsSwapEndianInt2,   CCEA_ACTION_SIZE_VARIABLE);
+   cceaRegisterAction(cceaBasicActionUIDs[CCEA_REMOVE_ACTIONS_ON_EVENT],           removeActionsOnEvent,         swapEndianInt2,             sizeof(struct cceaRemoveActionOnEvent));
+   cceaRegisterAction(cceaBasicActionUIDs[CCEA_INVOKE_EVENT],                      invokeEvent,                  swapEndianInt1,             sizeof(struct cceaInvokeEvent));
+   cceaRegisterAction(cceaBasicActionUIDs[CCEA_TERMINATE_ENGINE],                  terminateEngine,              NULL,                       sizeof(uint32_t));
+   
+   cceaBasicEventsUIDs[0] = cceNameToUID("cceload");
+   cceaBasicEventsUIDs[1] = cceNameToUID("ccefree");
+   cceaBasicEventsUIDs[2] = cceNameToUID("ccesave");
+   cceaRegisterEvent(cceaBasicEventsUIDs[0]);
+   cceaRegisterEvent(cceaBasicEventsUIDs[1]);
+   cceaRegisterEvent(cceaBasicEventsUIDs[2]);
+   return 0;
+}
+
+static int postInitActions (void)
+{
+   resizeHashTable(g_actionsAllocated << (g_actionsQuantity > (g_actionsAllocated >> 1 | g_actionsAllocated >> 3)));
+   g_flags &= ~CCE_ACTIONS_INITIALIZING;
    return 0;
 }
 
 static void terminateActions (void)
 {
-   free(timers);
-   free(actions);
-   free(endianSwapActions);
-   timersQuantity   = 0;
-   timersAllocated  = 0;
-   actionsQuantity  = 0;
-   actionsAllocated = 0;
-   llrmlist(&delayedActions);
+   free(g_actions);
+   free(g_endianSwapActions);
 }
 
-CCE_API uint8_t cceRegisterAction (uint32_t ID, cce_actionfun action, void (*endianSwap)(void*))
+CCE_API void cceaLoadActionsPlugin (void)
 {
-   if (ID >= actionsAllocated) do
-   {
-      CCE__REALLOC_ARRAY(actions, ID + 1);
-      endianSwapActions = realloc(endianSwapActions, actionsAllocated * sizeof(cce_actionfun*));
-      memset(actions           + oldAllocated, 0, (actionsAllocated - oldAllocated) * sizeof(cce_actionfun));
-      memset(endianSwapActions + oldAllocated, 0, (actionsAllocated - oldAllocated) * sizeof(cce_actionfun));
-   }
-   while (0);
-   actions[ID] = action;
-   endianSwapActions[ID] = endianSwap;
-   actionsQuantity = CCE_MAX(ID + 1, actionsQuantity + 1);
-   return 0;
+   if (cceaPluginUID == 0)
+      cceaPluginUID = cceNameToUID("cceacde");
+   cceRegisterPlugin(cceaPluginUID, NULL, NULL, initActions, postInitActions, terminateActions, 0);
+   g_flags |= CCE_ACTIONS_INITIALIZING;
 }
 
-CCE_API void cceSetTimerState (uint16_t timerID, uint8_t state)
+CCE_API void cceaRegisterActionsFileIOFunctions (uint16_t functionSetID)
 {
-   if (timerID >= timersAllocated)
-   {
-      CCE_REALLOC_ARRAY_ZEROED(timers, timerID + 1);
-   }
-   timers[timerID].flags &= ~(CCE_TIMER_START_STOP | ((state & CCE_CHANGETIMERSTATE_DISABLE_AUTO_RESTART_ON_ALARM) >> 1));
-   timers[timerID].flags |= (state & CCE_CHANGETIMERSTATE_SWITCH) ^ (((state & CCE_CHANGETIMERSTATE_SWITCH) == CCE_CHANGETIMERSTATE_SWITCH) << (timers[timerID].initTime == 0));
-   timers[timerID].flags |= state & CCE_CHANGETIMERSTATE_ENABLE_AUTO_RESTART_ON_ALARM;
-   timers[timerID].flags ^= ((state & CCE_CHANGETIMERSTATE_SWITCH_AUTO_RESTART_ON_ALARM) >> 2);
-   g_flags |= CCE_PROCESS_TIMERS;
-}
-
-CCE_API void cceSetTimerDelay (uint16_t timerID, uint32_t newDelay, uint8_t actionType)
-{
-   if (timerID >= timersAllocated)
-   {
-      CCE_REALLOC_ARRAY_ZEROED(timers, timerID + 1);
-   }
-   if (actionType == CCE_ACTION_SHIFT)
-   {
-      newDelay += timers[timerID].delay;
-   }
-   if (timers[timerID].initTime + timers[timerID].delay >= currentTime)
-   {
-      // Avoid making troubles to delayAction handlers
-      timers[timerID].initTime += (int64_t) timers[timerID].delay - (int64_t) newDelay;
-   }
-   else if (timers + timerID == nextTimer && timers[timerID].delay < newDelay)
-   {
-      nextTimer = NULL; // Must be found again
-   }
-   else if (timers[timerID].initTime + newDelay < nextTimer->initTime + nextTimer->delay)
-   {
-      nextTimer = timers + timerID;
-   }
-   timers[timerID].delay = newDelay;
-}
-
-CCE_API void cceDelayAction (uint16_t repeatsQuantity, uint32_t delayOrID, uint32_t actionStructSize, void *actionStruct, uint8_t flags)
-{
-   if (flags & CCE_DELAYACTION_EXECUTE_ON_START)
-      EXEC_ACTION(actionStruct, 1);
-   
-   cce_void *data = llnodealloc(sizeof(struct DelayedAction) + actionStructSize, delayedActions.type);
-   LL_NEXT(data) = NULL;
-   struct DelayedAction *head = (struct DelayedAction*) data;
-   if (flags & CCE_DELAYACTION_NEVER_END)
-      head->repeatsLeft = UINT16_MAX;
-   else
-      head->repeatsLeft = repeatsQuantity;
-   head->delay = delayOrID;
-   if (((flags & (CCE_DELAYACTION_EXTERNAL_TIMER | CCE_DELAYACTION_START_EXTERNAL_TIMER)) == (CCE_DELAYACTION_EXTERNAL_TIMER | CCE_DELAYACTION_START_EXTERNAL_TIMER)))
-      timers[delayOrID].flags |= CCE_TIMER_START;
-   
-   head->initTime = cceGetTime();
-   head->flags = flags & (CCE_DELAYACTION_EXTERNAL_TIMER | CCE_DELAYACTION_NEVER_END | CCE_DELAYACTION_EXECUTE_ONCE_PER_TIMER_ALARM | CCE_DELAYACTION_RESTART_EXTERNAL_TIMER_ON_ALARM);
-   memcpy(data + sizeof(struct DelayedAction), actionStruct, actionStructSize);
-   if (flags & CCE_DELAYACTION_EXTERNAL_TIMER)
-   {
-      llprependchain(&delayedActions, data);
-      if (delayedActionsWithExternalTimerQuantity == 0)
-         lastDelayedActionWithExternalTimer = head;
-      ++delayedActionsWithExternalTimerQuantity;
-      return;
-   }
-   if (head->delay < cceGetDeltaTime() * 2)
-   {
-      llinsertchainp(&delayedActions, lastDelayedActionWithExternalTimer, data);
-      if (delayedActionsWithVerySmallDelayQuantity == 0)
-         lastDelayedActionWithVerySmallDelay = head;
-      firstDelayedActionWithVerySmallDelay = head;
-      ++delayedActionsWithVerySmallDelayQuantity;
-      return;
-   }
-   if (nextDelayedActionWithoutExternalTimer == NULL || head->initTime + head->delay < nextDelayedActionWithoutExternalTimer->initTime + nextDelayedActionWithoutExternalTimer->delay)
-   {
-      llinsertchainp(&delayedActions, (lastDelayedActionWithVerySmallDelay == NULL) ? lastDelayedActionWithExternalTimer : lastDelayedActionWithVerySmallDelay, data);
-      nextDelayedActionWithoutExternalTimer = head;
-      return;
-   }
-   llappendchain(&delayedActions, data);
-}
-
-// Uses cache inefficiently (linked lists are bad at this). But arrays are out of luck here because actions have variable-size structs (making them hard to use with arrays)
-static void runDelayedActions (void)
-{
-   cce_void *prevnode = NULL, *node = delayedActions.chain;
-   struct DelayedAction *head;
-   uint32_t i = 0;
-   int64_t timerDiff;
-   uint16_t count;
-   // If no timers expired, no need to check actions dependant on them
-   if (nextTimer != NULL && (nextTimer->initTime + nextTimer->delay <= currentTime))
-   {
-      while (i < delayedActionsWithExternalTimerQuantity)
-      {
-         head = (struct DelayedAction*)node;
-         struct cce_timer *timer = timers + head->delay;
-         if (timer->initTime == 0 || (timerDiff = currentTime - (timer->initTime + timer->delay)) < 0)
-            goto CONTINUE;
-         count = 1;
-         if ((uint32_t)timerDiff >= timer->delay && !(head->flags & CCE_DELAYACTION_EXECUTE_ONCE_PER_TIMER_ALARM) &&
-            (timer->flags & CCE_TIMER_AUTO_RESTART_ON_ALARM || head->flags & CCE_DELAYACTION_RESTART_EXTERNAL_TIMER_ON_ALARM) &&
-            timer->delay != 0)
-         {
-            count += timerDiff / timer->delay;
-         }
-         count = CCE_MIN(count, head->repeatsLeft);
-         EXEC_ACTION(node + sizeof(struct DelayedAction), count);
-         head->repeatsLeft = (head->flags & CCE_DELAYACTION_NEVER_END) ? head->repeatsLeft : head->repeatsLeft - count;
-         if (head->repeatsLeft == 0)
-         {
-            node = LL_NEXT(node);
-            llrmsublistp(&delayedActions, prevnode, 1);
-            --delayedActionsWithExternalTimerQuantity;
-            continue;
-         }
-         if (head->flags & CCE_DELAYACTION_RESTART_EXTERNAL_TIMER_ON_ALARM)
-         {
-            timer->flags |= CCE_TIMER_START;
-         }
-CONTINUE:
-         prevnode = node;
-         node = LL_NEXT(node);
-         ++i;
-      }
-      // Could be changed
-      lastDelayedActionWithExternalTimer = (struct DelayedAction*)prevnode;
-   }
-   else
-   {
-      node     = (cce_void*) firstDelayedActionWithVerySmallDelay;
-      prevnode = (cce_void*) lastDelayedActionWithExternalTimer;
-   }
-   i = 0;
-   if (node != NULL) while (i < delayedActionsWithVerySmallDelayQuantity)
-   {
-      head = (struct DelayedAction*)node;
-      timerDiff = (int64_t)currentTime - (int64_t)(head->initTime + head->delay);
-      if (timerDiff < 0)
-         goto CONTINUE2;
-      count = 1;
-      if ((uint64_t)timerDiff >= head->delay && (head->flags & CCE_DELAYACTION_EXECUTE_ONCE_PER_TIMER_ALARM) == 0 && head->delay > 0)
-      {
-         count += timerDiff / head->delay;
-         timerDiff %= head->delay;
-      }
-      count = CCE_MIN(count, head->repeatsLeft);
-      EXEC_ACTION(node + sizeof(struct DelayedAction), count);
-      head->repeatsLeft = (head->flags & CCE_DELAYACTION_NEVER_END) ? head->repeatsLeft : head->repeatsLeft - count;
-      if (head->repeatsLeft == 0)
-      {
-         node = LL_NEXT(node);
-         llrmsublistp(&delayedActions, prevnode, 1);
-         --delayedActionsWithVerySmallDelayQuantity;           
-         if ((struct DelayedAction*)prevnode == lastDelayedActionWithExternalTimer)
-            firstDelayedActionWithVerySmallDelay = (struct DelayedAction*)((i < delayedActionsWithVerySmallDelayQuantity) ? node : NULL);
-         continue;
-      }
-      head->initTime = currentTime - timerDiff;
-CONTINUE2:
-      prevnode = node;
-      node = LL_NEXT(node);
-      ++i;
-   }
-   else
-      node = (cce_void*) nextDelayedActionWithoutExternalTimer;
-   // Could be changed
-   lastDelayedActionWithVerySmallDelay = (struct DelayedAction*)prevnode;
-   head = (struct DelayedAction*)node;
-   if (node == NULL || ((int64_t)currentTime - (int64_t)(head->initTime + head->delay)) < 0)
-      return; // Skip checking remaining actions because the one with least remaining time hasn't expired
-   struct DelayedAction *prevMinDelayNode = NULL;
-   struct DelayedAction *minDelayNode = NULL;
-   uint64_t minimalTimeLeft = UINT64_MAX;
-   while (node != NULL)
-   {
-      head = (struct DelayedAction*)node;
-      timerDiff = (int64_t)currentTime - (int64_t)(head->initTime + head->delay);
-      if (timerDiff < 0)
-      {
-         if (minimalTimeLeft > (uint64_t)(-timerDiff))
-         {
-            prevMinDelayNode = (struct DelayedAction*)prevnode;
-            minDelayNode = head;
-            minimalTimeLeft = -timerDiff;
-         }
-         goto CONTINUE3;
-      }
-      count = 1;
-      if ((uint64_t)timerDiff >= head->delay && !(head->flags & CCE_DELAYACTION_EXECUTE_ONCE_PER_TIMER_ALARM))
-      {
-         count += timerDiff / head->delay;
-         timerDiff %= head->delay;
-      }
-      count = CCE_MIN(count, head->repeatsLeft);
-      EXEC_ACTION(node + sizeof(struct DelayedAction), count);
-      head->repeatsLeft = (head->flags & CCE_DELAYACTION_NEVER_END) ? head->repeatsLeft : head->repeatsLeft - count;
-      if (head->repeatsLeft == 0)
-      {
-         node = LL_NEXT(node);
-         llrmsublistp(&delayedActions, prevnode, 1);
-         continue;
-      }
-      head->initTime = currentTime - timerDiff;
-      if (minimalTimeLeft > (uint64_t)CCE_MAX((int64_t)head->delay - timerDiff, 0))
-      {
-         prevMinDelayNode = (struct DelayedAction*)prevnode;
-         minDelayNode = head;
-         minimalTimeLeft = CCE_MAX((int64_t)head->delay - timerDiff, 0);
-      }
-CONTINUE3:
-      prevnode = node;
-      node = LL_NEXT(node);
-      ++i;
-   }
-   // Allows checking action that has the least time remaining first (and skipping checking remaining ones if not expired)
-   if (nextDelayedActionWithoutExternalTimer != minDelayNode && minDelayNode != NULL)
-      llinsertchainp(&delayedActions, (lastDelayedActionWithVerySmallDelay == NULL) ? lastDelayedActionWithExternalTimer : lastDelayedActionWithVerySmallDelay,
-                     nextDelayedActionWithoutExternalTimer = llpullnodep(&delayedActions, prevMinDelayNode));
-   else if (minDelayNode == NULL)
-   {
-      nextDelayedActionWithoutExternalTimer = NULL;
-   }
-}
-
-static void processTimers (void)
-{
-   struct cce_timer *minRemainsTimer;
-   uint64_t minRemains;
-   int64_t diff;
-   if (nextTimer == NULL /* Was lost, must be found again */ || nextTimer->initTime + nextTimer->delay <= currentTime)
-   {
-      minRemains = INT64_MAX;
-      minRemainsTimer = NULL;
-      for (struct cce_timer *iterator = timers, *end = timers + timersQuantity; iterator < end; ++iterator)
-      {
-         diff = currentTime - (iterator->initTime + iterator->delay);
-         if (diff >= 0 && ((iterator->flags & CCE_TIMER_AUTO_RESTART_ON_ALARM) || iterator->flags & CCE_TIMER_START))
-         {
-            diff *= (diff > 0 && iterator->initTime > 0 && iterator->delay > 0);
-            if (diff > (int64_t) iterator->delay)
-            {
-               diff %= iterator->delay;
-            }
-            iterator->initTime = currentTime - diff;
-            diff = -iterator->delay - diff;
-         }
-         else if (diff >= 0 || iterator->flags & CCE_TIMER_STOP)
-         {
-            iterator->initTime = 0;
-            continue;
-         }
-         if (minRemains > (uint64_t) -diff)
-         {
-            minRemains = -diff;
-            minRemainsTimer = iterator;
-         }
-      }
-   }
-   else if (g_flags & CCE_PROCESS_TIMERS)
-   {
-      minRemainsTimer = nextTimer;
-      minRemains = currentTime - (nextTimer->initTime + nextTimer->delay);
-      for (struct cce_timer *iterator = timers, *end = timers + timersQuantity; iterator < end; ++iterator)
-      {
-         if (iterator->flags & CCE_TIMER_STOP)
-         {
-            iterator->initTime = 0;
-            continue;
-         }
-         
-         if (!(iterator->flags & CCE_TIMER_START))
-            continue;
-         
-         iterator->initTime = currentTime;
-         if (minRemains > iterator->delay)
-         {
-            minRemains = iterator->delay;
-            minRemainsTimer = iterator;
-         }
-      }
-   }
-   g_flags &= ~CCE_PROCESS_TIMERS;
-   nextTimer = minRemainsTimer;
-   return;
-}
-
-static void updateActions (void)
-{
-   currentTime = cceGetTime();
-   runDelayedActions();
-   if (g_flags & CCE_PROCESS_TIMERS)
-      processTimers();
-}
-
-CCE_API int cceLoadActions (void *buffer, uint16_t sectionSize, struct cce_buffer *info, FILE *file)
-{
-   CCE_UNUSED(info);
-   CCE_UNUSED(sectionSize);
-   uint32_t onLoadActionsSize = 0, onFreeActionsSize = 0;
-   struct cce_actioninfo *map = buffer;
-   void *onLoadActions;
-   uint16_t *onLoadActionsSizes;
-   uint16_t onLoadActionsQuantity;
-   sectionSize = sectionSize > 0;
-   CCE__LOAD_ACTION_METADATA(map, file, onLoadActions, map->onFreeActions, onLoadActionsSize, onFreeActionsSize);
-   CCE__LOAD_ACTIONS(map, file, onLoadActions, map->onFreeActions, onLoadActionsSize, onFreeActionsSize,
-                     malloc(onLoadActionsQuantity * sizeof(uint16_t) + onLoadActionsSize), 
-                     malloc(map->onFreeActionsQuantity * sizeof(uint16_t) + onFreeActionsSize),
-                     (uint16_t*)((cce_void*)onLoadActions + onLoadActionsSize), (uint16_t*)((cce_void*)map->onFreeActions + onFreeActionsSize));
-   cce__runActions(onLoadActionsSizes, onLoadActions, onLoadActionsQuantity);
-   free(onLoadActions); // We no longer need that
-   return 0;
-}
-
-CCE_API int cceLoadActionsDynamic (void *buffer, uint16_t sectionSize, struct cce_buffer *info, FILE *file)
-{
-   CCE_UNUSED(info);
-   CCE_UNUSED(sectionSize);
-   uint32_t onLoadActionsSize = 0, onFreeActionsSize = 0;
-   struct cce_dynamicactioninfo *map = buffer;
-   CCE__LOAD_ACTION_METADATA(map, file, map->onLoadActions, map->onFreeActions, onLoadActionsSize, onFreeActionsSize);
-   CCE__LOAD_ACTIONS(map, file, map->onLoadActions, map->onFreeActions, onLoadActionsSize, onFreeActionsSize,
-                     malloc(onLoadActionsSize), 
-                     malloc(onFreeActionsSize),
-                     malloc(map->onLoadActionsQuantity * sizeof(uint16_t)),
-                     malloc(map->onFreeActionsQuantity * sizeof(uint16_t)));
-   cce__runActions(map->onLoadActionsSizes, map->onLoadActions, map->onLoadActionsQuantity);
-   map->onLoadActionsSizesAllocated  = map->onLoadActionsQuantity;
-   map->onFreeActionsSizesAllocated  = map->onFreeActionsQuantity;
-   return 0;
-}
-
-CCE_API void cceCreateActions (void *buffer, struct cce_buffer *info)
-{
-   CCE_UNUSED(info);
-   struct cce_dynamicactioninfo *map = buffer;
-   CCE_ALLOC_ARRAY(map->onLoadActionsSizes, 1);
-   CCE_ALLOC_ARRAY(map->onFreeActionsSizes, 1);
-   map->onLoadActions = NULL;
-   map->onLoadActionsQuantity = 0;
-   map->onFreeActions = NULL;
-   map->onFreeActionsQuantity = 0;
-}
-
-CCE_API void cceFreeActions (void *buffer, struct cce_buffer *info)
-{
-   CCE_UNUSED(info);
-   struct cce_actioninfo *map = buffer;
-   free(map->onFreeActions);
-}
-
-CCE_API void cceFreeActionsDynamic (void *buffer, struct cce_buffer *info)
-{
-   CCE_UNUSED(info);
-   struct cce_dynamicactioninfo *map = buffer;
-   free(map->onLoadActions);
-   free(map->onLoadActionsSizes);
-   free(map->onFreeActions);
-   free(map->onFreeActionsSizes);
-}
-
-CCE_API uint16_t cceStoreActions (void *buffer, struct cce_buffer *info, FILE *file)
-{
-   CCE_UNUSED(info);
-   struct cce_dynamicactioninfo *map = buffer;
-   uint16_t tmp = cceHostEndianToLittleEndianInt16(map->onLoadActionsQuantity);
-   fwrite(&tmp, sizeof(uint16_t), 1, file);
-   tmp = cceHostEndianToLittleEndianInt16(map->onFreeActionsQuantity);
-   fwrite(&tmp, sizeof(uint16_t), 1, file);
-   size_t bytesWrittenPos = ftell(file), endPos;
-   fseek(file, sizeof(uint32_t) * 2, SEEK_CUR);
-   uint32_t bytesWritten[4] = {0};
-   uint16_t *sizes, *end;
-   uint16_t maxSize = 0;
-   if (cceEndianess == CCE_BIG_ENDIAN)
-   {
-      sizes = map->onLoadActionsSizes, end = map->onLoadActionsSizes + map->onLoadActionsQuantity;
-      for (uint16_t *iterator = sizes; iterator < end; ++iterator)
-         maxSize = *iterator > maxSize ? *iterator : maxSize;
-      
-      sizes = map->onFreeActionsSizes, end = map->onFreeActionsSizes + map->onFreeActionsQuantity;
-      for (uint16_t *iterator = sizes; iterator < end; ++iterator)
-         maxSize = *iterator > maxSize ? *iterator : maxSize;
-      
-      cce_void *actionTMP = malloc(maxSize);
-      STORE_ACTIONS_SWAP_ENDIAN(map->onLoadActions,  sizes, bytesWritten[0], tmp, actionTMP)
-      STORE_ACTIONS_SWAP_ENDIAN(map->onFreeActions,  sizes, bytesWritten[1], tmp, actionTMP)
-      free(actionTMP);
-   }
-   else
-   {
-      STORE_ACTIONS_PRESERVE_ENDIAN(map->onLoadActions,  sizes, bytesWritten[0])
-      STORE_ACTIONS_PRESERVE_ENDIAN(map->onFreeActions,  sizes, bytesWritten[1])
-   }
-   endPos = ftell(file);
-   fseek(file, bytesWrittenPos, SEEK_SET);
-   cceHostEndianToLittleEndianArrayInt32(bytesWritten, 4);
-   fwrite(bytesWritten, sizeof(uint32_t), 2, file);
-   fseek(file, endPos, SEEK_SET);
-   return 1;
-}
-
-CCE_API void cceLoadActionsPlugin (void)
-{
-   cceRegisterPlugin("actions", NULL, NULL, initActions, terminateActions, 0);
-   cceRegisterUpdateCallback(updateActions);
+   cceRegisterFileIOcallbacks(functionSetID, cceaPluginUID, loadActions, freeActions, createActions, storeActions, sizeof(struct ccea_actioninfo));
 }

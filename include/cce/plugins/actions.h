@@ -6,14 +6,14 @@
 
    Conservative Creator's Engine is free software: you can redistribute it and/or modify it under 
    the terms of the GNU Lesser General Public License as published by the Free Software Foundation,
-   either version 2 of the License, or (at your option) any later version.
+   either version 2.1 of the License, or (at your option) any later version.
 
    Conservative Creator's Engine is distributed in the hope that it will be useful, but WITHOUT
    ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR 
    PURPOSE. See the GNU Lesser General Public License for more details.
 
    You should have received a copy of the GNU Lesser General Public License along
-   with Conservative Creator's Engine. If not, see <https://www.gnu.org/licenses/>.
+   with Conservative Creator's Engine. If not, see <https://www.gnu.org/licenses/old-licenses/lgpl-2.1.html>.
 */
 
 #ifndef ACTIONS_H
@@ -27,154 +27,161 @@ extern "C"
 {
 #endif // __cplusplus
 
-struct cce_actioninfo
+typedef void (*ccea_actionfun)(void*, uint32_t, struct cce_buffer*);
+
+// All actions are aligned to 32-bit boundary. Be careful with pointers and 64-bit ints!
+
+struct cceaAction
 {
-   struct cce_action *onFreeActions;
-   uint16_t          *onFreeActionsSizes;
-   uint16_t           onFreeActionsQuantity;
+   uint32_t UID;
 };
 
-struct cce_dynamicactioninfo
+struct cceaDynamicAction
 {
-   struct cce_action *onFreeActions;
-   uint16_t          *onFreeActionsSizes;
-   uint16_t           onFreeActionsQuantity;
-   uint16_t           onFreeActionsSizesAllocated;
-   uint16_t           onLoadActionsQuantity;
-   uint16_t           onLoadActionsSizesAllocated;
-   struct cce_action *onLoadActions;
-   uint16_t          *onLoadActionsSizes;
+   uint32_t UID;
+   uint32_t size;
 };
 
-/*
-   Every structure here has 32-bit alignment. Using 64-bit aligned structures is not recommended, due to a possibility of misaligned reading
-*/
-
-#define CCE_ACTION_SHIFT 0x0
-#define CCE_ACTION_SET   0x1
-
-typedef void (*cce_actionfun)(const void*, uint16_t);
-
-#define CCE_CHANGETIMERSTATE_START  0x1
-#define CCE_CHANGETIMERSTATE_STOP   0x2
-#define CCE_CHANGETIMERSTATE_SWITCH 0x3
-#define CCE_CHANGETIMERSTATE_ENABLE_AUTO_RESTART_ON_ALARM  0x4
-#define CCE_CHANGETIMERSTATE_DISABLE_AUTO_RESTART_ON_ALARM 0x8
-#define CCE_CHANGETIMERSTATE_SWITCH_AUTO_RESTART_ON_ALARM  0x10
-
-struct cceSetTimerStateAction
+struct cceaDelayedAction
 {
-   uint32_t actionID;
-   uint16_t ID;
-   cce_enum state;
-   uint8_t cce__pad;
+   uint32_t UID;
+   // Use for whatever purpose you want - but this pad is necessary! (exactly 4 bytes, can be uint32_t, uint16_t[2] or uint8_t[4])
+   uint32_t __pad;
+   // Update it to avoid deletion from queue
+   uint32_t timeout;
 };
 
-struct cceSetTimerDelayAction
+struct cceaDelayedDynamicAction
 {
-   uint32_t actionID;
-   uint32_t delay;
-   uint16_t ID;
-   cce_enum action;
-   uint8_t cce__pad;
-};
-
-#define CCE_DELAYACTION_EXECUTE_ONCE_PER_TIMER_ALARM 0x1
-// repeatsQuantity field is ignored
-#define CCE_DELAYACTION_NEVER_END 0x2
-
-#define CCE_DELAYACTION_EXTERNAL_TIMER 0x4
-#define CCE_DELAYACTION_RESTART_EXTERNAL_TIMER_ON_ALARM 0x08
-#define CCE_DELAYACTION_START_EXTERNAL_TIMER 0x10
-
-// Doesn't count as repeat!
-#define CCE_DELAYACTION_EXECUTE_ON_START 0x20
-
-// action data should be located right after this struct
-struct cceDelayAction
-{
-   uint32_t actionID;
-   union
-   {
-      uint32_t delay;
-      uint32_t timerID; // technically 16 bit
-   } timerInfo;
-   uint32_t delayedActionStructSize;
-   uint16_t repeatsQuantity;
-   uint8_t flags;
-   uint8_t cce__pad;
+   uint32_t UID;
+   // Update it to avoid deletion from queue
+   uint32_t size;
+   uint32_t timeout;
 };
 
 // Followed by actions to run
-struct cceRunActions
+struct cceaActionRunner
 {
-   uint32_t actionID;
-   uint16_t actionQuantity;
-   uint16_t actionSizes[1]; // Can be more than 1 - depends on quantity. Last is omitted! When even must be pad to keep everithing aligned.
+   uint32_t UID;
+   uint32_t totalSize;
 };
 
-struct cceSetEngineShouldTerminate
+// Followed by actions to run
+struct cceaRunActions
 {
-   uint32_t actionID;
-   uint8_t  state;
-   cce_enum action;
+   uint32_t UID;
+   uint32_t totalSize;
 };
 
-CCE_API void    cceSetTimerDelay  (uint16_t timerID, uint32_t newDelay, uint8_t actionType);
-CCE_API void    cceSetTimerState  (uint16_t timerID, uint8_t state);
-CCE_API void    cceDelayAction    (uint16_t repeatsQuantity, uint32_t delayOrID, uint32_t actionStructSize, void *actionStruct, uint8_t flags);
-CCE_API uint8_t cceRegisterAction (uint32_t ID, cce_actionfun action, void (*endianSwap)(void*));
+// Followed by actions to run
+struct cceaRunActionsNTimes
+{
+   uint32_t UID;
+   uint32_t totalSize;
+   uint32_t n;
+};
 
-CCE_API int      cceLoadActions        (void *buffer, uint16_t sectionSize, struct cce_buffer *info, FILE *file);
-CCE_API int      cceLoadActionsDynamic (void *buffer, uint16_t sectionSize, struct cce_buffer *info, FILE *file);
-CCE_API void     cceCreateActions      (void *buffer, struct cce_buffer *info);
-CCE_API void     cceFreeActions        (void *buffer, struct cce_buffer *info);
-CCE_API void     cceFreeActionsDynamic (void *buffer, struct cce_buffer *info);
-CCE_API uint16_t cceStoreActions       (void *buffer, struct cce_buffer *info, FILE *file);
-CCE_API void     cceLoadActionsPlugin  (void);
+// Followed by actions to add
+struct cceaAppendListOfRunDelayedActions
+{
+   uint32_t UID;
+   uint32_t totalSize;
+};
 
-#define CCE_ACTION_STARTTIMER 0
-#define CCE_ACTION_SETTIMERDELAY 1
-#define CCE_ACTION_DELAYACTION 2
-#define CCE_ACTION_RUNACTIONS 3
-#define CCE_ACTION_SETENGINESHOULDTERMINATE 4
+// Followed by actions to run
+struct cceaDelayActions
+{
+   uint32_t UID;
+   uint32_t totalSize;
+   uint32_t delay;
+};
 
-#define CCE__LOAD_ACTION_METADATA(map, file, onLoad, onFree, onLoadSize, onFreeSize) \
-fread(&onLoad  ## Quantity, sizeof(uint16_t), 1, file); \
-fread(&onFree  ## Quantity, sizeof(uint16_t), 1, file); \
-fread(&onLoadSize,   sizeof(uint32_t), 1, file); \
-fread(&onFreeSize,   sizeof(uint32_t), 1, file); \
-onLoad ## Quantity = cceLittleEndianToHostEndianInt16(onLoad ## Quantity); \
-onFree ## Quantity = cceLittleEndianToHostEndianInt16(onFree ## Quantity); \
-onLoadSize =  cceLittleEndianToHostEndianInt16(onLoadSize); \
-onFreeSize =  cceLittleEndianToHostEndianInt16(onFreeSize)
+// Followed by actions to run
+struct cceaDelayActionsPeriodic
+{
+   uint32_t UID;
+   uint32_t totalSize;
+   uint32_t delay;
+};
 
-#define CCE__LOAD_ACTIONS(map, file, onLoad, onFree, onLoadSize, onFreeSize, onLoadActionsAlloc, onFreeActionsAlloc, \
-                         onLoadActionSizesAlloc, onFreeActionSizesAlloc) \
-do \
-{ \
-   onLoad = onLoadActionsAlloc; \
-   onFree = onFreeActionsAlloc; \
-   onLoad ## Sizes = onLoadActionSizesAlloc; \
-   onFree  ## Sizes = onFreeActionSizesAlloc; \
-   \
-   fread(onLoad ## Sizes, sizeof(uint16_t), onLoad ## Quantity, file); \
-   fread(onLoad,  1, onLoadSize, file); \
-   fread(onFree ## Sizes, sizeof(uint16_t), onFree ## Quantity, file); \
-   fread(onFree,  1, onFreeSize, file); \
-   \
-   if (cceEndianess == CCE_BIG_ENDIAN) \
-   { \
-      cceSwapEndianArrayIntN(onLoad ## Sizes, onLoad ## Quantity, 2); \
-      cceSwapEndianArrayIntN(onFree ## Sizes, onFree ## Quantity, 2); \
-      cce__swapActionsEndian(onLoad ## Sizes, onLoad, onLoad  ## Quantity); \
-      cce__swapActionsEndian(onFree ## Sizes, onFree, onFree  ## Quantity); \
-   } \
-} \
-while (0)
+// Followed by actions to run
+struct cceaDelayActionsRepeated
+{
+   uint32_t UID;
+   uint32_t totalSize;
+   uint32_t delay;
+   uint32_t repeats;
+};
+
+// Followed by actions to add
+struct cceaAddActionsOnEvent
+{
+   uint32_t UID;
+   uint32_t totalSize;
+   uint32_t eventUID;
+   uint32_t actionSubsUID;
+};
+
+struct cceaRemoveActionOnEvent
+{
+   uint32_t UID;
+   uint32_t eventUID;
+   uint32_t actionSubsUID;
+};
+
+struct cceaInvokeEvent
+{
+   uint32_t UID;
+   uint32_t eventUID;
+};
+
+struct cceaTerminateEngine
+{
+   uint32_t UID;
+};
+
+#define CCEA_RUN_ACTIONS 0
+#define CCEA_RUN_ACTIONS_ONCE 1
+#define CCEA_RUN_ACTIONS_N_TIMES 2
+#define CCEA_DELAY_ACTIONS 3
+#define CCEA_DELAY_ACTIONS_PERIODIC 4
+#define CCEA_DELAY_ACTIONS_REPEATED 5
+#define CCEA_RUN_DELAYED_ACTIONS 7
+#define CCEA_RUN_PERIODIC_ACTIONS 8
+#define CCEA_RUN_REPEATED_ACTIONS 9
+#define CCEA_APPEND_LIST_OF_RUNDELAYED_ACTIONS 11
+#define CCEA_ADD_ACTIONS_ON_EVENT 12
+#define CCEA_REMOVE_ACTIONS_ON_EVENT 13
+#define CCEA_INVOKE_EVENT 14
+#define CCEA_TERMINATE_ENGINE 15
+
+CCE_API extern uint32_t cceaBasicActionUIDs[16];
+
+#define CCEA_EVENT_LOAD 0
+#define CCEA_EVENT_FREE 1
+#define CCEA_EVENT_WRITE 2
+
+CCE_API extern uint32_t cceaBasicEventsUIDs[3];
+
+CCE_API extern uint32_t cceaPluginUID;
+
+CCE_API void  cceaRunAction (struct cceaAction *action, uint32_t count, struct cce_buffer *state);
+CCE_API void  cceaRegisterAction (uint32_t actionUID, ccea_actionfun action, void (*endianSwap)(void*), uint32_t actionSize);
+CCE_API void  cceaRegisterEvent (uint32_t eventUID);
+CCE_API void  cceaInvokeEvent (uint32_t eventUID, uint32_t count, struct cce_buffer *map);
+CCE_API void  cceaAddActionOnEvent (uint32_t eventUID, uint32_t actionSubsUID, struct cceaAction *action, struct cce_buffer *map);
+CCE_API void  cceaRemoveActionOnEvent (uint32_t eventUID, uint32_t actionSubsUID, struct cce_buffer *map);
+CCE_API void  cceaLoadActionsPlugin  (void);
+// Expects POINTERS to actions, not actions themselves
+CCE_API void* cceaActionRunnerCreateDynamic (uint32_t runActionsID, uint32_t runActionsStructSize, uint32_t actionsQuantity, ...);
+CCE_API void  cceaRegisterActionsFileIOFunctions (uint16_t functionSetID);
+
+CCE_API void  cceaRunDelayedActions (struct cce_buffer *map);
+
+#define CCEA_ACTION_SIZE_VARIABLE 0
 
 #ifdef __cplusplus
 }
 #endif // __cplusplus
-
+#include "actions_runactions.h"
 #endif // ACTIONS_H

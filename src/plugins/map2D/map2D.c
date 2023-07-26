@@ -607,5 +607,5 @@ static int initMap2D (void *data)
 
 CCE_API void cceLoadMap2Dplugin (void)
 {
-   cceRegisterPlugin("map2d", NULL, loadCallback, initMap2D, terminateMap2D, CCE_DEFAULT);
+   cceRegisterPlugin(cceNameToUID("map2d"), NULL, loadCallback, initMap2D, NULL, terminateMap2D, CCE_DEFAULT);
 }

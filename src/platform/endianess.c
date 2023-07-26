@@ -24,67 +24,9 @@
 
 #include "../../include/cce/endianess.h"
 
-#define CCE_UNUSED(x) (void)(x)
-
-CCE_API uint16_t (*cceLittleEndianConversionInt16) (uint16_t) = NULL;
-CCE_API uint32_t (*cceLittleEndianConversionInt32) (uint32_t) = NULL;
-CCE_API uint64_t (*cceLittleEndianConversionInt64) (uint64_t) = NULL;
-CCE_API void* (*cceLittleEndianConversionArrayIntN)    (void*, size_t, size_t)        = NULL;
-CCE_API void* (*cceLittleEndianConversionNewArrayIntN) (void*, const void*, size_t, size_t) = NULL;
-CCE_API uint16_t (*cceBigEndianConversionInt16) (uint16_t) = NULL;
-CCE_API uint32_t (*cceBigEndianConversionInt32) (uint32_t) = NULL;
-CCE_API uint64_t (*cceBigEndianConversionInt64) (uint64_t) = NULL;
-CCE_API void* (*cceBigEndianConversionArrayIntN)    (void*, size_t, size_t)        = NULL;
-CCE_API void* (*cceBigEndianConversionNewArrayIntN) (void*, const void*, size_t, size_t) = NULL;
-
-// 0 - Big Endian, 1 - Little Endian
-static cce_endianess g_endianess;
-CCE_API const cce_endianess *const cceEndianess = &g_endianess;
-
-CCE_API uint16_t cceSwapEndianInt16 (uint16_t value)
+CCE_API void cceSwapEndianArrayIntN (void *array, size_t arraySize, size_t n)
 {
-   uint8_t *bytes = (uint8_t*) &value;
-   register uint8_t buffer;
-   buffer   = bytes[0];
-   bytes[0] = bytes[1];
-   bytes[1] = buffer;
-   return value;
-}
-
-CCE_API uint32_t cceSwapEndianInt32 (uint32_t value)
-{
-   uint8_t *bytes = (uint8_t*) &value;
-   register uint8_t buffer;
-   buffer   = bytes[0];
-   bytes[0] = bytes[3];
-   bytes[3] = buffer;
-   buffer   = bytes[1];
-   bytes[1] = bytes[2];
-   bytes[2] = buffer;
-   return value;
-}
-
-CCE_API uint64_t cceSwapEndianInt64 (uint64_t value)
-{
-   uint8_t *bytes = (uint8_t*) &value;
-   register uint8_t buffer;
-   buffer   = bytes[0];
-   bytes[0] = bytes[7];
-   bytes[7] = buffer;
-   buffer   = bytes[1];
-   bytes[1] = bytes[6];
-   bytes[6] = buffer;
-   buffer   = bytes[2];
-   bytes[2] = bytes[5];
-   bytes[5] = buffer;
-   buffer   = bytes[3];
-   bytes[3] = bytes[4];
-   bytes[4] = buffer;
-   return value;
-}
-
-CCE_API void* cceSwapEndianArrayIntN (void *array, size_t arraySize, size_t n)
-{
+   n >>= 3;
    register uint8_t buffer;
    for (uint8_t *iterator = (uint8_t*) array, *end = ((uint8_t*) array) + arraySize * n; iterator < end; iterator += n)
    {
@@ -95,11 +37,11 @@ CCE_API void* cceSwapEndianArrayIntN (void *array, size_t arraySize, size_t n)
          iterator[n - i - 1] = buffer;
       }
    }
-   return array;
 }
 
-CCE_API void* cceSwapEndianNewArrayIntN (void *newArray, const void *array, size_t arraySize, size_t n)
+CCE_API void cceSwapEndianNewArrayIntN (void *newArray, const void *array, size_t arraySize, size_t n)
 {
+   n >>= 3;
    for (uint8_t *iterator = (uint8_t*) array, *jiterator = (uint8_t*) newArray, *end = ((uint8_t*) array) + arraySize * n;
         iterator < end; iterator += n)
    {
@@ -108,72 +50,5 @@ CCE_API void* cceSwapEndianNewArrayIntN (void *newArray, const void *array, size
          jiterator[n - i - 1] = iterator[i];
          jiterator[i]         = iterator[n - i - 1];
       }
-   }
-   return newArray;
-}
-
-static uint16_t ccePreserveEndianInt16 (uint16_t value)
-{
-   return value;
-}
-
-static uint32_t ccePreserveEndianInt32 (uint32_t value)
-{
-   return value;
-}
-
-static uint64_t ccePreserveEndianInt64 (uint64_t value)
-{
-   return value;
-}
-
-CCE_API void* ccePreserveEndianArrayIntN (void *array, size_t arraySize, size_t n)
-{
-   CCE_UNUSED(arraySize);
-   CCE_UNUSED(n);
-   return array;
-}
-
-CCE_API void* ccePreserveEndianNewArrayIntN (void *newArray, const void *array, size_t arraySize, size_t n)
-{
-   memcpy(newArray, array, arraySize * n);
-   return newArray;
-}
-
-static inline uint8_t getEndianess (void)
-{
-   uint16_t a = 1;
-   uint8_t *b = (uint8_t*) &a;
-   return a == *b;
-}
-
-CCE_API void cceInitEndianConversion (void)
-{
-   g_endianess = getEndianess();
-   if (g_endianess == CCE_BIG_ENDIAN)
-   {
-      cceLittleEndianConversionInt16 = cceSwapEndianInt16;
-      cceLittleEndianConversionInt32 = cceSwapEndianInt32;
-      cceLittleEndianConversionInt64 = cceSwapEndianInt64;
-      cceLittleEndianConversionArrayIntN = cceSwapEndianArrayIntN;
-      cceLittleEndianConversionNewArrayIntN = cceSwapEndianNewArrayIntN;
-      cceBigEndianConversionInt16 = ccePreserveEndianInt16;
-      cceBigEndianConversionInt32 = ccePreserveEndianInt32;
-      cceBigEndianConversionInt64 = ccePreserveEndianInt64;
-      cceBigEndianConversionArrayIntN = ccePreserveEndianArrayIntN;
-      cceBigEndianConversionNewArrayIntN = ccePreserveEndianNewArrayIntN;
-   }
-   else
-   {
-      cceLittleEndianConversionInt16 = ccePreserveEndianInt16;
-      cceLittleEndianConversionInt32 = ccePreserveEndianInt32;
-      cceLittleEndianConversionInt64 = ccePreserveEndianInt64;
-      cceLittleEndianConversionArrayIntN = ccePreserveEndianArrayIntN;
-      cceLittleEndianConversionNewArrayIntN = ccePreserveEndianNewArrayIntN;
-      cceBigEndianConversionInt16 = cceSwapEndianInt16;
-      cceBigEndianConversionInt32 = cceSwapEndianInt32;
-      cceBigEndianConversionInt64 = cceSwapEndianInt64;
-      cceBigEndianConversionArrayIntN = cceSwapEndianArrayIntN;
-      cceBigEndianConversionNewArrayIntN = cceSwapEndianNewArrayIntN;
    }
 }

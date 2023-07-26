@@ -180,7 +180,7 @@
 
 #include "../../include/cce/engine_common.h"
 
-struct cce_keys
+struct cce_ini_keys
 {
    float deadzone;
    int8_t keyAxisValue;

@@ -43,8 +43,8 @@ const uint8_t cce__debruijnToBitPosition64[64] = {63, 0,  47, 1,  56, 48, 27, 2,
 const uint8_t cce__debruijnToBitPosition32[32] = {31, 0,  22, 1,  28, 23, 13, 2,  29, 26, 24, 17, 19, 14, 9,  3,
                                                   30, 21, 27, 12, 25, 16, 18, 8,  20, 11, 15, 7,  10, 6,  5,  4};
 
-const uint64_t cce__debruijnNumberLS6 = 0x7ef3ae369961512;
-const uint32_t cce__debruijnNumberLS5 = 0xfb9ac52;
+const uint64_t cce__debruijnNumberLS6 = 0x7ef3ae369961512llu;
+const uint32_t cce__debruijnNumberLS5 = 0xfb9ac52u;
 
 #define BINARYSEARCH(arr, arr_len, elem_size, val, cmp, comp, ret) \
 do \
@@ -68,12 +68,12 @@ do \
 } \
 while (0)
    
-CCE_API void* cceBinarySearchFirst (const void *key, const void *arr, size_t arr_len, size_t elem_size, cmp_fun cmp)
+CCE_API CCE_NOALIAS_FN void* cceBinarySearchFirst (const void *key, const void *arr, size_t arr_len, size_t elem_size, cce_cmpfun cmp)
 {
    BINARYSEARCH(arr, arr_len, elem_size, key, cmp, >, return);
 }
 
-CCE_API void* cceBinarySearchLast (const void *key, const void *arr, size_t arr_len, size_t elem_size, cmp_fun cmp)
+CCE_API CCE_NOALIAS_FN void* cceBinarySearchLast (const void *key, const void *arr, size_t arr_len, size_t elem_size, cce_cmpfun cmp)
 {
    const cce_void *result;
    BINARYSEARCH(arr, arr_len, elem_size, key, cmp, >=, result =);
@@ -82,7 +82,7 @@ CCE_API void* cceBinarySearchLast (const void *key, const void *arr, size_t arr_
    return (void*) (result - ((cmp(result - 1, key) == 0) ? elem_size : 0));
 }
 
-CCE_API void* cceLinearSearch (const void *key, const void *arr, size_t arr_len, size_t elem_size, cmp_fun cmp)
+CCE_API CCE_NOALIAS_FN void* cceLinearSearch (const void *key, const void *arr, size_t arr_len, size_t elem_size, cce_cmpfun cmp)
 {
    for (const void *end = (cce_void*)arr + arr_len * elem_size; arr < end; arr = (cce_void*)arr + elem_size)
    {
@@ -135,16 +135,16 @@ CCE_API void* cceReverseMemory (void *memory, size_t size)
    } \
 }
 
-CCE_API uint8_t cceU8Pow (uint8_t base, uint8_t exponent)
+CCE_API CCE_CONST_FN uint8_t cceU8Pow (uint8_t base, uint8_t exponent)
    CCE_POW(base, exponent, uint8_t)
    
-CCE_API uint16_t cceU16Pow (uint16_t base, uint16_t exponent)
+CCE_API CCE_CONST_FN uint16_t cceU16Pow (uint16_t base, uint16_t exponent)
    CCE_POW(base, exponent, uint16_t)
 
-CCE_API uint32_t cceU32Pow (uint32_t base, uint32_t exponent)
+CCE_API CCE_CONST_FN uint32_t cceU32Pow (uint32_t base, uint32_t exponent)
    CCE_POW(base, exponent, uint32_t)
    
-CCE_API uint64_t cceU64Pow (uint64_t base, uint64_t exponent)
+CCE_API CCE_CONST_FN uint64_t cceU64Pow (uint64_t base, uint64_t exponent)
    CCE_POW(base, exponent, uint64_t)
 
 // First utf-8 byte encodes it's length. 110XXXXX - length 2, 1110XXXX - length 3, 11110XXX - length 4 (max). This is branchless way of extracting this bits
@@ -154,7 +154,7 @@ CCE_API uint64_t cceU64Pow (uint64_t base, uint64_t exponent)
 // That all means we left to check 7-th bit of 2-nd and 3-rd byte in unicode sequence to get it's length. 
 #define GET_CHAR_LENGTH_UTF8BE(ch) (((*((ch) + 1) & 0x40) == 0) + ((*((uint16_t*) ((ch) + 1)) & 0x4040) == 0) + 2)
 
-CCE_API uint32_t cceGetCharSizeUTF8 (const unsigned char *ch)
+CCE_API CCE_NOALIAS_FN uint32_t cceGetCharSizeUTF8 (const unsigned char *ch)
 {
    switch ((*ch & 0xC0))
    {
@@ -172,7 +172,7 @@ CCE_API uint32_t cceGetCharSizeUTF8 (const unsigned char *ch)
    }
 }
 
-CCE_API struct UnicodeCharWithSize cceGetCharWithSizeUTF8 (const unsigned char *ch)
+CCE_API CCE_NOALIAS_FN struct UnicodeCharWithSize cceGetCharWithSizeUTF8 (const unsigned char *ch)
 {
    uint32_t result = 0;
    switch ((*ch & 0xC0))
@@ -211,12 +211,12 @@ CCE_API struct UnicodeCharWithSize cceGetCharWithSizeUTF8 (const unsigned char *
    }
 }
 
-CCE_API uint32_t cceGetCharUTF8 (const unsigned char *ch)
+CCE_API CCE_NOALIAS_FN uint32_t cceGetCharUTF8 (const unsigned char *ch)
 {
    return cceGetCharWithSizeUTF8(ch).ch;
 }
 
-CCE_API uint32_t cceGetCharFromStringUTF8 (const char *string, size_t position)
+CCE_API CCE_NOALIAS_FN uint32_t cceGetCharFromStringUTF8 (const char *string, size_t position)
 {   
    const unsigned char *str = (const unsigned char*) string;
    for (size_t i = 0; i < position; ++i)
@@ -226,7 +226,7 @@ CCE_API uint32_t cceGetCharFromStringUTF8 (const char *string, size_t position)
    return cceGetCharUTF8(str);
 }
 
-CCE_API char* cceConvertIntToBase64String (size_t number, char *buffer, uint8_t symbolsQuantity)
+CCE_API char* cceConvertIntToBase64String (uintmax_t number, char *buffer, uint8_t symbolsQuantity)
 {
    static const char
    dictionary[64] = {'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
@@ -237,6 +237,69 @@ CCE_API char* cceConvertIntToBase64String (size_t number, char *buffer, uint8_t 
       *(buffer + symbolsQuantity - i - 1u) = *(dictionary + ((number >> (i * 6)) & 63));
    }
    return buffer;
+}
+
+CCE_API CCE_NOALIAS_FN uint32_t cceNameToUID (const char *name)
+{
+   // Assumes ASCII
+   static const uint8_t 
+   letterToNumber[128] = { 0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+                           0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+                           0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+                           7, 21, 19, 18, 12, 11, 10,  6, 20,  8,  0,  0,  0,  0,  0,  0,
+                           0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 22,  0, 10, 11, 12, 13,
+                          14, 22, 15, 16, 17, 18, 19, 20, 22, 21, 22,  0,  0,  0,  0,  0,
+                           0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 22,  0, 10, 11, 12, 13,
+                          14, 22, 15, 16, 17, 18, 19, 20, 22, 21, 22,  0,  0,  0,  0,  0};
+   uint32_t result = 0;
+   size_t length = CCE_MIN(strlen(name), 7);
+   uint32_t offset = 1;
+   // Reversed to increase randomness of smaller differences (to more efficient hashing)
+   unsigned i = length;
+   do
+   {
+      --i;
+      result += letterToNumber[name[i]] * offset;
+      offset *= 23;
+   }
+   while (i > 0);
+   return result;
+}
+
+CCE_API CCE_CONST_FN char* cceUIDToName (uint32_t uid)
+{
+   char *numberToLetters[23] = {"[ _k.]", "a", "b", "c", "d", "e", "[7|f]", "[0|g]", "[9|h]", "i", "[jqxz]", "[6|l]", "[5|m]", "[4|n]", "o", "p", "r", "s", "t", "[3|u]", "[2|v]", "[8|w]", "[1|y]"};
+   static char uidName[79];
+   uidName[78] = '\0';
+   unsigned stri = 78;
+   for (unsigned i = 0; uid != 0 || i < 13; ++i)
+   {
+      char *letters = numberToLetters[uid % 30];
+      uid /= 30;
+      unsigned size = strlen(letters);
+      memcpy(uidName + stri - size, letters, size);
+      stri -= size;
+   }
+   return uidName + stri;
+}
+
+// TODO: analyze hash quality somehow
+CCE_API CCE_CONST_FN uint32_t cceUIDToHash (uint32_t uid, uint32_t powerOfTwoSize)
+{
+   if (powerOfTwoSize == UINT_MAX)
+      return uid;
+   if (powerOfTwoSize > 0xFFFFu)
+      return (uid & (powerOfTwoSize - 1)) ^ ((uid & ((powerOfTwoSize - 1) << 16)) >> 16);
+   uint32_t i = 0;
+   uint32_t inc = CCE_HIGHEST_BIT_INDEX(powerOfTwoSize);
+   uint32_t hash = uid & (powerOfTwoSize - 1);
+   do
+   {
+      i += inc;
+      hash ^= (uid & ((powerOfTwoSize - 1) << i)) >> i;
+   }
+   while (i < 19);
+   return hash;
 }
 
 CCE_API size_t cceStringToLowercase (char *str)
@@ -277,7 +340,7 @@ CCE_API void cceMemoryToUppercase (char *str, size_t size)
    }
 }
 
-CCE_API uint8_t cceStringToBool (const char *str)
+CCE_API CCE_NOALIAS_FN uint8_t cceStringToBool (const char *str)
 {
    if (str == NULL)
       return 0;
@@ -294,44 +357,50 @@ CCE_API uint8_t cceStringToBool (const char *str)
    return atoi(str) > 0;
 }
 
-CCE_API uint8_t cceCeilToPowerOfTwoInt8 (uint8_t x)
+CCE_API CCE_CONST_FN uint8_t cceCeilToPowerOfTwoInt8 (uint8_t x)
 {
    return CCE_CEIL_TO_POWER_OF_TWO(x, x);
 }
-CCE_API uint16_t cceCeilToPowerOfTwoInt16 (uint16_t x)
+CCE_API CCE_CONST_FN uint16_t cceCeilToPowerOfTwoInt16 (uint16_t x)
 {
    return CCE_CEIL_TO_POWER_OF_TWO(x, x);
 }
-CCE_API uint32_t cceCeilToPowerOfTwoInt32 (uint32_t x)
+CCE_API CCE_CONST_FN uint32_t cceCeilToPowerOfTwoInt32 (uint32_t x)
 {
    return CCE_CEIL_TO_POWER_OF_TWO(x, x);
 }
-CCE_API uint64_t cceCeilToPowerOfTwoInt64 (uint64_t x)
+CCE_API CCE_CONST_FN uint64_t cceCeilToPowerOfTwoInt64 (uint64_t x)
 {
    return CCE_CEIL_TO_POWER_OF_TWO(x, x);
 }
-CCE_API uint8_t  cceKeepHighBitInt8 (uint8_t x)
+CCE_API CCE_CONST_FN uint8_t  cceKeepHighBitInt8 (uint8_t x)
 {
    return CCE_KEEP_HIGH_BIT(x, x);
 }
-CCE_API uint16_t cceKeepHighBitInt16 (uint16_t x)
+CCE_API CCE_CONST_FN uint16_t cceKeepHighBitInt16 (uint16_t x)
 {
    return CCE_KEEP_HIGH_BIT(x, x);
 }
-CCE_API uint32_t cceKeepHighBitInt32 (uint32_t x)
+CCE_API CCE_CONST_FN uint32_t cceKeepHighBitInt32 (uint32_t x)
 {
    return CCE_KEEP_HIGH_BIT(x, x);
 }
-CCE_API uint64_t cceKeepHighBitInt64 (uint64_t x)
+CCE_API CCE_CONST_FN uint64_t cceKeepHighBitInt64 (uint64_t x)
 {
    return CCE_KEEP_HIGH_BIT(x, x);
 }
 
-float sinLookup[18] = {0.0f,        0.09801714f, 0.19509032f, 0.29028467f, 0.382683432f, 0.47139674f, 0.55557023f, 0.63439328f,
-                       0.70710678f, 0.77301045f, 0.8314696f,  0.88192127f, 0.9238795f,   0.95694033f, 0.98078528f, 0.9951847f, 1.0f, 0.9951847f};
-
-CCE_API float cceFastSinInt8 (uint8_t x)
+CCE_API CCE_NOALIAS_FN int cce__uint32PtrCompare (const void *_a, const void *_b)
 {
+   uint32_t a = **(uint32_t**)_a;
+   uint32_t b = **(uint32_t**)_b;
+   return (a > b) - (a < b);
+}
+
+CCE_API CCE_CONST_FN float cceFastSinInt8 (uint8_t x)
+{
+   static const float sinLookup[18] = {0.0f,        0.09801714f, 0.19509032f, 0.29028467f, 0.382683432f, 0.47139674f, 0.55557023f, 0.63439328f,
+                                       0.70710678f, 0.77301045f, 0.8314696f,  0.88192127f, 0.9238795f,   0.95694033f, 0.98078528f, 0.9951847f, 1.0f, 0.9951847f};
    int8_t isNegative = (x <= 128) * 2 - 1;
    x *= isNegative;
    x = (x > 64) ? 128 - x : x;
@@ -363,13 +432,13 @@ RETURN:
 #error "long and long long aren't 64-bit types"
 #endif
 
-#define ARRAY_TO_INITIALIZER_LIST1(arr)arr[0]
-#define ARRAY_TO_INITIALIZER_LIST2(arr)ARRAY_TO_INITIALIZER_LIST1(arr), arr[1]
-#define ARRAY_TO_INITIALIZER_LIST3(arr)ARRAY_TO_INITIALIZER_LIST2(arr), arr[2]
-#define ARRAY_TO_INITIALIZER_LIST4(arr)ARRAY_TO_INITIALIZER_LIST3(arr), arr[3]
+#define ARRAY_TO_INITIALIZER_LIST1(arr) arr[0]
+#define ARRAY_TO_INITIALIZER_LIST2(arr) ARRAY_TO_INITIALIZER_LIST1(arr), arr[1]
+#define ARRAY_TO_INITIALIZER_LIST3(arr) ARRAY_TO_INITIALIZER_LIST2(arr), arr[2]
+#define ARRAY_TO_INITIALIZER_LIST4(arr) ARRAY_TO_INITIALIZER_LIST3(arr), arr[3]
 
 #define STRING_TO_SXVECY(sign, signUpper, uIfUnsigned, bits, comp) \
-CCE_API struct cce_ ## sign ## bits ## vec ## comp cceStringTo ## signUpper ## bits ## Vec ## comp (const char *string) \
+CCE_API CCE_NOALIAS_FN struct cce_ ## sign ## bits ## vec ## comp cceStringTo ## signUpper ## bits ## Vec ## comp (const char *string) \
 { \
    STRTOVEC(string, uIfUnsigned ## int ## bits ## _t, comp, CCE_MACRO_CONCAT(strto ## uIfUnsigned, STR_CONV_SUFFIX)) \
    return (struct cce_ ## sign ## bits ## vec ## comp) {ARRAY_TO_INITIALIZER_LIST ## comp(vector)}; \

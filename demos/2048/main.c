@@ -32,7 +32,7 @@
 #define CONTROL_UPDATE 0x1
 #define LOCK_CONTROLS  0x2
 #define TEXSIDE 64
-#define MOVE_DURATION 96000
+#define MOVE_DURATION 128
 
 static uint8_t g_board[CCE_POW2(BOARD_SIZE)] = {0};
 static struct cce_buffer *g_map;
@@ -42,9 +42,9 @@ uint8_t flags;
 
 struct movecell_t
 {
-   uint32_t ID;
-   int16_t   xDiff;
-   int16_t   yDiff;
+   uint32_t UID;
+   int16_t  xDiff;
+   int16_t  yDiff;
    uint8_t  cell;
 };
 
@@ -55,9 +55,11 @@ struct setcelltype_t
    uint8_t type;
 };
 
+static uint32_t moveCellUID, setCellTypeUID, createCellUID, unlockControlsUID;
+
 struct cce_i8vec2 controlAxes;
 
-static void moveCell (const void *data, uint16_t count);
+static void moveCell (void *data, uint32_t count, struct cce_buffer *state);
 
 static void controls (int8_t horizontal, int8_t vertical)
 {
@@ -68,23 +70,9 @@ static void controls (int8_t horizontal, int8_t vertical)
 
 static void calculateCellMove (void)
 {
-   struct movecell_t moveInfo;
    flags |= LOCK_CONTROLS;
-   moveInfo.ID = 17;
    int8_t verticalAxis = (controlAxes.x == 0) ? controlAxes.y : 0;
    int8_t diff = ((int8_t)(verticalAxis | controlAxes.x) < 0) * 2 - 1;
-   cce_void tmp[sizeof(struct cceRunActions) + 2 * sizeof(uint16_t) + sizeof(struct movecell_t) + 2 * sizeof(struct setcelltype_t)];
-   struct cceRunActions *runActions = (struct cceRunActions*) &tmp;
-   runActions->actionID = CCE_ACTION_RUNACTIONS;
-   runActions->actionQuantity = 3;
-   runActions->actionSizes[0] = sizeof(struct movecell_t);
-   runActions->actionSizes[1] = sizeof(struct setcelltype_t);
-   struct movecell_t *move = (struct movecell_t*) (tmp + sizeof(struct cceRunActions) + 2 * sizeof(uint16_t));
-   move->ID = 17;
-   struct setcelltype_t *setType1 = (struct setcelltype_t*)(move + 1);
-   setType1->ID = 18;
-   struct setcelltype_t *setType2 = (setType1 + 1);
-   setType2->ID = 18;
    uint8_t isNewCell = 0, isMoved = 0;
    switch (((verticalAxis > 0) << 1) | ((controlAxes.x > 0) << 1) | (controlAxes.x != 0))
    {
@@ -109,20 +97,16 @@ static void calculateCellMove (void)
                if (cells == 0)
                   continue;
                isMoved = 1;
-               moveInfo.cell = i;
-               moveInfo.xDiff = 0;
-               moveInfo.yDiff = -cells;
-               cceDelayAction(TEXSIDE, MOVE_DURATION/TEXSIDE, sizeof(struct movecell_t), &moveInfo, CCE_DEFAULT);
-               move->cell = i;
-               move->xDiff = 0;
-               move->yDiff = TEXSIDE * cells;
-               setType1->cell = i;
-               setType1->type = 0;
-               setType2->cell = i - cells * BOARD_SIZE;
-               setType2->type = g_board[i] + isNewCell;
+               CCEA_RUNACTIONS_CREATE_STATIC1(moveAction, struct cceaDelayActionsRepeated, ((struct cceaDelayActionsRepeated){cceaBasicActionUIDs[CCEA_DELAY_ACTIONS_REPEATED], 0, MOVE_DURATION/TEXSIDE, TEXSIDE}),
+                                                          struct movecell_t,               ((struct movecell_t){moveCellUID, 0, -cells, i}));
+               cceaRunAction((struct cceaAction*)moveAction, 1, g_map);
+               CCEA_RUNACTIONS_CREATE_STATIC3(runActions, struct cceaDelayActions, ((struct cceaDelayActions){cceaBasicActionUIDs[CCEA_DELAY_ACTIONS], 0, MOVE_DURATION}),
+                                                          struct movecell_t,     ((struct movecell_t){moveCellUID, 0, TEXSIDE * cells, i}),
+                                                          struct setcelltype_t,  ((struct setcelltype_t){setCellTypeUID, i, 0}),
+                                                          struct setcelltype_t,  ((struct setcelltype_t){setCellTypeUID, i - cells * BOARD_SIZE, g_board[i] + isNewCell}));
+               cceaRunAction((struct cceaAction*)runActions, 1, g_map);
                g_board[i - cells * BOARD_SIZE] = (g_board[i] + isNewCell) | isNewCell << 7;
                g_board[i] = 0;
-               cceDelayAction(1, MOVE_DURATION, sizeof(tmp), runActions, CCE_DEFAULT);
                freeCells += isNewCell;
             }
          }
@@ -149,20 +133,16 @@ static void calculateCellMove (void)
                if (cells == 0)
                   continue;
                isMoved = 1;
-               moveInfo.cell = i;
-               moveInfo.xDiff = 0;
-               moveInfo.yDiff = cells;
-               cceDelayAction(TEXSIDE, MOVE_DURATION/TEXSIDE, sizeof(struct movecell_t), &moveInfo, CCE_DEFAULT);
-               move->cell = i;
-               move->xDiff = 0;
-               move->yDiff = -TEXSIDE * cells;
-               setType1->cell = i;
-               setType1->type = 0;
-               setType2->cell = i + cells * BOARD_SIZE;
-               setType2->type = g_board[i] + isNewCell;
+               CCEA_RUNACTIONS_CREATE_STATIC1(moveAction, struct cceaDelayActionsRepeated, ((struct cceaDelayActionsRepeated){cceaBasicActionUIDs[CCEA_DELAY_ACTIONS_REPEATED], 0, MOVE_DURATION/TEXSIDE, TEXSIDE}),
+                                                          struct movecell_t,               ((struct movecell_t){moveCellUID, 0, cells, i}));
+               cceaRunAction((struct cceaAction*)moveAction, 1, g_map);
+               CCEA_RUNACTIONS_CREATE_STATIC3(runActions, struct cceaDelayActions, ((struct cceaDelayActions){cceaBasicActionUIDs[CCEA_DELAY_ACTIONS], 0, MOVE_DURATION}),
+                                                          struct movecell_t,     ((struct movecell_t){moveCellUID, 0, -TEXSIDE * cells, i}),
+                                                          struct setcelltype_t,  ((struct setcelltype_t){setCellTypeUID, i, 0}),
+                                                          struct setcelltype_t,  ((struct setcelltype_t){setCellTypeUID, i + cells * BOARD_SIZE, g_board[i] + isNewCell}));
+               cceaRunAction((struct cceaAction*)runActions, 1, g_map);
                g_board[i + cells * BOARD_SIZE] = (g_board[i] + isNewCell) | isNewCell << 7;
                g_board[i] = 0;
-               cceDelayAction(1, MOVE_DURATION, sizeof(tmp), runActions, CCE_DEFAULT);
                freeCells += isNewCell;
             }
          }
@@ -190,20 +170,16 @@ static void calculateCellMove (void)
                   if (cells == 0)
                      continue;
                   isMoved = 1;
-                  moveInfo.cell = i;
-                  moveInfo.xDiff = -cells;
-                  moveInfo.yDiff = 0;
-                  cceDelayAction(TEXSIDE, MOVE_DURATION/TEXSIDE, sizeof(struct movecell_t), &moveInfo, CCE_DEFAULT);
-                  move->cell = i;
-                  move->xDiff = TEXSIDE * cells;
-                  move->yDiff = 0;
-                  setType1->cell = i;
-                  setType1->type = 0;
-                  setType2->cell = i - cells;
-                  setType2->type = g_board[i] + isNewCell;
+                  CCEA_RUNACTIONS_CREATE_STATIC1(moveAction, struct cceaDelayActionsRepeated, ((struct cceaDelayActionsRepeated){cceaBasicActionUIDs[CCEA_DELAY_ACTIONS_REPEATED], 0, MOVE_DURATION/TEXSIDE, TEXSIDE}),
+                                                             struct movecell_t,               ((struct movecell_t){moveCellUID, -cells, 0, i}));
+                  cceaRunAction((struct cceaAction*)moveAction, 1, g_map);
+                  CCEA_RUNACTIONS_CREATE_STATIC3(runActions, struct cceaDelayActions, ((struct cceaDelayActions){cceaBasicActionUIDs[CCEA_DELAY_ACTIONS], 0, MOVE_DURATION}),
+                                                             struct movecell_t,     ((struct movecell_t){moveCellUID, TEXSIDE * cells, 0, i}),
+                                                             struct setcelltype_t,  ((struct setcelltype_t){setCellTypeUID, i, 0}),
+                                                             struct setcelltype_t,  ((struct setcelltype_t){setCellTypeUID, i - cells, g_board[i] + isNewCell}));
+                  cceaRunAction((struct cceaAction*)runActions, 1, g_map);
                   g_board[i - cells] = (g_board[i] + isNewCell) | isNewCell << 7;
                   g_board[i] = 0;
-                  cceDelayAction(1, MOVE_DURATION, sizeof(tmp), runActions, CCE_DEFAULT);
                   freeCells += isNewCell;
                }
             }
@@ -234,20 +210,16 @@ static void calculateCellMove (void)
                   if (cells == 0)
                      continue;
                   isMoved = 1;
-                  moveInfo.cell = i;
-                  moveInfo.xDiff = cells;
-                  moveInfo.yDiff = 0;
-                  cceDelayAction(TEXSIDE, MOVE_DURATION/TEXSIDE, sizeof(struct movecell_t), &moveInfo, CCE_DEFAULT);
-                  move->cell = i;
-                  move->xDiff = -TEXSIDE * cells;
-                  move->yDiff = 0;
-                  setType1->cell = i;
-                  setType1->type = 0;
-                  setType2->cell = i + cells;
-                  setType2->type = g_board[i] + isNewCell;
+                  CCEA_RUNACTIONS_CREATE_STATIC1(moveAction, struct cceaDelayActionsRepeated, ((struct cceaDelayActionsRepeated){cceaBasicActionUIDs[CCEA_DELAY_ACTIONS_REPEATED], 0, MOVE_DURATION/TEXSIDE, TEXSIDE}),
+                                                             struct movecell_t,               ((struct movecell_t){moveCellUID, cells, 0, i}));
+                  cceaRunAction((struct cceaAction*)moveAction, 1, g_map);
+                  CCEA_RUNACTIONS_CREATE_STATIC3(runActions, struct cceaDelayActions, ((struct cceaDelayActions){cceaBasicActionUIDs[CCEA_DELAY_ACTIONS], 0, MOVE_DURATION}),
+                                                             struct movecell_t,     ((struct movecell_t){moveCellUID, -TEXSIDE * cells, 0, i}),
+                                                             struct setcelltype_t,  ((struct setcelltype_t){setCellTypeUID, i, 0}),
+                                                             struct setcelltype_t,  ((struct setcelltype_t){setCellTypeUID, i + cells, g_board[i] + isNewCell}));
+                  cceaRunAction((struct cceaAction*)runActions, 1, g_map);
                   g_board[i + cells] = (g_board[i] + isNewCell) | isNewCell << 7;
                   g_board[i] = 0;
-                  cceDelayAction(1, MOVE_DURATION, sizeof(tmp), runActions, CCE_DEFAULT);
                   freeCells += isNewCell;
                }
             }
@@ -256,11 +228,10 @@ static void calculateCellMove (void)
    }
    if (isMoved)
    {
-      runActions->actionQuantity = 2;
-      runActions->actionSizes[0] = sizeof(uint32_t);
-      *(uint32_t*)(tmp + sizeof(struct cceRunActions)) = 16;
-      *(uint32_t*)(tmp + sizeof(struct cceRunActions) + sizeof(uint32_t)) = 19;
-      cceDelayAction(1, 96000, sizeof(struct cceRunActions) + 2 * sizeof(uint32_t), runActions, CCE_DEFAULT);
+      CCEA_RUNACTIONS_CREATE_STATIC2(runActions, struct cceaDelayActions, ((struct cceaDelayActions){cceaBasicActionUIDs[CCEA_DELAY_ACTIONS], 0, MOVE_DURATION}),
+                                                 uint32_t, createCellUID,
+                                                 uint32_t, unlockControlsUID);
+      cceaRunAction((struct cceaAction*)runActions, 1, g_map);
    }
    else
    {
@@ -323,7 +294,7 @@ static struct cce_buffer* genBoard (void)
    return map;
 }
 
-static void createCell (const void *data, uint16_t count)
+static void createCell (void *data, uint32_t count, struct cce_buffer *state)
 {
    CCE_UNUSED(data);
    do
@@ -340,35 +311,35 @@ static void createCell (const void *data, uint16_t count)
       }
       --realPos;
       g_board[realPos] = 1 + type;
-      struct cce_element *element = cceGetElements(realPos, 1, g_map);
+      struct cce_element *element = cceGetElements(realPos, 1, state);
       element->data.texturePosition.x = TEXSIDE * (1 + type);
       --freeCells;
       --count;
    }
    while (count > 0);
-   cceSetElementsUpdated(cceGetRenderingInfo(g_map));
+   cceSetElementsUpdated(cceGetRenderingInfo(state));
 }
 
-static void moveCell (const void *data, uint16_t count)
+static void moveCell (void *data, uint32_t count, struct cce_buffer *state)
 {
    const struct movecell_t *vals = data;
-   struct cce_elementposition *position = cceGetElementsPosition(0, vals->cell, 1, g_map);
+   struct cce_elementposition *position = cceGetElementsPosition(0, vals->cell, 1, state);
    position->position.x += vals->xDiff * (int16_t)count;
    position->position.y += vals->yDiff * (int16_t)count;
-   cceSetElementsPositionsUpdated(cceGetElementPositionArray(0, g_map));
+   cceSetElementsPositionsUpdated(cceGetElementPositionArray(0, state));
 }
 
-static void setElementType (const void *data, uint16_t count)
+static void setElementType (void *data, uint32_t count, struct cce_buffer *state)
 {
    CCE_UNUSED(count);
    const struct setcelltype_t *vals = data;
-   struct cce_element *element = cceGetElements(vals->cell, 1, g_map);
+   struct cce_element *element = cceGetElements(vals->cell, 1, state);
    element->data.texturePosition.x = (vals->type % BOARD_SIZE) * TEXSIDE;
    element->data.texturePosition.y = (vals->type / BOARD_SIZE) * TEXSIDE;
-   cceSetElementsUpdated(cceGetRenderingInfo(g_map));
+   cceSetElementsUpdated(cceGetRenderingInfo(state));
 }
 
-static void unlockControls (const void *data, uint16_t count)
+static void unlockControls (void *data, uint32_t count, struct cce_buffer *state)
 {
    CCE_UNUSED(data);
    CCE_UNUSED(count);
@@ -386,7 +357,7 @@ int main (int argc, char **argv)
       }
       cceSetCurrentPath(argv[1]);
    }
-   cceLoadActionsPlugin();
+   cceaLoadActionsPlugin();
    cceLoadMap2Dplugin();
    if (cceInit("demos/2048/game.ini"))
    {
@@ -398,17 +369,21 @@ int main (int argc, char **argv)
    controlAxes = (struct cce_i8vec2) {0, 0};
    cceSetRenderingLayerMap2D(0, 0, g_map);
    cceSetAxisChangeCallback(controls, CCE_AXISPAIR_LSTICK);
-   cceRegisterAction(16, createCell, NULL);
-   cceRegisterAction(17, moveCell, NULL);
-   cceRegisterAction(18, setElementType, NULL);
-   cceRegisterAction(19, unlockControls, NULL);
+   moveCellUID = cceNameToUID("mvcell");
+   setCellTypeUID = cceNameToUID("stcell");
+   createCellUID = cceNameToUID("mkcell");
+   unlockControlsUID = cceNameToUID("ulctl");
+   cceaRegisterAction(createCellUID, createCell, NULL, sizeof(uint32_t));
+   cceaRegisterAction(moveCellUID, moveCell, NULL, sizeof(struct movecell_t));
+   cceaRegisterAction(setCellTypeUID, setElementType, NULL, sizeof(struct setcelltype_t));
+   cceaRegisterAction(unlockControlsUID, unlockControls, NULL, sizeof(uint32_t));
    {
       unsigned seed;
-      cceGetRandom(&seed, sizeof(unsigned));
+      cceGetRandomSeed(&seed, sizeof(unsigned));
       srand(seed);
       rand();
    }
-   createCell(NULL, 1);
+   createCell(NULL, 1, g_map);
    while (cceEngineShouldTerminate() == 0)
    {
       cceRenderMap2D();
@@ -417,6 +392,7 @@ int main (int argc, char **argv)
          calculateCellMove();
       }
       cceUpdate();
+      cceaRunDelayedActions(g_map);
       cceScreenUpdate();
    }
    cceFreeMap2D(g_map);

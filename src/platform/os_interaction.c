@@ -102,19 +102,90 @@ CCE_API void cceTerminateTemporaryDirectory (void)
 #include <pwd.h>
 #include <unistd.h>
 #include <ftw.h>
+#include <time.h>
 
-#if (defined(linux) || defined(__linux) || defined(__linux__)) && !defined(CCE_GETRANDOM_POSIX)
+time_t engineStartTimeSec = 0;
+
+#if defined(linux) || defined(__linux) || defined(__linux__)
+
+static uint8_t doClockCoarseHaveEnoughPrecision;
+
 #include <sys/random.h>
 
-CCE_API int cceGetRandom (void *buffer, size_t bufferSize)
+CCE_API int cceGetRandomSeed (void *buffer, size_t bufferSize)
 {
    return (getrandom(buffer, bufferSize, 0) == (ssize_t)bufferSize) - 1;
 }
 
-#else
+CCE_API uint32_t cceGetMonotonicTime (void)
+{
+   
+   struct timespec tp;
+   clock_gettime((doClockCoarseHaveEnoughPrecision) ? CLOCK_MONOTONIC_COARSE : CLOCK_MONOTONIC, &tp);
+   return (tp.tv_sec - engineStartTimeSec) * 1000 + tp.tv_nsec / 1000000;
+}
+
+#define CCE_INI_TIME() \
+do \
+{ \
+   struct timespec tp; \
+   clock_getres(CLOCK_MONOTONIC_COARSE, &tp); \
+   doClockCoarseHaveEnoughPrecision = tp.tv_nsec <= 1000000 && tp.tv_sec == 0; \
+   engineStartTimeSec = cceGetMonotonicTime(); \
+} \
+while (0)
+
+#elif defined(__APPLE__) && defined(__MACH__)
+
+static mach_timebase_info_data_t timebase = {0, 0};
+
+#include <mach/mach_time.h>
+CCE_API uint32_t cceGetMonotonicTime (void)
+{
+   uint64_t time = mach_absolute_time();
+   return (time - engineStartTimeSec) * timebase.numer / (timebase.denom * 1000000);
+}
+
+#define CCE_INI_TIME() \
+(void) mach_timebase_info(&timebase); \
+engineStartTimeSec = mach_absolute_time()
+
+#elif defined(_POSIX_MONOTONIC_CLOCK) && _POSIX_MONOTONIC_CLOCK >= 0
+
+CCE_API uint32_t cceGetMonotonicTime (void)
+{
+   struct timespec tp;
+   clock_gettime(CLOCK_MONOTONIC, &tp);
+   return (tp.tv_sec - engineStartTimeSec) * 1000 + tp.tv_nsec / 1000000;
+}
+
+#define CCE_INI_TIME() \
+do \
+{ \
+   struct timespec tp; \
+   if (clock_gettime(CLOCK_MONOTONIC, &tp) != 0) \
+   {
+      fputs("ENGINE::OS_INTERACTION::MONOTONIC_CLOCKS_UNAVAILABLE:\nThe system does not support monotonic clocks required for engine operation\n", stderr); \
+      return -1; \
+   } \
+} \
+while (0)
+
+#endif // if LINUX elif MAC_OS elif defined(_POSIX_MONOTONIC_CLOCK) && _POSIX_MONOTONIC_CLOCK >= 0
+
+#define DEFAULT_PATH_LENGTH 256
+
+int cce__iniOsInteraction ()
+{
+   CCE_INI_TIME();
+   return 0;
+}
+
+#if !defined(linux) || !defined(__linux) || !defined(__linux__)
+
 #include <fcntl.h>
 
-CCE_API int cceGetRandom (void *buffer, size_t bufferSize)
+CCE_API int cceGetRandomSeed (void *buffer, size_t bufferSize)
 {
    int fd = open("/dev/urandom", O_RDONLY);
    if (fd < 0)
@@ -123,9 +194,7 @@ CCE_API int cceGetRandom (void *buffer, size_t bufferSize)
    return (close(fd) == 0 && bytesRead == (ssize_t)bufferSize) - 1;
 }
 
-#endif
-
-#define DEFAULT_PATH_LENGTH 256
+#endif // if !defined(linux) || !defined(__linux) || !defined(__linux__)
 
 CCE_API void cceTruncateFile (FILE *file, size_t size)
 {
@@ -371,6 +440,9 @@ CCE_API void cceDeleteDirectory (const char *path)
 #include <shellapi.h>
 #include <wincrypt.h>
 
+LARGE_INTEGER performanceCounterFrequency;
+LARGE_INTEGER engineStartTime;
+
 static void printSystemError (char *message)
 {
    DWORD error = GetLastError();
@@ -396,7 +468,26 @@ static char* getErrorMessage (DWORD error)
    return errorString;
 }
 
-CCE_API int cceGetRandom (void *buffer, size_t bufferSize)
+CCE_API cceGetMonotonicTime (void)
+{
+   LARGE_INTEGER time;
+   QueryPerformanceCounter(&time);
+   #ifdef _WIN64
+   return (time.QuadPart - engineStartTime.QuadPart) * 1000 / performanceCounterFrequency.QuadPart;
+   #else
+   DWORD ticks = time.LowPart - engineStartTime.LowPart;
+   return ticks * 1000 / performanceCounterFrequency.LowPart | ticks / performanceCounterFrequency.LowPart * 1000;
+   #endif
+}
+
+int cce__iniOsInteraction ()
+{
+   QueryPerformanceFrequency(&performanceCounterFrequency);
+   QueryPerformanceCounter(&engineStartTime);
+   return 0;
+}
+
+CCE_API int cceGetRandomSeed (void *buffer, size_t bufferSize)
 {
    HCRYPTPROV cryptProvider = NULL;
    const char *containerName = "CCEKeyContainer";
@@ -557,7 +648,7 @@ CCE_API char* cceGetTemporaryDirectory (size_t spaceToLeave)
       ++tmpPathLength;
       *(tmpPath + tmpPathLength) = '\0';
       uint32_t ID;
-      cceGetRandom(&ID, 4);
+      cceGetRandomSeed(&ID, 3);
       cceConvertIntToBase64String(ID, tmpPath + (tmpPathLength - 6u - 1u - 2u), 6u);
       CreateDirectoryA(tmpPath, NULL);
    }

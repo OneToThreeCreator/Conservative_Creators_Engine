@@ -50,7 +50,7 @@ CCE_API struct cce_elementposition* cceGetElementsPosition (uint8_t layer, uint1
          CCE_ALLOC_ARRAY_ZEROED(renderingInfo->positions[layer].data, positionID + quantity);
          renderingInfo->positions[layer].dataQuantity = positionID + quantity;
       }
-      // Workaround is used to cram one extra bit into elementpositionarray struct (to indicate update request). Extra variable would increase struct size by 50% (+8 bytes) because of alignment rules.
+      // Workaround is used to cram one extra bit into elementpositionarray struct (to indicate update request). Extra variable would increase struct size by 50% (+8 bytes) because of alignment rules. Should not happen too often
       else if (positionID >= ((renderingInfo->positions[layer].dataAllocated & ~0x1) | (renderingInfo->positions[layer].dataQuantity == 1 || renderingInfo->positions[layer].dataAllocated > 0x80000000)))
          CCE_REALLOC_ARRAY_ZEROED(renderingInfo->positions[layer].data, positionID + quantity);
       renderingInfo->positions[layer].dataQuantity = CCE_MAX(positionID + quantity, renderingInfo->positions[layer].dataQuantity);

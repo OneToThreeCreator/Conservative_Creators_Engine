@@ -26,25 +26,21 @@ extern "C"
 
 #include <stdio.h>
 
-#include "../include/cce/engine_common.h"
+#include "engine_common.h"
 
 #define CCE_DEFAULT_WINDOW_LABEL "CCE Window"
 
 #define CCE_ENGINE_STOP 0x80
 
 extern const uint8_t *const cce__flags;
-extern uint64_t cce__currentTime, cce__deltaTime;
+extern uint32_t cce__currentTime, cce__deltaTime;
 
-void cce__engineUpdate (void);
-void cce__doNothing (void);
-void cce__shortToString (char *str, const unsigned short number, const char *strEnd);
-int cce__keyIniCallback(void *data, const char *name, const char *value);
-void cce__registerBackend (const char *lowercasename, void *data, int (*iniCallback)(void*, const char*, const char*), int (*init)(void*), void (*term)(void), uint8_t flags);
+CCE_API void cce__loadKeyboardBindingsBackendPlugin (int (*loadKeysFn)(void*), struct cce_ini_keys *buffer);
+CCE_API void cce__registerBackend (const char *lowercasename, void *data, int (*iniCallback)(void*, const char*, const char*), int (*init)(void*), int (*postinit)(void), void (*term)(void), uint8_t flags);
 
 extern struct cce_backend_data
 {
    void (*engineUpdate) (void);
-   uint64_t (*getTime) (void);
    void (*toFullscreen) (void);
    void (*toWindow) (void);
 }

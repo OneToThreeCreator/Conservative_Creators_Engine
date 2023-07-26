@@ -934,9 +934,9 @@ CCE_API struct cce_u8vec4 cceStringToKeys4 (const char *str)
    return (struct cce_u8vec4) {result[0], result[1], result[2], result[3]};
 }
 
-int cce__keyIniCallback(void *data, const char *name, const char *value)
+int keyIniCallback(void *data, const char *name, const char *value)
 {
-   struct cce_keys *vals = data;
+   struct cce_ini_keys *vals = data;
    char buf[15];
    strncpy(buf, name, 15);
    cceMemoryToLowercase(buf, 14);
@@ -1012,4 +1012,9 @@ int cce__keyIniCallback(void *data, const char *name, const char *value)
       fprintf(stderr, "ENGINE::INI::KEY_PARSER_ERROR:\nUnknown binding %s\n", name);
    }
    return 0;
+}
+
+CCE_API void cce__loadKeyboardBindingsBackendPlugin (int (*loadKeysFn)(void*), struct cce_ini_keys *buffer)
+{
+   cceRegisterPlugin(cceNameToUID("controls"), buffer, keyIniCallback, loadKeysFn, NULL, NULL, CCE_INI_CALLBACK_FREE_DATA);
 }

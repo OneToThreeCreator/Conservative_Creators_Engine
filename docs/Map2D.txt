@@ -17,18 +17,8 @@
 uint8_t headSize
 
 HEAD:
-char resourcesToLoad[8];
-uint16_t resourcesToLoadQuantity
-char renderingInformation[8]
-uint16_t renderingInformationHeadSize
-char colliderInformation[8]
-uint16_t colliderInformationHeadSize
-char actionInformation[8]
-uint16_t actionInformationHeadSize
-char openWorldInformation[8]
-uint16_t openworldInformationHeadSize
-char SOME_GAME-SPECIFIC_INFORMATION[8];
-uint16_t SOME_GAME-SPECIFIC_INFORMATION_HEAD_SIZE
+uint64_t informationUUID[headSize]
+uint16_t informationHeadSize[headSize]
 
 RESOURCES:
 uint32_t texturesNamesSize
@@ -54,20 +44,15 @@ uint16_t              collisionGroupsQuantity
 uint16_t              collisionQuantity
 
 struct Collider       colliders       [collidersQuantity]
-struct ElementGroup   transformGroups [transformGroupsQuantity]  // Groups can be used to transform Colliders (rotation of colliders is unsupported)
+struct ElementGroup   transformGroups [transformGroupsQuantity] // Groups can be used to transform Colliders (rotation of colliders is unsupported)
 struct ElementGroup   collisionGroups [collisionGroupsQuantity]
 struct CollisionGroup collision       [collisionQuantity]
 
 ACTIONS:
-uint16_t      onLoadActionsQuantity
-uint16_t      onFreeActionsQuantity
-uint32_t      onLoadActionsSize
-uint32_t      onFreeActionsSize
-
-uint16_t      onLoadActionSizes [onLoadActionsQuantity]
-struct Action onLoadActions     [onLoadActionsSize]
-uint16_t      onFreeActionSizes [onFreeActionsQuantity]
-struct Action onFreeActions     [onFreeActionsSize]
+uint32_t mapCurrentTime;
+uint32_t eventsUIDs          [actionsHeadSize]
+uint32_t actionSubsUIDs      [actionsHeadSize][size] // (size stored as the first member)
+struct action onEventActions [actionsHeadSize]
 
 OPENWORLD:
 uint8_t        exitMapQuantity
@@ -78,7 +63,7 @@ uint32_t       onEnterActionsSize
 uint32_t       onLeaveActionsSize
 
 struct ExitMap exitMaps
-char           exitMapNames [exitMapNamesSize]
+char           exitMapNames       [exitMapNamesSize]
 uint16_t       onEnterActionSizes [onEnterActionsQuantity]
 struct Action  onEnterActions     [onEnterActionsSize]
 uint16_t       onLeaveActionSizes [onLeaveActionsQuantity]

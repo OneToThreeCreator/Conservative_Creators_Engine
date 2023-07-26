@@ -27,6 +27,7 @@ extern "C"
 #include <stdint.h>
 #include "config.h"
 
+#include "attributes.h"
 #include "cce_exports.h"
 
 typedef uint8_t cce_void;
@@ -51,13 +52,6 @@ CCE_VEC_STS(cce_f32, float);
 CCE_VEC_STS(cce_u64, uint64_t);
 CCE_VEC_STS(cce_i64, int64_t);
 CCE_VEC_STS(cce_f64, double);
-
-struct cce_timer
-{
-   uint64_t initTime;
-   uint32_t delay; /* Limited to about 71 minutes. Rarely needed, taking into account microsecond timer precision (a lot less than one frame) */
-   uint8_t  flags;
-};
 
 #define CCE_COLOR_RGB 0x00
 // HSV with decimal point at 0.1 [0 - 3599]
@@ -155,36 +149,40 @@ struct cce_collider_cirND_X_Y
 #define CCE_POW3(x) (x)*(x)*(x)
 #define CCE_POW4(x) (CCE_POW2(x))*(CCE_POW2(x))
 
-CCE_API uint64_t cceGetDeltaTime    (void);
-CCE_API uint64_t cceGetTime  (void);
+CCE_API uint32_t cceGetFrameDeltaTime    (void);
+CCE_API uint32_t cceGetFrameCurrentTime  (void);
 
 #define CCE_INI_CALLBACK_FREE_DATA 0x1
 #define CCE_INI_CALLBACK_DO_NOT_INIT 0x2
 
-CCE_API void     cceRegisterPlugin (const char *lowercaseName, void *data, int (*iniCallback)(void*, const char*, const char*), int (*init)(void*), void (*term)(void), uint8_t flags);
-CCE_API uint16_t cceRegisterUpdateCallback (void (*callback)(void));
-CCE_API void     cceEnableUpdateCallback (uint16_t callbackID);
-CCE_API void     cceDisableUpdateCallback (uint16_t callbackID);
-CCE_API uint8_t  cceCheckPlugin (const char *name);
-CCE_API uint8_t  cceIsPluginLoading (const char *name);
-CCE_API void     cceSetAxisChangeCallback (void (*callback)(int8_t, int8_t), cce_enum axePair);
-CCE_API void     cceSetButtonCallback (void (*callback)(uint16_t buttonState, uint16_t diff));
-CCE_API void     cceSetKeyCallback (void (*callback)(cce_enum key, cce_enum state));
-CCE_API int      cceInit (const char *path);
-CCE_API void     cceUpdate (void);
-CCE_API void     cceTerminate (void);
-CCE_API union cce_color cceHSVtoRGB (union cce_color color);
-CCE_API union cce_color cceHSLtoRGB (union cce_color color);
-CCE_API union cce_color cceHCLtoRGB (union cce_color color);
-CCE_API union cce_color cceHSVtoHCL (union cce_color color);
-CCE_API union cce_color cceHSLtoHCL (union cce_color color);
-CCE_API union cce_color cceHCLtoHSV (union cce_color color);
-CCE_API union cce_color cceHCLtoHSL (union cce_color color);
-CCE_API union cce_color cceHSVtoHSL (union cce_color color);
-CCE_API union cce_color cceHSLtoHSV (union cce_color color);
-CCE_API union cce_color cceRGBtoHSV (union cce_color color);
-CCE_API union cce_color cceRGBtoHSL (union cce_color color);
-CCE_API union cce_color cceRGBtoHCL (union cce_color color);
+/* Handles overflow of cceGetMonotonicTime. Maximum delay is 24.8 days */
+#define cceIsTimeout(time, timeout) ((sizeof(time) == 4) ? (timeout) - (time) - 1 >= 0x7FFFFFFF : timeout <= time)
+
+CCE_API int cceRegisterPlugin (uint32_t uid, void *data, int (*iniCallback)(void*, const char*, const char*), int (*init)(void*), int (*postinit)(void), void (*term)(void), uint8_t flags);
+CCE_API uint16_t            cceRegisterUpdateCallback (void (*callback)(void));
+CCE_API void                cceEnableUpdateCallback (uint16_t callbackID);
+CCE_API void                cceDisableUpdateCallback (uint16_t callbackID);
+CCE_API CCE_PURE_FN uint8_t cceCheckPlugin (uint32_t uid);
+CCE_API CCE_PURE_FN uint8_t cceIsPluginLoading (uint32_t uid);
+CCE_API void                cceSetAxisChangeCallback (void (*callback)(int8_t, int8_t), cce_enum axePair);
+CCE_API void                cceSetButtonCallback (void (*callback)(uint16_t buttonState, uint16_t diff));
+CCE_API void                cceSetKeyCallback (void (*callback)(cce_enum key, cce_enum state));
+CCE_API int                 cceInit (const char *path);
+CCE_API void                cceUpdate (void);
+CCE_API void                cceTerminate (void);
+
+CCE_API CCE_CONST_FN union cce_color cceHSVtoRGB (union cce_color color);
+CCE_API CCE_CONST_FN union cce_color cceHSLtoRGB (union cce_color color);
+CCE_API CCE_CONST_FN union cce_color cceHCLtoRGB (union cce_color color);
+CCE_API CCE_CONST_FN union cce_color cceHSVtoHCL (union cce_color color);
+CCE_API CCE_CONST_FN union cce_color cceHSLtoHCL (union cce_color color);
+CCE_API CCE_CONST_FN union cce_color cceHCLtoHSV (union cce_color color);
+CCE_API CCE_CONST_FN union cce_color cceHCLtoHSL (union cce_color color);
+CCE_API CCE_CONST_FN union cce_color cceHSVtoHSL (union cce_color color);
+CCE_API CCE_CONST_FN union cce_color cceHSLtoHSV (union cce_color color);
+CCE_API CCE_CONST_FN union cce_color cceRGBtoHSV (union cce_color color);
+CCE_API CCE_CONST_FN union cce_color cceRGBtoHSL (union cce_color color);
+CCE_API CCE_CONST_FN union cce_color cceRGBtoHCL (union cce_color color);
 
 #define cce__checkCollisionRect(element1, element2, comp) \
    (element1.position.comp < (element2.position. comp + element2.size.comp) && (element1.position. comp + element1.size.comp) > element2.position.comp)

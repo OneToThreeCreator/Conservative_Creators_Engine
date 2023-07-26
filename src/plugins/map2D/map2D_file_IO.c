@@ -240,7 +240,7 @@ static uint16_t storeElements (void *buffer, struct cce_buffer *info, FILE *file
          if (*jiterator == iterator->textureID)
          {
             tmp.textureID = cceHostEndianToLittleEndianInt16(dependantTextures - jiterator + 1);
-            cceHostEndianToLittleEndianNewArrayInt16(&tmp.data.texturePosition, &iterator->data.texturePosition, 4);
+            cceHostEndianToLittleEndianNewArrayInt16((uint16_t*)&tmp.data.texturePosition, (uint16_t*)&iterator->data.texturePosition, 4);
             goto TEXTUREID_SET;
          }
       }
@@ -331,7 +331,7 @@ static int loadResourcesSection (void *buffer, uint16_t sectionSize, struct cce_
          ptrdiff_t namesQuantity = jit - names;
          if (namesQuantity >= namesAllocated)
          {
-            CCE_REALLOC_ARRAY(names, namesQuantity + 1);
+            CCE_REALLOC_ARRAY(names, (uint32_t)(namesQuantity + 1));
             jit = names + namesQuantity;
          }
          if (it >= iend)
@@ -438,18 +438,18 @@ void cce__initMap2DLoaders (void)
    resourceLoadingFunctionsBufferSizes = malloc((resourceLoadingFunctionsAllocated + 1) * sizeof(size_t));
    resourceLoadingFunctionsBufferSizes[0] = 0;
    cce__staticMapFunctionSet = cceGetFileIOfunctionSet();
-   cceRegisterFileIOcallbacks(cce__staticMapFunctionSet, "m2Dres",  loadResourcesSection, freeResourcesSection, NULL,                   NULL,                  sizeof(struct cce_resourceinfo));
-   cceRegisterFileIOcallbacks(cce__staticMapFunctionSet, "m2Drend", loadElements,         freeElements,         NULL,                   NULL,                  sizeof(struct cce_renderinginfo));
+   cceRegisterFileIOcallbacks(cce__staticMapFunctionSet, cceNameToUID("m2Dres"),  loadResourcesSection, freeResourcesSection, NULL,                   NULL,                  sizeof(struct cce_resourceinfo));
+   cceRegisterFileIOcallbacks(cce__staticMapFunctionSet, cceNameToUID("m2Drend"), loadElements,         freeElements,         NULL,                   NULL,                  sizeof(struct cce_renderinginfo));
    
-   cce__resourceLoadersOffset = cceGetFunctionBufferOffset(0, cce__staticMapFunctionSet);
-   cce__renderingInfoOffset   = cceGetFunctionBufferOffset(1, cce__staticMapFunctionSet);
+   cce__resourceLoadersOffset = cceGetFunctionBufferOffset(cceNameToUID("m2Dres"), cce__staticMapFunctionSet);
+   cce__renderingInfoOffset   = cceGetFunctionBufferOffset(cceNameToUID("m2Drend"), cce__staticMapFunctionSet);
    cce__dynamicMapFunctionSet = cceGetFileIOfunctionSet();
-   cceRegisterFileIOcallbacks(cce__dynamicMapFunctionSet, "m2Dres",  loadResourcesSection, freeResourcesSection, createResourcesSection, storeResourcesSection, sizeof(struct cce_resourceinfo));
-   cceRegisterFileIOcallbacks(cce__dynamicMapFunctionSet, "m2Drend", loadElementsDynamic,  freeElementsDynamic,  createElements,         storeElements,         sizeof(struct cce_dynamicrenderinginfo));
-   if (cceIsPluginLoading("actions"))
+   cceRegisterFileIOcallbacks(cce__dynamicMapFunctionSet, cceNameToUID("m2Dres"),  loadResourcesSection, freeResourcesSection, createResourcesSection, storeResourcesSection, sizeof(struct cce_resourceinfo));
+   cceRegisterFileIOcallbacks(cce__dynamicMapFunctionSet, cceNameToUID("m2Drend"), loadElementsDynamic,  freeElementsDynamic,  createElements,         storeElements,         sizeof(struct cce_dynamicrenderinginfo));
+   if (cceIsPluginLoading(cceaPluginUID))
    {
-      cceRegisterFileIOcallbacks(cce__staticMapFunctionSet,  "actions", cceLoadActions,        cceFreeActions,        NULL,             NULL,            sizeof(struct cce_actioninfo));
-      cceRegisterFileIOcallbacks(cce__dynamicMapFunctionSet, "actions", cceLoadActionsDynamic, cceFreeActionsDynamic, cceCreateActions, cceStoreActions, sizeof(struct cce_dynamicactioninfo));
+      cceaRegisterActionsFileIOFunctions(cce__staticMapFunctionSet);
+      cceaRegisterActionsFileIOFunctions(cce__dynamicMapFunctionSet);
    }
 }
 
@@ -552,7 +552,7 @@ if (!cceIsPathAbsolute(path)) \
 else \
    function
 
-CCE_API struct cce_buffer* cceLoadMap2D(char *path)
+CCE_API struct cce_buffer* cceLoadMap2D (char *path)
 {
    struct cce_buffer *result;
    CCE_EXPAND_PATH(path, result = cceLoadBinaryCCF(path, cce__staticMapFunctionSet));

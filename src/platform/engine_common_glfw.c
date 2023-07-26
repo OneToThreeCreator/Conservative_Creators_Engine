@@ -29,7 +29,7 @@
 #include "../../include/cce/utils.h"
 #include "../../include/cce/engine_common_keyboard.h"
 
-#include "../engine_common_internal.h"
+#include "../../include/cce/engine_common_internal.h"
 
 #define CCE_FULLSCREEN 0x10
 #define CCE_MOVE_EVENT 0x20
@@ -100,13 +100,6 @@ static int8_t g_keyWeight;
 static uint8_t cceKeyFromGLFWkey (int16_t key);
 static int16_t cceKeyToGLFWkey (uint8_t key);
 
-static uint64_t getTime__glfw (void)
-{
-   uint64_t currentTime = glfwGetTimerValue();
-   currentTime *= 1000000.0f / glfwGetTimerFrequency();
-   return currentTime;
-}
-
 static int keycompare (const void *_a, const void *_b)
 {
    const struct key_glfw *a = _a;
@@ -117,7 +110,7 @@ static int keycompare (const void *_a, const void *_b)
 // Accounts for deadzone
 #define getGamepadAxisValue(val) ((CCE_ABS(val) > g_deadzone) ? ((val - (1 - ((signbit(val) != 0) << 1)) * g_deadzone) * g_maxValueDeadzoneCorrected) : 0)
 
-// Gamepad input in glfw is terrible
+// This code is terrible
 static void processGamepads (void)
 {
    GLFWgamepadstate gamepad;
@@ -462,8 +455,7 @@ static void keyCallback (GLFWwindow *window, int key, int scancode, int action, 
    }
    if (cce__keyCallback != NULL)
    {
-      uint8_t ccekey = cceKeyFromGLFWkey(key);
-      cce__keyCallback(ccekey, action);
+      cce__keyCallback(cceKeyFromGLFWkey(key), action);
    }
 }
 
@@ -576,7 +568,6 @@ int initEngine__glfw (void *data)
    cce__engineBackend.toWindow = toWindow__glfw;
    cce__engineBackend.toFullscreen = toFullscreen__glfw;
    cce__engineBackend.engineUpdate = engineUpdate__glfw;
-   cce__engineBackend.getTime = getTime__glfw;
    cceEngineShouldTerminate = engineShouldTerminate__glfw;
    cceSetEngineShouldTerminate = setEngineShouldTerminate__glfw;
    cceScreenUpdate = swapBuffers__glfw;
@@ -661,7 +652,7 @@ ERROR:
 
 static int loadKeys__glfw (void *data)
 {
-   struct cce_keys *keys = data;
+   struct cce_ini_keys *keys = data;
    g_keysQuantity = 0;
    for (uint8_t *it = (uint8_t*)&keys->stickL.x, *end = (uint8_t*)&keys->start.y + 1; it < end; ++it)
    {
@@ -712,16 +703,16 @@ static int loadKeys__glfw (void *data)
 
 void loadBackend__glfw (void)
 {
-   struct cce_keys *keys = malloc(sizeof(struct cce_keys) + sizeof(struct glfw_properties));
+   struct cce_ini_keys *keys = malloc(sizeof(struct cce_ini_keys) + sizeof(struct glfw_properties));
    struct glfw_properties *props = (struct glfw_properties*)(keys + 1);
    props->windowName = NULL;
    props->resolution = (struct cce_u16vec2){640, 480};
    props->flags = 0;
-   cce__registerBackend("glfw", props, iniCallback__glfw, initEngine__glfw, terminateEngine__glfw, 0);
+   cce__registerBackend("glfw", props, iniCallback__glfw, initEngine__glfw, NULL, terminateEngine__glfw, 0);
    memset(&keys->stickL.x, 0, (uint8_t*)&keys->start.y - (uint8_t*)&keys->stickL.x + 1);
    keys->deadzone = 0.2f;
    keys->keyAxisValue = INT8_MAX;
-   cceRegisterPlugin("controls", keys, cce__keyIniCallback, loadKeys__glfw, NULL, CCE_INI_CALLBACK_FREE_DATA);
+   cce__loadKeyboardBindingsBackendPlugin(loadKeys__glfw, keys);
 }
 
 static int16_t cceKeyToGLFWkey (uint8_t key)

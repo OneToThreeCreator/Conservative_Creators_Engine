@@ -29,7 +29,7 @@
 #include "../../../include/cce/utils.h"
 #include "../../../include/cce/os_interaction.h"
 
-#include "../../engine_common_internal.h"
+#include "../../../include/cce/engine_common_internal.h"
 #include "map2D_internal.h"
 
 #define CCE_CAMERATRANSFORM_OFFSET 0u
